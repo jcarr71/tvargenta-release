@@ -117,18 +117,47 @@ Si todo sale bien debrias recibir un saludo con tu usuario como el siguiente:
 
 "Hi [user]! You've successfully authenticated, but GitHub does not provide shell access." 
 
-A continuacion preparamos el directorio donde vamos a clonar el repo: 
 
-Asegurate que /srv exista (ya existe) y dale ownership a tu usuario (nuevamente notar q mi usuario es rs pero deben usar el de ustedes) 
+### 6) Clonar el repositorio de GitHub
+
+Ahora preparemos el directorio donde clonaremos el repositorio.
+La carpeta /srv normalmente existe por defecto, pero si no es así, podés crearla con:
+
+`sudo mkdir -p /srv`
+
+Luego, asignale la propiedad de esa carpeta a tu usuario actual (reemplazá rs con tu propio nombre de usuario).
+Esto te permitirá escribir dentro de /srv sin tener que usar sudo todo el tiempo:
+
+`sudo chown -R rs:rs /srv`
+
+#### Opción A – Clonar usando HTTPS (la más fácil)
+Este es el método recomendado si no tenés configuradas llaves SSH en tu cuenta de GitHub.
 
 ```
-cd /srv 
-git clone git@github.com:rsappia/TVArgenta-Release.git tvargenta 
+cd /srv
+git clone https://github.com/rsappia/TVArgenta-Release.git tvargenta
 cd /srv/tvargenta
 ```
+#### Opción B – Clonar usando SSH (para usuarios avanzados)
+Usá este método solo si ya tenés una llave SSH configurada en tu cuenta de GitHub.
+
+```
+cd /srv
+git clone git@github.com:rsappia/TVArgenta-Release.git tvargenta
+cd /srv/tvargenta
+```
+Debería verse algo así:
+
 <img width="729" height="202" alt="GetImage(8)" src="https://github.com/user-attachments/assets/28d59e5f-dd75-451f-a5ad-3bd34a4ce57b" />
 
-##Instalar dependencias del sistema y del proyecto 
+#### Consejo:
+
+Si aparece un error como
+Permission denied (publickey)
+simplemente significa que estás intentando usar el método SSH sin tener llaves configuradas.
+En ese caso, usá la versión HTTPS de arriba — funciona exactamente igual.
+
+## Instalar dependencias del sistema y del proyecto 
 Ejecutamos:
 ```
 sudo apt update 
