@@ -15,6 +15,7 @@ This release marks a huge step forward for TVArgenta — not only as a nostalgic
 - Bluetooth controller pairing — plug in or connect wirelessly for instant play.
 - Wi-Fi management — improved on-screen setup to connect or switch networks.
 - Reworked web management pages — redesigned interface for easier content editing and uploads.
+- Multi language feature introduced (ES / EN / DE )
 - New on-screen overlays — updated menu system directly on the TV display for faster navigation.
 
 ## 💾 Flashing the Image
