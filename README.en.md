@@ -4,6 +4,64 @@
 
 TVArgenta is a retro-style TV built with a Raspberry Pi that brings back the experience of channel surfing between commercials and offline content. It includes a local backend to manage videos, channels, and metadata — all inside a 3D-printed case.
 
+-------------------------------------------------------------
+# TVArgenta v2.0 — Major Update
+
+This release marks a huge step forward for TVArgenta — not only as a nostalgic Raspberry Pi TV experience but now as a more complete and autonomous retro system.
+
+## What’s New
+- Ready-to-flash system image — no manual setup required.
+- RetroPie integration — switch seamlessly between TV mode and gaming mode.
+- Bluetooth controller pairing — plug in or connect wirelessly for instant play.
+- Wi-Fi management — improved on-screen setup to connect or switch networks.
+- Reworked web management pages — redesigned interface for easier content editing and uploads.
+- New on-screen overlays — updated menu system directly on the TV display for faster navigation.
+
+## 💾 Flashing the Image
+
+This image is provided as a ready-to-use Raspberry Pi 4 (2 GB +) system, based on Raspberry Pi OS Bookworm.
+It includes all scripts, dependencies, and startup services preconfigured.
+
+### Recommended method (Raspberry Pi Imager)
+
+- 1.Download the .img.xz file from the official release or Archive.org mirror
+- 2.Open Raspberry Pi Imager → Choose OS → Use Custom Image → select the downloaded .img.xz.
+- 3.Choose your SD card (32 GB or larger).
+- 4.⚠️ When prompted with “Edit settings before flashing?”, choose “No”.
+  - Do not preconfigure Wi-Fi, hostname, username, or password.
+  - The image already includes its own internal setup.
+  - Changing these values may break internal scripts or cause Wi-Fi pairing conflicts.
+- 5.Wait for flashing and verification to complete, then safely eject the SD card.
+- 6.Insert the card into your Raspberry Pi 4 and power on — the system will boot directly into the TVArgenta interface.
+
+## Integrity & Authenticity Verification
+
+Before using the image, it’s strongly recommended to verify both its integrity and authenticity.
+
+```
+# Verify integrity
+sha256sum -c TVArgenta_v2.0.sha256
+
+# Verify authenticity (optional)
+gpg --verify TVArgenta_v2.0.sha256.asc
+```
+If both checks return “OK”, your image is verified.
+
+## Important Notice
+
+This image is provided as-is, without any warranty or guarantee.
+Use at your own risk.
+
+Altering the preconfigured settings (network, user, startup behavior) is not supported and may cause the system to malfunction.
+Users who decide to modify these parameters do so entirely at their own responsibility.
+
+## License
+
+Creative Commons Attribution – NonCommercial – NoDerivs 4.0 International
+(CC BY-NC-ND 4.0)
+
+-------------------------------------------------------------
+
 # Part One: Basic Raspberry Pi Configuration
 
 We prepare the SD card (in this case, I’m using a 64 GB one).
