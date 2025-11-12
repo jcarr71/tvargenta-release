@@ -1,0 +1,28 @@
+{
+  "configuracion.page_title": "TVArgenta Settings",
+  "configuracion.header": "⚙️ TVArgenta Settings",
+
+  "configuracion.nav.back": "⬅ Back",
+  "configuracion.nav.back_home": "⬅ Back to home",
+
+  "configuracion.sections.order.title": "🏷 Tag priority order",
+  "configuracion.sections.order.help": "Drag to reorder. The first tag has the highest priority.",
+
+  "configuracion.sections.tags.title": "🚫 Included / excluded tags",
+  "configuracion.sections.tags.help": "Uncheck what you DON'T want to use. If you uncheck a tag, it is also removed from the priority order.",
+
+  "configuracion.search.placeholder": "Search tag…",
+
+  "configuracion.buttons.expand_all": "Expand groups",
+  "configuracion.buttons.collapse_all": "Collapse groups",
+
+  "configuracion.group.buttons.all": "All",
+  "configuracion.group.buttons.none": "None",
+
+  "configuracion.save.main": "💾 Save settings",
+  "configuracion.save.sticky.label": "Changes ready",
+  "configuracion.save.sticky.button": "💾 Save",
+
+  "configuracion.collapse.show": "Show",
+  "configuracion.collapse.hide": "Hide"
+}

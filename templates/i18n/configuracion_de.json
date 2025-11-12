@@ -1,0 +1,28 @@
+{
+  "configuracion.page_title": "TVArgenta Einstellungen",
+  "configuracion.header": "⚙️ TVArgenta Einstellungen",
+
+  "configuracion.nav.back": "⬅ Zurück",
+  "configuracion.nav.back_home": "⬅ Zurück zur Startseite",
+
+  "configuracion.sections.order.title": "🏷 Reihenfolge der Tag-Priorität",
+  "configuracion.sections.order.help": "Zum Sortieren ziehen. Der erste Tag hat die höchste Priorität.",
+
+  "configuracion.sections.tags.title": "🚫 Ein- / Ausgeschlossene Tags",
+  "configuracion.sections.tags.help": "Deaktiviere, was du NICHT verwenden möchtest. Wenn du einen Tag deaktivierst, wird er auch aus der Prioritätenliste entfernt.",
+
+  "configuracion.search.placeholder": "Tag suchen…",
+
+  "configuracion.buttons.expand_all": "Gruppen erweitern",
+  "configuracion.buttons.collapse_all": "Gruppen einklappen",
+
+  "configuracion.group.buttons.all": "Alle",
+  "configuracion.group.buttons.none": "Keine",
+
+  "configuracion.save.main": "💾 Einstellungen speichern",
+  "configuracion.save.sticky.label": "Änderungen bereit",
+  "configuracion.save.sticky.button": "💾 Speichern",
+
+  "configuracion.collapse.show": "Anzeigen",
+  "configuracion.collapse.hide": "Ausblenden"
+}

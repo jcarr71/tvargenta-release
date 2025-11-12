@@ -1,0 +1,88 @@
+{
+
+  "settings.language": "Language",
+  "lang.es": "Spanish",
+  "lang.en": "English",
+  "lang.de": "German",
+  "overlay.lang_changed": "Language updated",
+
+  "app.title": "TVArgenta",
+  "overlay.loading_channel": "Loading channel...",
+  "overlay.no_videos": "No videos available",
+  "overlay.net_error": "Connection error",
+  "overlay.connecting": "Connecting...",
+  "overlay.disconnecting": "Disconnecting...",
+  "overlay.forgotten": "Forgotten",
+  "overlay.pairing": "Pairing...",
+  "overlay.paired_ok": "Done 😉",
+  "overlay.pair_error": "Pairing error",
+  "overlay.enter_gaming": "Entering Retro Gaming Mode…",
+  "overlay.shutting_down": "Shutting down…",
+  "overlay.searching": "Searching...",
+
+  "vol.label": "Volume",
+  "vol.mute_badge": "MUTE",
+  "vol.mute_title": "Volume at 0",
+
+  "menu.title": "MAIN MENU",
+  "menu.predefined": "Predefined Channels",
+  "menu.mine": "My Channels",
+  "menu.settings": "Settings (ES/EN/DE)",
+  "menu.bt": "Bluetooth",
+  "menu.gaming": "Retro Gaming Mode",
+  "menu.poweroff": "Power Off",
+  "menu.back": "Back",
+
+  "menu.footer.nav": "[Rotate] Navigate",
+  "menu.footer.select": "[Press] Select",
+
+  "settings.title": "Settings",
+  "settings.show_channel_name": "Show channel name",
+  "settings.yes": "Yes",
+  "settings.no": "No",
+
+  "power.confirm": "Confirm shutdown",
+
+  "bt.root.known": "Known Devices",
+  "bt.root.scan": "Scan for New",
+
+  "bt.dev.connect": "Connect",
+  "bt.dev.disconnect": "Disconnect",
+  "bt.dev.forget": "Forget",
+
+  "bt.new.pairconnect": "Pair & Connect",
+
+  "bt.status_on": "[ON]",
+  "bt.status_off": "[OFF]",
+  "bt.unknown": "(unknown)",
+
+  "settings.wifi": "Wi-Fi / Connection",
+  "wifi.show_status": "Show Wi-Fi status",
+  "wifi.start_ap": "Configure from phone",
+  "wifi.apply_best": "Connect to best known network",
+  "wifi.manage_known": "Saved networks (forget)",
+  "wifi.status_client": "Connected to {ssid}",
+  "wifi.status_ap": "Access Point active: {ssid}",
+  "wifi.status_disconnected": "No Wi-Fi connection",
+  "wifi.status_error": "Error reading Wi-Fi status",
+  "wifi.ap_started": "Connect your phone to {ssid} (password {password}) to configure Wi-Fi",
+  "wifi.ap_error": "Could not start hotspot",
+  "wifi.ap_done": "Connected to {ssid}",
+  "wifi.no_known": "No saved networks",
+  "wifi.no_known_visible": "No saved networks available",
+  "wifi.best_ok": "Trying to connect to {ssid}…",
+  "wifi.best_error": "Could not connect to any known network",
+  "wifi.forget_ok": "Forgot network: {ssid}",
+  "wifi.forget_error": "Could not forget network",
+  "wifi.ap_hint": "Use your camera to scan the code or enter the URL. Press the button/encoder to exit.",
+  "wifi.ap_qr_desc": "1) Connect your device to {ssid} (password {password}). 2) Scan the code or open the URL to configure WiFi.",
+
+  "wifi.show_gestion_qr": "Management QR (web)",
+  "wifi.qr_gestion_title": "Content Management",
+  "wifi.qr_gestion_desc": "From a device on the same network, open this address:",
+  "wifi.qr_error": "Could not generate QR code",
+  "wifi.qr_offline": "TVArgenta is currently offline. Connect it to Wi-Fi or Ethernet to manage it from another device.",
+  "wifi.qr_error": "Couldn't generate the management QR code."
+
+
+}

@@ -1,0 +1,19 @@
+{
+  "upload.page_title": "Videos hochladen - TVArgenta",
+  "upload.header": "📤 Videos zu TVArgenta hochladen",
+
+  "upload.status.ok": "✅ Videos erfolgreich hochgeladen",
+  "upload.status.error_hevc": "❌ Das Video verwendet einen nicht unterstützten Codec (HEVC/H.265)",
+  "upload.status.error_prefix": "⚠️ ",
+
+  "upload.status.box_initial": "Videos werden verarbeitet…",
+  "upload.status.done_token": "Fertig",
+
+  "upload.form.label": ".mp4-Dateien hierher ziehen oder zum Auswählen klicken",
+  "upload.form.no_files": "Keine Dateien ausgewählt.",
+  "upload.form.button": "Videos hochladen",
+
+  "upload.nav.back_home": "⬅ Zur Startseite",
+
+  "upload.lang.label": "Sprache"
+}

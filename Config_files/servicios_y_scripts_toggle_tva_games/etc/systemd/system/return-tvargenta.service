@@ -1,0 +1,13 @@
+[Unit]
+Description=Volver de EmulationStation a TVArgenta
+After=emulationstation-session.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/bin/return_to_tvargenta.sh
+
+[Install]
+WantedBy=multi-user.target
+

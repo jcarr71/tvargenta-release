@@ -1,0 +1,19 @@
+{
+  "upload.page_title": "Subir videos - TVArgenta",
+  "upload.header": "📤 Subir videos a TVArgenta",
+
+  "upload.status.ok": "✅ Videos subidos correctamente",
+  "upload.status.error_hevc": "❌ El video usa un códec no compatible (HEVC/H.265)",
+  "upload.status.error_prefix": "⚠️ ",
+
+  "upload.status.box_initial": "Procesando videos…",
+  "upload.status.done_token": "¡Listo",
+
+  "upload.form.label": "Arrastrá los archivos .mp4 o hacé clic para seleccionarlos",
+  "upload.form.no_files": "Ningún archivo seleccionado.",
+  "upload.form.button": "Subir videos",
+
+  "upload.nav.back_home": "⬅ Volver al inicio",
+
+  "upload.lang.label": "Idioma"
+}

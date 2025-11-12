@@ -1,0 +1,21 @@
+[Unit]
+Description=EmulationStation / RetroPie session
+After=graphical.target
+
+[Service]
+Type=simple
+User=rs
+Group=rs
+Environment=HOME=/home/rs
+Environment=USER=rs
+Environment=LOGNAME=rs
+Environment=SHELL=/bin/bash
+Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=TERM=xterm
+ExecStart=/opt/retropie/supplementary/emulationstation/emulationstation
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
+

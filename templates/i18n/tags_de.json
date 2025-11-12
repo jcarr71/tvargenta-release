@@ -1,0 +1,42 @@
+{
+  "tags.page_title": "Tags verwalten",
+  "tags.header": "🏷 Tags und Gruppen verwalten",
+
+  "tags.nav.back_edit": "⬅ Zurück",
+  "tags.nav.back_home": "⬅ Startseite",
+
+  "tags.search.label": "In allen Tags suchen",
+  "tags.search.placeholder": "Zum Filtern tippen…",
+  "tags.search.help": "Filtert Tags aller Gruppen dynamisch.",
+
+  "tags.group.new.title": "➕ Neue Gruppe erstellen",
+  "tags.group.new.toggle_show": "Anzeigen",
+  "tags.group.new.toggle_hide": "Ausblenden",
+  "tags.group.new.name_placeholder": "Gruppenname",
+  "tags.group.new.create_btn": "Erstellen",
+
+  "tags.tag.new.title": "➕ Neuen Tag hinzufügen",
+  "tags.tag.new.name_placeholder": "Tag-Name",
+  "tags.tag.new.group_placeholder": "Gruppe",
+  "tags.tag.new.add_btn": "Hinzufügen",
+
+  "tags.group.inline.new_tag_placeholder": "Neuer Tag in {group}",
+
+  "tags.group.color.label": "Farbe",
+  "tags.group.color.save_btn": "Speichern",
+
+  "tags.group.delete.btn": "🗑 Gruppe löschen",
+  "tags.group.delete.confirm": "Gruppe „{group}“ und alle zugehörigen Tags aus dem System löschen?",
+
+  "tags.tag.delete.confirm": "Tag „{tag}“ aus Gruppe „{group}“ löschen?",
+
+  "tags.collapse.show": "Anzeigen",
+  "tags.collapse.hide": "Ausblenden",
+
+  "tags.footer.back_edit": "⬅ Zurück zur Bearbeitung",
+  "tags.footer.back_home": "⬅ Zurück zur Startseite",
+
+  "tags.mobile.done": "Hier fertig",
+  "tags.mobile.back_edit": "⬅ Zurück",
+  "tags.mobile.back_home": "⬅ Start"
+}

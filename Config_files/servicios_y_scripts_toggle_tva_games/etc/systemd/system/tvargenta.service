@@ -1,0 +1,26 @@
+# /etc/systemd/system/tvargenta.service
+[Unit]
+Description=TVArgenta Backend (app.py)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=rs
+WorkingDirectory=/srv/tvargenta
+ExecStart=/srv/tvargenta/venv/bin/python /srv/tvargenta/app.py
+
+# PATH completo para que encuentre pkill y demás
+Environment="PATH=/srv/tvargenta/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+Environment="FLASK_ENV=production"
+
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+

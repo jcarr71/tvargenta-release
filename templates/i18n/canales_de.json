@@ -1,0 +1,23 @@
+{
+  "canales.page_title": "📺 TVArgenta Kanäle",
+  "canales.header": "📡 TVArgenta Kanäle",
+
+  "canales.card.tags_title": "🎯 Prioritäts-Tags:",
+  "canales.card.edit": "✏️ Kanal bearbeiten",
+  "canales.card.delete": "🗑️ Kanal löschen",
+
+  "canales.form.title_edit": "✏️ Kanal bearbeiten",
+  "canales.form.title_new": "➕ Neuen Kanal erstellen",
+
+  "canales.form.label_name": "📺 Kanalname",
+  "canales.form.label_desc": "📝 Beschreibung",
+  "canales.form.label_icon": "🌟 Icon wählen (optional)",
+  "canales.form.icon_none": "(Kein Icon)",
+  "canales.form.label_tags": "🏷️ Prioritäts-Tags (alle zutreffenden auswählen)",
+
+  "canales.form.submit_update": "💾 Aktualisieren",
+  "canales.form.submit_create": "💾 Kanal speichern",
+  "canales.form.cancel_edit": "❌ Bearbeitung abbrechen",
+
+  "canales.nav.back_home": "⬅ Zur Startseite"
+}

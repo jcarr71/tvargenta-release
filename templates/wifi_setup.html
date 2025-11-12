@@ -1,0 +1,490 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+
+<!DOCTYPE html>
+<html lang="{{ lang|default('es') }}">
+<head>
+  <meta charset="UTF-8">
+  <title>TVArgenta · Wi-Fi Setup</title>
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+
+  <link rel="stylesheet"
+      href="{{ url_for('static', filename='css/tvargenta-wifi.css') }}">
+ 
+</head>
+<body class="min-h-screen bg-black text-slate-100">
+
+  <!-- Fondo CRT + marca de agua -->
+  <div class="fixed inset-0 bg-black z-0 overflow-hidden">
+    <div class="absolute inset-0 crt-gradient"></div>
+    <div class="absolute inset-0 crt-noise"></div>
+    <div class="absolute inset-0 crt-scanlines"></div>
+    <div class="absolute inset-0 crt-roll"></div>
+
+    <!-- Marca de agua con background.png -->
+    <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <img
+        src="{{ url_for('static', filename='background.png') }}"
+        alt="TVArgenta"
+        class="logo-mark max-w-[95vw] mix-blend-screen blur-[1px]"
+      >
+    </div>
+  </div>
+
+  <!-- Contenido principal -->
+  <div class="relative z-10 max-w-md mx-auto px-3 pt-6 pb-8">
+
+    <!-- Header con logo + selector idioma -->
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <div class="flex items-center gap-2">
+        <img
+          src="{{ url_for('static', filename='logo_tvar.png') }}"
+          alt="TVArgenta"
+          class="w-40 h-auto drop-shadow-[0_4px_14px_rgba(0,0,0,0.85)]"
+          loading="eager"
+        >
+      </div>
+
+      <div class="text-right">
+        <span class="block text-[9px] uppercase tracking-[0.16em] text-slate-400/90 mb-1">
+          {{ tr("layout.lang_label") }}
+        </span>
+        <select id="lang-select"
+                class="bg-black/70 border border-slate-600/60 text-[10px] text-slate-100 px-2 py-1 rounded-md
+                       focus:outline-none focus:ring-1 focus:ring-sky-400/80">
+          <option value="es" {% if lang == 'es' %}selected{% endif %}>{{ tr("layout.lang_es") }}</option>
+          <option value="en" {% if lang == 'en' %}selected{% endif %}>{{ tr("layout.lang_en") }}</option>
+          <option value="de" {% if lang == 'de' %}selected{% endif %}>{{ tr("layout.lang_de") }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Card WiFi -->
+    <div class="card-glass p-4 space-y-4">
+
+      <div>
+        <h1 class="text-lg font-semibold text-sky-300 drop-shadow-sm">
+          {{ tr("wifi_setup.title") }}
+        </h1>
+        <p class="mt-1 text-[11px] text-slate-300/90 leading-snug">
+          {{ tr("wifi_setup.subtitle") }}
+        </p>
+      </div>
+
+      <!-- Estado actual -->
+      <section class="space-y-1">
+        <div class="flex items-center justify-between">
+          <h2 class="text-[11px] font-semibold text-slate-200 tracking-wide">
+            {{ tr("wifi_setup.status_title") }}
+          </h2>
+          <span class="pill-label">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            TVArgenta Wi-Fi
+          </span>
+        </div>
+        <div id="status-text" class="text-[10px] text-slate-300/95">
+          {{ tr("wifi_setup.status_unknown") }}
+        </div>
+      </section>
+
+      <div class="h-px bg-slate-700/60 my-1"></div>
+
+      <!-- Redes disponibles -->
+      <section class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-[11px] font-semibold text-slate-200 tracking-wide">
+            {{ tr("wifi_setup.scan_title") }}
+          </h2>
+          <div class="flex gap-1">
+            <button id="btn-scan" class="btn-primary text-[10px]">
+              {{ tr("wifi_setup.scan_button") }}
+            </button>
+            <button id="btn-refresh" class="btn-soft hidden">
+              {{ tr("wifi_setup.scan_refresh") }}
+            </button>
+          </div>
+        </div>
+        <div id="scan-msg" class="text-[9px] text-slate-400"></div>
+        <ul id="networks-list"
+            class="mt-1 max-h-40 overflow-y-auto rounded-lg border border-slate-700/70 divide-y divide-slate-800/80
+                   bg-slate-950/70 text-[10px]">
+          <!-- items desde JS -->
+        </ul>
+        <div id="scan-empty" class="text-[9px] text-slate-500 hidden">
+          {{ tr("wifi_setup.scan_empty") }}
+        </div>
+      </section>
+
+      <!-- Redes guardadas -->
+      <section class="space-y-2">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="text-[11px] font-semibold text-slate-200 tracking-wide">
+            {{ tr("wifi_setup.known_title") }}
+          </h2>
+          <button id="btn-apply-best" class="btn-soft">
+            {{ tr("wifi_setup.apply_best_btn") }}
+          </button>
+        </div>
+        <ul id="known-list"
+            class="mt-1 max-h-24 overflow-y-auto rounded-lg border border-slate-800/70 divide-y divide-slate-900
+                   bg-slate-950/60 text-[9px]">
+          <!-- items desde JS -->
+        </ul>
+        <div id="known-empty" class="text-[9px] text-slate-500">
+          {{ tr("wifi_setup.known_empty") }}
+        </div>
+      </section>
+
+      <!-- Formulario conexión -->
+      <section id="connect-section" class="space-y-1 hidden">
+        <h2 class="text-[11px] font-semibold text-slate-200 tracking-wide">
+          {{ tr("wifi_setup.form_title") }}
+        </h2>
+
+        <label class="block text-[9px] text-slate-300/90 mb-0.5">
+          {{ tr("wifi_setup.form_ssid_label") }}
+        </label>
+        <input id="ssid-input"
+               class="w-full px-2 py-1.5 rounded-md bg-slate-950/90 border border-slate-700/80
+                      text-[10px] text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-400/80"
+               type="text" autocomplete="off">
+
+        <label class="block text-[9px] text-slate-300/90 mt-1 mb-0.5">
+          {{ tr("wifi_setup.form_password_label") }}
+        </label>
+        <div class="relative">
+          <input id="password-input"
+                 class="w-full px-2 py-1.5 pr-14 rounded-md bg-slate-950/90 border border-slate-700/80
+                        text-[10px] text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-400/80"
+                 type="password" autocomplete="off">
+          <button id="toggle-pass"
+                  type="button"
+                  class="absolute inset-y-0 right-1 my-auto px-1.5 text-[8px] rounded
+                         bg-slate-900/90 text-slate-300 border border-slate-700/70">
+            {{ tr("wifi_setup.form_show_password") }}
+          </button>
+        </div>
+
+        <div class="flex gap-2 mt-2">
+          <button id="btn-connect" class="btn-primary">
+            {{ tr("wifi_setup.form_connect_btn") }}
+          </button>
+          <button id="btn-cancel-form" class="btn-soft">
+            ✕
+          </button>
+        </div>
+      </section>
+
+      <!-- Mensajes -->
+      <div id="message"
+           class="min-h-[16px] text-[9px] text-slate-300 mt-1">
+        {{ tr("wifi_setup.msg_select_network") }}
+      </div>
+
+      <!-- Volver -->
+      <div class="pt-1">
+        <a href="/"
+           class="inline-flex items-center gap-1 text-[9px] text-slate-400 hover:text-sky-300 transition">
+          ← {{ tr("wifi_setup.back_to_tv") }}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Cambio de idioma (igual que en index)
+    (function () {
+      const sel = document.getElementById('lang-select');
+      if (!sel) return;
+      sel.addEventListener('change', function () {
+        const lang = this.value || 'es';
+        const url = new URL(window.location.href);
+        url.searchParams.set('lang', lang);
+        window.location.href = url.toString();
+      });
+    })();
+
+    // i18n strings desde el servidor
+    const T = {
+      scanning: "{{ tr('wifi_setup.msg_scanning') }}",
+      selectNetwork: "{{ tr('wifi_setup.msg_select_network') }}",
+      connectTpl: "{{ tr('wifi_setup.msg_connecting') }}",
+      connectedOkTpl: "{{ tr('wifi_setup.msg_connected_ok') }}",
+      connectedFailTpl: "{{ tr('wifi_setup.msg_connected_fail') }}",
+      forgetOkTpl: "{{ tr('wifi_setup.msg_forget_ok') }}",
+      forgetFailTpl: "{{ tr('wifi_setup.msg_forget_fail') }}",
+      applyBestOk: "{{ tr('wifi_setup.msg_apply_best_ok') }}",
+      applyBestFail: "{{ tr('wifi_setup.msg_apply_best_fail') }}",
+      statusConnectedTpl: "{{ tr('wifi_setup.status_connected') }}",
+      statusDisconnected: "{{ tr('wifi_setup.status_disconnected') }}",
+      statusUnknown: "{{ tr('wifi_setup.status_unknown') }}",
+      knownCurrent: "{{ tr('wifi_setup.known_current') }}"
+    };
+
+    const elStatus = document.getElementById('status-text');
+    const elScanMsg = document.getElementById('scan-msg');
+    const elScanEmpty = document.getElementById('scan-empty');
+    const elNetworks = document.getElementById('networks-list');
+    const elKnown = document.getElementById('known-list');
+    const elKnownEmpty = document.getElementById('known-empty');
+    const elMsg = document.getElementById('message');
+    const sectionConnect = document.getElementById('connect-section');
+    const inpSsid = document.getElementById('ssid-input');
+    const inpPass = document.getElementById('password-input');
+
+    function setMessage(text, cls) {
+      elMsg.className = "min-h-[16px] text-[9px] mt-1 " + (cls || "text-slate-300");
+      elMsg.textContent = text || "";
+    }
+
+    function renderStatus(st) {
+      if (!st || !st.mode) {
+        elStatus.textContent = T.statusUnknown;
+        return;
+      }
+      if (st.mode === "client" && st.ssid) {
+        elStatus.textContent = T.statusConnectedTpl.replace("{ssid}", st.ssid);
+      } else if (st.mode === "client") {
+        elStatus.textContent = T.statusDisconnected;
+      } else if (st.mode === "ap" && st.ap_ssid) {
+        elStatus.textContent = `AP: "${st.ap_ssid}"`;
+      } else {
+        elStatus.textContent = T.statusUnknown;
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const r = await fetch("/api/wifi/status");
+        const d = await r.json();
+        if (d.ok) renderStatus(d);
+      } catch (e) {
+        renderStatus(null);
+      }
+    }
+
+    function showConnectForm(ssid) {
+      sectionConnect.classList.remove("hidden");
+      inpSsid.value = ssid || "";
+      inpPass.value = "";
+      setMessage(T.selectNetwork, "text-slate-300");
+    }
+
+    function hideConnectForm() {
+      sectionConnect.classList.add("hidden");
+      inpSsid.value = "";
+      inpPass.value = "";
+    }
+
+    function renderNetworks(list) {
+      elNetworks.innerHTML = "";
+      elScanEmpty.classList.toggle("hidden", !!(list && list.length));
+      if (!list || !list.length) return;
+      list.forEach(n => {
+        const li = document.createElement("li");
+        li.className = "wifi-list-item px-2.5 py-1.5 flex items-center justify-between gap-2 cursor-pointer";
+        const ssid = document.createElement("span");
+        ssid.className = "text-[10px] text-slate-50";
+        ssid.textContent = n.ssid || "(hidden)";
+        const meta = document.createElement("span");
+        meta.className = "text-[8px] text-slate-400";
+        const dbm = typeof n.signal === "number" ? `${n.signal} dBm` : "";
+        meta.textContent = (n.secured ? "🔒 " : "• ") + dbm;
+        li.appendChild(ssid);
+        li.appendChild(meta);
+        li.addEventListener("click", () => showConnectForm(n.ssid));
+        elNetworks.appendChild(li);
+      });
+    }
+
+    function renderKnown(list, currentSsid) {
+      elKnown.innerHTML = "";
+      const has = list && list.length;
+      elKnownEmpty.classList.toggle("hidden", !!has);
+      if (!has) return;
+      list.forEach(ssid => {
+        const li = document.createElement("li");
+        li.className = "px-2.5 py-1.5 flex items-center justify-between gap-2";
+        const left = document.createElement("div");
+        left.className = "flex items-center gap-1.5";
+        const dot = document.createElement("span");
+        dot.className = "w-1.5 h-1.5 rounded-full " +
+          (ssid === currentSsid ? "bg-emerald-400" : "bg-slate-500");
+        const txt = document.createElement("span");
+        txt.className = "text-[9px] text-slate-100";
+        txt.textContent = ssid;
+        left.appendChild(dot);
+        left.appendChild(txt);
+        if (ssid === currentSsid) {
+          const tag = document.createElement("span");
+          tag.className = "text-[8px] text-emerald-400/90";
+          tag.textContent = T.knownCurrent;
+          left.appendChild(tag);
+        }
+        const btnRow = document.createElement("div");
+        btnRow.className = "flex gap-1";
+        const btnUse = document.createElement("button");
+        btnUse.className = "btn-soft";
+        btnUse.textContent = "→";
+        btnUse.onclick = () => showConnectForm(ssid);
+        const btnForget = document.createElement("button");
+        btnForget.className = "btn-soft";
+        btnForget.textContent = "✕";
+        btnForget.onclick = () => forgetNetwork(ssid);
+        btnRow.appendChild(btnUse);
+        btnRow.appendChild(btnForget);
+
+        li.appendChild(left);
+        li.appendChild(btnRow);
+        elKnown.appendChild(li);
+      });
+    }
+
+    async function loadNetworks() {
+      elScanMsg.textContent = T.scanning;
+      elScanEmpty.classList.add("hidden");
+      document.getElementById("btn-refresh").classList.add("hidden");
+      try {
+        const r = await fetch("/api/wifi/networks");
+        const d = await r.json();
+        if (d.ok) {
+          renderNetworks(d.networks || []);
+          document.getElementById("btn-refresh").classList.remove("hidden");
+          elScanMsg.textContent = "";
+        } else {
+          elScanMsg.textContent = d.error || "Error";
+        }
+      } catch (e) {
+        elScanMsg.textContent = "Desconectado";
+      }
+    }
+
+    async function loadKnown() {
+      try {
+        const stResp = await fetch("/api/wifi/status");
+        const st = (await stResp.json()).ok ? await stResp.json() : null;
+      } catch (e) {}
+
+      try {
+        const r = await fetch("/api/wifi/known");
+        const d = await r.json();
+        if (d.ok) {
+          // Para marcar actual, pedimos status aparte:
+          let current = null;
+          try {
+            const rs = await fetch("/api/wifi/status");
+            const ds = await rs.json();
+            if (ds.ok && ds.mode === "client" && ds.ssid) current = ds.ssid;
+          } catch (e) {}
+          renderKnown(d.networks || [], current);
+        }
+      } catch (e) {
+        // silencio
+      }
+    }
+
+    async function connectSelected() {
+      const ssid = (inpSsid.value || "").trim();
+      const password = (inpPass.value || "").trim();
+      if (!ssid) return;
+      setMessage(T.connectTpl.replace("{ssid}", ssid), "text-sky-300");
+      try {
+        const r = await fetch("/api/wifi/connect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ssid, password })
+        });
+        const d = await r.json();
+        if (d.ok) {
+          setMessage(T.connectedOkTpl.replace("{ssid}", ssid), "text-emerald-400");
+          await loadStatus();
+          await loadKnown();
+          hideConnectForm();
+        } else {
+          setMessage(
+            T.connectedFailTpl
+              .replace("{ssid}", ssid)
+              .replace("{error}", d.error || "error"),
+            "text-red-400"
+          );
+        }
+      } catch (e) {
+        setMessage(
+          "Desconectado de TVArgenta Wi-Fi. Si la TV se conectó a la red seleccionada, ya podés cerrar esta página.",
+		  "text-slate-300"
+        );
+      }
+    }
+
+    async function forgetNetwork(ssid) {
+      if (!ssid) return;
+      try {
+        const r = await fetch("/api/wifi/forget", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ssid })
+        });
+        const d = await r.json();
+        if (d.ok) {
+          setMessage(T.forgetOkTpl.replace("{ssid}", ssid), "text-slate-300");
+          await loadKnown();
+        } else {
+          setMessage(
+            T.forgetFailTpl
+              .replace("{ssid}", ssid)
+              .replace("{error}", d.error || "error"),
+            "text-red-400"
+          );
+        }
+      } catch (e) {
+        setMessage(
+          T.forgetFailTpl.replace("{ssid}", ssid).replace("{error}", "network_error"),
+          "text-red-400"
+        );
+      }
+    }
+
+    async function applyBest() {
+      try {
+        const r = await fetch("/api/wifi/apply_best", { method: "POST" });
+        const d = await r.json();
+        if (d.ok) {
+          setMessage(T.applyBestOk, "text-sky-300");
+          await loadStatus();
+          await loadKnown();
+        } else {
+          setMessage(T.applyBestFail, "text-red-400");
+        }
+      } catch (e) {
+        setMessage(T.applyBestFail, "text-red-400");
+      }
+    }
+
+    // Wire events
+    document.getElementById("btn-scan").onclick = loadNetworks;
+    document.getElementById("btn-refresh").onclick = loadNetworks;
+    document.getElementById("btn-connect").onclick = connectSelected;
+    document.getElementById("btn-cancel-form").onclick = hideConnectForm;
+    document.getElementById("btn-apply-best").onclick = applyBest;
+
+    document.getElementById("toggle-pass").onclick = function () {
+      if (inpPass.type === "password") {
+        inpPass.type = "text";
+      } else {
+        inpPass.type = "password";
+      }
+    };
+
+    // Inicial
+    (async function init() {
+      await loadStatus();
+      await loadNetworks();
+      await loadKnown();
+    })();
+  </script>
+</body>
+</html>

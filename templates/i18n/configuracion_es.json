@@ -1,0 +1,28 @@
+{
+  "configuracion.page_title": "Configuración TVArgenta",
+  "configuracion.header": "⚙️ Configuración de TVArgenta",
+
+  "configuracion.nav.back": "⬅ Volver",
+  "configuracion.nav.back_home": "⬅ Volver al inicio",
+
+  "configuracion.sections.order.title": "🏷 Orden de prioridad de tags",
+  "configuracion.sections.order.help": "Arrastrá para ordenar. El primero tiene mayor prioridad.",
+
+  "configuracion.sections.tags.title": "🚫 Tags incluidos / excluidos",
+  "configuracion.sections.tags.help": "Destildá lo que NO querés usar. Si destildás un tag, también se quita del orden de prioridad.",
+
+  "configuracion.search.placeholder": "Buscar tag…",
+
+  "configuracion.buttons.expand_all": "Expandir grupos",
+  "configuracion.buttons.collapse_all": "Colapsar grupos",
+
+  "configuracion.group.buttons.all": "Todos",
+  "configuracion.group.buttons.none": "Ninguno",
+
+  "configuracion.save.main": "💾 Guardar configuración",
+  "configuracion.save.sticky.label": "Cambios listos",
+  "configuracion.save.sticky.button": "💾 Guardar",
+
+  "configuracion.collapse.show": "Mostrar",
+  "configuracion.collapse.hide": "Ocultar"
+}

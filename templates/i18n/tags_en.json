@@ -1,0 +1,42 @@
+{
+  "tags.page_title": "Manage tags",
+  "tags.header": "🏷 Manage Tags & Groups",
+
+  "tags.nav.back_edit": "⬅ Back",
+  "tags.nav.back_home": "⬅ Home",
+
+  "tags.search.label": "Search across all tags",
+  "tags.search.placeholder": "Type to filter…",
+  "tags.search.help": "Dynamically filters tags across all groups.",
+
+  "tags.group.new.title": "➕ Create new group",
+  "tags.group.new.toggle_show": "Show",
+  "tags.group.new.toggle_hide": "Hide",
+  "tags.group.new.name_placeholder": "Group name",
+  "tags.group.new.create_btn": "Create",
+
+  "tags.tag.new.title": "➕ Add new tag",
+  "tags.tag.new.name_placeholder": "Tag name",
+  "tags.tag.new.group_placeholder": "Group",
+  "tags.tag.new.add_btn": "Add",
+
+  "tags.group.inline.new_tag_placeholder": "New tag in {group}",
+
+  "tags.group.color.label": "Color",
+  "tags.group.color.save_btn": "Save",
+
+  "tags.group.delete.btn": "🗑 Delete group",
+  "tags.group.delete.confirm": "Delete group “{group}” and all its tags from the system?",
+
+  "tags.tag.delete.confirm": "Delete tag “{tag}” from group “{group}”?",
+
+  "tags.collapse.show": "Show",
+  "tags.collapse.hide": "Hide",
+
+  "tags.footer.back_edit": "⬅ Back to editing",
+  "tags.footer.back_home": "⬅ Back to home",
+
+  "tags.mobile.done": "All set here",
+  "tags.mobile.back_edit": "⬅ Back",
+  "tags.mobile.back_home": "⬅ Home"
+}

@@ -1,0 +1,42 @@
+{
+  "tags.page_title": "Administrar tags",
+  "tags.header": "🏷 Administrar Tags y Grupos",
+
+  "tags.nav.back_edit": "⬅ Volver",
+  "tags.nav.back_home": "⬅ Inicio",
+
+  "tags.search.label": "Buscar en todos los tags",
+  "tags.search.placeholder": "Escribí para filtrar…",
+  "tags.search.help": "Filtra dinámicamente los tags de todos los grupos.",
+
+  "tags.group.new.title": "➕ Crear nuevo grupo",
+  "tags.group.new.toggle_show": "Mostrar",
+  "tags.group.new.toggle_hide": "Ocultar",
+  "tags.group.new.name_placeholder": "Nombre del grupo",
+  "tags.group.new.create_btn": "Crear",
+
+  "tags.tag.new.title": "➕ Agregar nuevo tag",
+  "tags.tag.new.name_placeholder": "Nombre del tag",
+  "tags.tag.new.group_placeholder": "Grupo",
+  "tags.tag.new.add_btn": "Agregar",
+
+  "tags.group.inline.new_tag_placeholder": "Nuevo tag en {group}",
+
+  "tags.group.color.label": "Color",
+  "tags.group.color.save_btn": "Guardar",
+
+  "tags.group.delete.btn": "🗑 Eliminar grupo",
+  "tags.group.delete.confirm": "¿Eliminar el grupo «{group}» y todos sus tags del sistema?",
+
+  "tags.tag.delete.confirm": "¿Eliminar el tag «{tag}» del grupo «{group}»?",
+
+  "tags.collapse.show": "Mostrar",
+  "tags.collapse.hide": "Ocultar",
+
+  "tags.footer.back_edit": "⬅ Volver a la edición",
+  "tags.footer.back_home": "⬅ Volver al inicio",
+
+  "tags.mobile.done": "Listo por acá",
+  "tags.mobile.back_edit": "⬅ Volver",
+  "tags.mobile.back_home": "⬅ Inicio"
+}

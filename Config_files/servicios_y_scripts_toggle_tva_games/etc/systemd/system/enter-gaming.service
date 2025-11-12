@@ -1,0 +1,14 @@
+[Unit]
+Description=Switch de TVArgenta -> EmulationStation/RetroPie
+After=tvargenta.service
+Wants=emulationstation-session.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+ExecStart=/usr/local/bin/enter-gaming-wrapper.sh
+
+[Install]
+WantedBy=multi-user.target
+

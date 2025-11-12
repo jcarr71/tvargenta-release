@@ -1,0 +1,51 @@
+{
+  "index.title": "📺 TVArgenta",
+
+  "index.stats.total_time": "⏳ Gesamte Erinnerungszeit:",
+
+  "index.actions.watch_tv": "📺 TV ansehen",
+  "index.actions.channels": "📡 Kanäle",
+  "index.actions.upload": "⬆️ Hochladen",
+  "index.actions.config": "⚙️ Einstellungen",
+  "index.actions.tags": "🛠 Tags",
+
+  "index.videos.title": "🎬 Verfügbare Videos",
+  "index.videos.count_label": "Ergebnis(se)",
+
+  "index.filters.toggle_show": "🔎 Filter anzeigen",
+  "index.filters.toggle_hide": "🔎 Filter ausblenden",
+  "index.filters.by_channel_label": "Nach Kanal filtern",
+  "index.filters.by_channel_all": "— Alle —",
+  "index.filters.rule_hint": "Regel: einschließen, wenn mindestens ein erforderlicher Tag und kein ausgeschlossener Tag vorhanden ist.",
+  "index.filters.order_label": "Sortieren",
+  "index.filters.order.dur_asc": "Dauer ↑",
+  "index.filters.order.dur_desc": "Dauer ↓",
+  "index.filters.order.title_asc": "Titel A→Z",
+  "index.filters.order.title_desc": "Titel Z→A",
+  "index.filters.order.date_desc": "Datum (neueste)",
+  "index.filters.order.date_asc": "Datum (älteste)",
+  "index.filters.tags_label": "Nach Tags filtern (Klick zum Statuswechsel)",
+  "index.filters.search_placeholder": "Tag suchen…",
+  "index.filters.clear_button": "Zurücksetzen",
+  "index.filters.legend": "Zustände: grau = neutral · gelb = erforderlich · rot = ausgeschlossen.",
+  "index.filters.legend_tip": " +Klick setzt direkt auf ausgeschlossen.",
+  "index.filters.chip_title": "Klick zum Wechseln: neutral → einschließen → ausschließen",
+
+  "index.new_videos.header": "🆕 Neue Videos ohne Metadaten",
+  "index.new_videos.no_duration": "Keine Dauer",
+  "index.new_videos.fill_metadata": "➕ Metadaten ergänzen",
+
+  "index.video_card.date": "Datum:",
+  "index.video_card.character": "Figur:",
+  "index.video_card.view": "Ansehen",
+  "index.video_card.edit": "Bearbeiten",
+  "index.video_card.delete_full_title": "Video vollständig löschen",
+
+  "index.ghosts.header": "👻 Geister-Videos (Datei nicht gefunden)",
+  "index.ghosts.delete_all": "🧹 Alle löschen",
+  "index.ghosts.edit_metadata": "✏️ Metadaten bearbeiten",
+
+  "index.confirm.delete_metadata": "Bist du sicher, dass du die Metadaten von „{id}“ löschen möchtest?",
+  "index.confirm.delete_ghosts": "⚠️ Dadurch werden ALLE Geister-Einträge (ohne Videodatei) gelöscht.\nMöchtest du fortfahren?",
+  "index.confirm.delete_full": "⚠️ Dadurch werden die Videodatei, ihre Metadaten und ihr Thumbnail gelöscht.\nBist du sicher?"
+}

@@ -1,0 +1,2199 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta name="google" content="notranslate">	
+  <meta charset="UTF-8">
+  <title>TV Argenta</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+	  width: 100vw;
+	  height: 100vh;
+      background-color: black;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+	
+	
+	#root, video {
+	  width: 100vw;
+	  height: 100vh;
+	  object-fit: cover;
+	}
+
+	#overlay {
+	  position: fixed;
+	  bottom: 35px;
+	  left: 50%;
+	  transform: translateX(-50%);
+	  background: #ffffff;
+	  color: #0055ff;
+	  font-family: monospace;
+	  font-size: 28px;
+	  font-weight: 600;
+	  padding: 10px 20px;
+	  border-radius: 10px;
+	  text-align: center;
+	  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+	  z-index: 10002;
+	  opacity: 0;
+	  pointer-events: none;
+	  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+	  pointer-events: none;
+	}
+
+    #overlay.show {
+      opacity: 1;
+	  transform: translateX(-50%) translateY(0);
+    }
+	
+	body {
+	  cursor: none;
+	}
+	
+	video::-webkit-media-controls-enclosure {
+		overflow: hidden;
+    }
+	
+	#barra-volumen {
+	  position: absolute;
+	  bottom: 24px;
+	  left: 50%;
+	  transform: translateX(-50%);
+	  background: #0000cc; /* azul clásico de OSD */
+	  padding: 8px 14px;
+	  border: 2px solid white;
+	  box-shadow: 0 0 3px white;
+	  display: flex;
+	  align-items: center;
+	  gap: 14px;
+	  font-family: Arial, sans-serif;
+	  color: white;
+	  z-index: 9998;
+	  border-radius: 4px;
+	  image-rendering: pixelated;
+	}
+
+	.label-volumen {
+	  font-size: 14px;
+	  font-weight: bold;
+	  white-space: nowrap;
+	}
+
+	.bloques {
+	  display: flex;
+	  gap: 4px;
+	}
+
+	.bloques .bloque {
+	  width: 6px;
+	  height: 16px;
+	  background: white;
+	  opacity: 0.2;
+	  transition: opacity 0.1s ease;
+	}
+
+	.bloques .bloque.activo {
+	  opacity: 1;
+	}
+
+	#barra-volumen.oculto {
+	  display: none;
+	}
+
+
+	body::before {
+	  content: "";
+	  position: absolute;
+	  width: 100%;
+	  height: 100%;
+	  background: repeating-linear-gradient(
+		to bottom,
+		rgba(255,255,255,0.02),
+		rgba(255,255,255,0.02) 1px,
+		transparent 1px,
+		transparent 2px
+	  );
+	  pointer-events: none;
+	  z-index: 9999;
+	}
+	
+	#menu-osd {
+	  position: absolute;     
+	  top: 10%;
+	  left: 50%;
+	  transform: translateX(-50%);
+	  width: 60vw;
+	  max-width: 480px;
+	  aspect-ratio: 4 / 3;
+	  background: #0018a8;
+	  color: #fff;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  border: 3px solid #ffffff;
+	  box-shadow: 0 0 10px #ffffff;
+	  padding: 14px 18px 20px;
+	  border-radius: 6px;
+	  display: none;
+	  z-index: 10001; /* arriba de las scanlines */
+	}
+
+	  #menu-osd .menu-title {
+		font-weight: bold;
+		letter-spacing: 1px;
+		text-align: center;
+		border-bottom: 2px solid #ffffff;
+		padding-bottom: 6px;
+		margin-bottom: 10px;
+	  }
+
+	  #menu-osd .menu-list {
+		list-style: none;
+		margin: 0;
+		padding: 6px 0 0 0;
+	  }
+
+	  #menu-osd .menu-item {
+		font-size: 22px;
+		line-height: 1.6em;
+		white-space: nowrap;
+	  }
+
+	  #menu-osd .cursor {
+		display: inline-block;
+		width: 1em;
+		text-align: center;
+		margin-right: 6px;
+	  }
+
+	  /* Pie de ayuda */
+	  #menu-osd .menu-footer {
+		margin-top: 10px;
+		border-top: 2px solid #ffffff;
+		padding-top: 6px;
+		font-size: 16px;
+		display: flex;
+		flex-wrap: wrap; 
+		justify-content: space-between;
+		align-items: flex-end;
+		justify-content: space-between;
+		opacity: 0.9;
+	  }
+	  
+	 /* Tres columnas: izq (nav), centro (wifi), der (select) */
+	.menu-footer-left,
+	.menu-footer-right {
+	  flex: 1 1 40%;
+	  display: flex;
+	  align-items: center;
+	}
+	
+	
+	.menu-footer-left {
+	  justify-content: flex-start;
+	}
+
+	.menu-footer-center {
+	  order: 2;                     
+	  flex: 0 0 100%;
+	  display: flex;
+	  justify-content: center;
+	  align-items: baseline;
+	  gap: 8px;
+	  margin-top: 10px;
+	}
+	.menu-footer-right {
+	  justify-content: flex-end;
+	}
+	  
+	#menu-osd .menu-item.activo {
+	  background: rgba(255,255,255,0.15);
+	}
+	#channel-badge {
+	  position: absolute;
+	  bottom: 35px;              
+	  right: 55px;
+	  padding: 6px 10px;
+	  background: rgba(0, 0, 32, 0.45);
+	  border: 2px solid rgba(255,255,255,0.6);
+	  color: #fff;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  font-size: 14px;
+	  letter-spacing: 0.5px;
+	  text-transform: uppercase;
+	  border-radius: 6px;
+	  box-shadow: 0 0 6px rgba(255,255,255,0.25);
+	  z-index: 10000;
+	  display: none;
+	}
+
+
+	#mute-indicator{
+	  position: absolute;
+	  top: 24px;
+	  left: 12px;
+	  display: none;
+	  align-items: center;
+	  gap: 8px;
+	  padding: 6px 10px;
+	  background: rgba(0, 0, 64, 0.85);
+	  border: 2px solid white;
+	  border-radius: 4px;
+	  box-shadow: 0 0 6px rgba(255,255,255,0.5);
+	  color: white;
+	  font-family: "Lucida Console", monospace;
+	  font-size: 14px;
+	  letter-spacing: 1px;
+	  image-rendering: pixelated;
+	  z-index: 11000;
+	}
+	#mute-indicator .label{
+	  font-size:14px;
+	  letter-spacing:0.5px;
+	  text-transform:uppercase;
+	  opacity:.95;
+	}
+	#mute-indicator svg{
+	  width: 28px;
+	  height: 28px;
+	}
+	
+	/* Bloque WiFi */
+	
+	 #wifi-status {
+	  display: flex;
+	  align-items: flex-end;   /* alinea base de barras y texto */
+	}
+
+	#wifi-status-label {
+	  display: inline-block;
+	  margin: 0 0 2px 8px;     
+	  padding: 0;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  font-size: 17px;
+	  color: #ffffff;
+	  text-shadow: 0 0 6px #000000;
+	}
+
+
+	.wifi-icon {
+	  display: inline-flex;
+	  align-items: flex-end;
+	  gap: 3px;
+	}
+
+	.wifi-bar {
+	  width: 4px;
+	  border-radius: 2px 2px 0 0;
+	  background: rgba(255,255,255,0.35);
+	}
+
+	.wifi-bar.b1 { height: 8px; }
+	.wifi-bar.b2 { height: 12px; }
+	.wifi-bar.b3 { height: 16px; }
+
+  /* Estados */
+  .wifi-off .wifi-bar {
+	background: rgba(255,255,255,0.25);
+	opacity: 0.4;
+  }
+
+  .wifi-on .wifi-bar {
+	background: #3fb950; /* verde */
+	opacity: 0.95;
+  }
+
+  .wifi-ap .wifi-bar {
+	background: #facc15; /* amarillo */
+	opacity: 0.95;
+  }
+
+	.wifi-offline-text {
+	  color: #ffb37a; /* naranja claro sobre azul */
+	}
+
+
+	.wifi-ap-text {
+	  color: #ffe58a; /* amarillo claro */
+	}
+	
+	.wifi-on-text {
+	  color: #8affb3; /* verde pastel */
+	}
+	
+  </style>
+  
+</head>
+<body>
+  <video id="tvVideo" autoplay playsinline></video>
+  <div id="overlay">{{ tr("overlay.loading_channel") }}</div>
+  <div id="barra-volumen" class="oculto">
+    <span class="label-volumen">{{ tr("vol.label") }}</span>
+    <div class="bloques"></div>
+  </div>
+  
+<!-- Menú OSD -->
+ <div id="menu-osd" aria-hidden="true">
+  <div class="menu-title"
+       id="menu-title"
+       data-i18n="menu.title">
+    {{ tr("menu.title") }}
+  </div>
+
+  <ul class="menu-list" id="menu-list"></ul>
+
+    <div class="menu-footer">
+    <div class="menu-footer-left" data-i18n="menu.footer.nav">
+      {{ tr("menu.footer.nav") }}
+    </div>
+
+    <div class="menu-footer-center" id="wifi-status-footer">
+      <div id="wifi-icon" class="wifi-icon wifi-off">
+        <div class="wifi-bar b1"></div>
+        <div class="wifi-bar b2"></div>
+        <div class="wifi-bar b3"></div>
+      </div>
+      <div id="wifi-status-label" class="wifi-offline-text">
+        Offline
+      </div>
+    </div>
+
+    <div class="menu-footer-right" data-i18n="menu.footer.select">
+      {{ tr("menu.footer.select") }}
+    </div>
+  </div>
+ </div>
+  
+  <div id="channel-badge"></div>
+	
+ <!-- Indicador de mute -->
+  <div id="mute-indicator" aria-hidden="true" title="{{ tr('vol.mute_title') }}">
+    <svg viewBox="0 0 32 32" role="img" aria-label="Muted">
+      <rect x="0" y="0" width="32" height="32" rx="3" fill="#0000aa" stroke="white" stroke-width="2"/>
+      <path fill="white" d="M8 10h4l6-5v22l-6-5h-4z"/>
+      <line x1="20" y1="10" x2="28" y2="22" stroke="red" stroke-width="3"/>
+      <line x1="28" y1="10" x2="20" y2="22" stroke="red" stroke-width="3"/>
+    </svg>
+    <span class="label" id="mute-label">{{ tr("vol.mute_badge") }}</span>
+  </div>
+
+<!-- QR Code -->
+
+<!-- Modal QR / AP (añadir justo después de #overlay) -->
+<div id="wifi-ap-modal" style="display:none; position:fixed; inset:0; z-index:20000; align-items:center; justify-content:center;">
+  <div id="wifi-ap-card" style="max-width:420px; width:90%; background:white; color:#0055ff; font-family:monospace; padding:18px; border-radius:10px; box-shadow:0 6px 24px rgba(0,0,0,0.45); text-align:center; position:relative;">
+  
+      <img src="/static/logo_tvar_2.png"
+       alt="TVArgenta"
+       style="max-width:80px; margin:0 auto 6px auto; display:block;">
+    
+    <div style="font-weight:700; font-size:20px; margin-bottom:8px;" id="wifi-ap-title"> {{ tr("wifi.ap_qr_title") }}</div>
+    <div id="wifi-ap-desc" style="font-size:14px; margin-bottom:8px;"></div>
+
+    <div id="wifi-ap-qr-wrap" style="margin:8px 0;">
+      <img id="wifi-ap-qr" src="" alt="QR" style="max-width:190px; width:60%; height:auto; border:1px solid #ddd; background:white;">
+    </div>
+
+	<div id="wifi-ap-url" style="font-size:13px; word-break:break-all; margin-top:8px;"></div>
+
+	<div id="wifi-ap-hint"
+		 style="margin-top:10px; font-size:12px; color:#555;"
+		 data-i18n="wifi.ap_hint">
+	  Usa la cámara para escanear el código o ingresá la URL. Pulsá el botón/encoder para salir.
+	</div>
+
+	<div id="wifi-ap-timer"
+		 style="position:absolute; right:10px; top:8px; font-size:12px; color:#888;">
+	</div>
+
+  </div>
+</div>
+
+
+  <script>
+    const video = document.getElementById('tvVideo');
+	video.muted = false;
+	video.volume = 0.5;
+	
+	video.addEventListener('volumechange', () => {
+	  if (video.volume === 0 || video.muted) {
+		mostrarIconoMute(true);
+	  } else {
+		mostrarIconoMute(false);
+	  }
+	});
+	
+    const overlay = document.getElementById('overlay');
+    let currentVideo = null;
+	let ultimoCanal = null;
+	
+	let enPedido = false;           // evita pedidos simultáneos
+	let ultimaCarga = 0;            // timestamp de última carga efectiva
+	const MIN_INTERVAL_MS = 1200;   // ventana para ignorar pedidos repetidos
+	let reloadTimer = null;         // timer para reintento diferido de reload
+	
+	let playedReportedFor = null;   // video_id para el que ya se reportó play
+	let playedTimer = null;         // timeout a 10s
+	let playedArmed = false;        // evita múltiples enganches
+	
+	// Idiomas disponibles (orden = visual en el menú)
+	const AVAILABLE_LANGS = [
+	  { code: "es", key: "lang.es", label: "Español" },
+	  { code: "en", key: "lang.en", label: "English" },
+	  { code: "de", key: "lang.de", label: "Deutsch" }
+	  // sumá más si querés: {code:"it", key:"lang.it", label:"Italiano"}
+	];
+
+	
+	
+	// ---- I18N CORE (mínimo) ----
+	let I18N = { lang: "es", dict: {} };
+	let lastLangSeen = null;
+	
+	async function i18nInit(){
+	  try {
+		const r = await fetch("/api/lang");
+		if (r.ok){
+		  const d = await r.json();
+		  if (d && d.lang) I18N.lang = d.lang;
+		}
+	  } catch(e) {}
+
+	  try {
+		const t = await fetch(`/i18n/${I18N.lang}.json`);
+		if (t.ok) I18N.dict = await t.json();
+	  } catch(e) { I18N.dict = {}; }
+
+	  document.documentElement.lang = I18N.lang;
+	  translateStaticDOM();
+	}
+	
+	async function pollLanguageFromBackend() {
+	  try {
+		const r = await fetch("/api/lang");
+		if (!r.ok) return;
+
+		const data = await r.json();
+		const srvLang = data && data.lang;
+		if (!srvLang) return;
+
+		if (lastLangSeen === null) {
+		  // primera vez: fijamos baseline
+		  lastLangSeen = srvLang;
+		  return;
+		}
+
+		if (srvLang !== I18N.lang) {
+		  console.log(`[I18N] Cambio externo detectado: ${I18N.lang} → ${srvLang}`);
+		  lastLangSeen = srvLang;
+		  // actualizamos SOLO el front, sin volver a escribir el JSON
+		  await setLanguage(srvLang, { skipBackend: true });
+		}
+	  } catch (e) {
+		// silencioso; si falla una vez no pasa nada
+		// console.warn("[I18N] pollLanguageFromBackend fallo:", e);
+	  }
+	}
+
+
+	function tr(key){ return I18N.dict[key] || key; }
+
+	function translateStaticDOM(){
+	  document.querySelectorAll("[data-i18n]").forEach(n=>{
+		const k = n.getAttribute("data-i18n");
+		const txt = tr(k);
+		if (n.tagName === "TITLE") { document.title = txt; }
+		n.textContent = txt;
+	  });
+	  document.querySelectorAll("[data-i18n-title]").forEach(n=>{
+		const k = n.getAttribute("data-i18n-title");
+		n.title = tr(k);
+	  });
+	}
+	// ---- /I18N CORE ----
+	
+	
+	async function setLanguage(langCode, { skipBackend = false } = {}) {
+	  if (!skipBackend) {
+		try {
+		  const r = await fetch("/api/language", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ lang: langCode })
+		  });
+
+		  const data = await r.json().catch(() => ({}));
+		  if (!r.ok || !data.ok) {
+			console.warn("[I18N] Error desde /api/language:", data);
+		  } else {
+			console.log("[I18N] Idioma guardado en backend:", data.lang);
+		  }
+		} catch (e) {
+		  console.warn("[I18N] No pude hacer POST /api/language:", e);
+		}
+	  }
+
+	  // Actualizar front siempre (venga del OSD o de un cambio externo)
+	  I18N.lang = langCode;
+
+	  try {
+		const t = await fetch(`/i18n/${I18N.lang}.json`);
+		I18N.dict = t.ok ? await t.json() : {};
+	  } catch (e) {
+		I18N.dict = {};
+	  }
+
+	  document.documentElement.lang = I18N.lang;
+	  translateStaticDOM();
+	  buildMenu();
+	  renderMenu();
+
+	  // Mensaje solo para cambios interactivos del usuario;
+	  // para los externos igual no molesta si aparece.
+	  mostrarOverlay(tr("overlay.lang_changed") || "Idioma actualizado");
+	}
+
+
+
+
+	
+	 async function warmupAudio() {
+		try {
+		  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+		  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.1), ctx.sampleRate); // 100 ms de silencio
+		  const src = ctx.createBufferSource();
+		  src.buffer = buf;
+		  src.connect(ctx.destination);
+		  src.start(0);
+		  // Esperamos un tick y cerramos el contexto (libera recursos y deja todo “listo”)
+		  await new Promise(r => setTimeout(r, 120));
+		  await ctx.close();
+		  console.log('[PLAYER] Audio warm-up done');
+		} catch (e) {
+		  console.warn('[PLAYER] Audio warm-up failed:', e);
+		}
+	  }
+
+
+	async function reportPlayed(videoId) {
+	  try {
+		await fetch("/api/played", {
+		  method: "POST",
+		  headers: {"Content-Type": "application/json"},
+		  body: JSON.stringify({ video_id: videoId })
+		});
+	  } catch (e) {
+		console.warn("[TV] reportPlayed falló:", e);
+	  }
+	}
+	
+	
+    // Fullscreen automático
+    function requestFullscreen() {
+      const el = document.documentElement;
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+      else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    }
+
+	document.addEventListener('click', () => {
+	  video.muted = false;
+	  updateMuteIndicatorFromVol();
+	  video.play();
+	}, { once: true });
+
+	document.addEventListener("DOMContentLoaded", async () => {
+		try {
+		  
+		  await i18nInit();
+		  lastLangSeen = I18N.lang;
+		  setInterval(pollLanguageFromBackend, 5000); // cada 5s
+
+		  
+		  // 1) “despierta” el audio para que Chromium libere/prepare ALSA
+		  await warmupAudio();
+
+		  // 2) fullscreen (no bloquea si falla)
+		  requestFullscreen();
+
+		  // 3) micro-colchón: da tiempo a que el dispositivo de audio quede ready
+		  await new Promise(r => setTimeout(r, 120));
+
+		  // 4) arrancar el primer video
+		  cargarSiguienteVideo();
+
+		  // 5) aplicar volumen guardado
+		  try {
+			const res = await fetch("/api/volumen");
+			const data = await res.json();
+			video.volume = data.valor / 100;
+			updateMuteIndicatorFromVol(data.valor);
+		  } catch (e) {
+			console.warn("[PLAYER] no pude leer volumen:", e);
+		  }
+
+		  // 6) preferencias UI (badge de canal, etc.)
+		  await cargarUiPrefs();
+		} catch (e) {
+		  console.error("[PLAYER] init falló:", e);
+		  // fall back: igual probá cargar
+		  cargarSiguienteVideo();
+		}
+	  });
+
+	
+	function cargarSiguienteVideo(force = false) {
+	  const ahora = Date.now();
+
+	  // Si ya hay un fetch en vuelo, no encimamos otro
+	  if (enPedido) {
+		console.debug("[TV] Skip: pedido en curso");
+		return;
+	  }
+
+	  // Throttle: si fue hace muy poco y no es forzado, lo ignoramos
+	  if (!force && (ahora - ultimaCarga) < MIN_INTERVAL_MS) {
+		console.debug("[TV] Skip: throttle activo", { msDesdeUltima: ahora - ultimaCarga });
+		return;
+	  }
+
+	  enPedido = true;
+
+	  fetch('/api/next_video')
+		.then(res => res.json())
+		.then(data => {
+		  if (data.cooldown) {
+			// Pequeño retry para salir del bache inicial
+			setTimeout(() => cargarSiguienteVideo(true), 700);
+			return;
+		  }
+		  if (data.no_videos) {
+			mostrarOverlay("overlay.no_videos");
+			return;
+		  }
+
+		  const cambioDeVideo = data.video_id !== currentVideo;
+		  const cambioDeCanal = data.modo !== ultimoCanal;
+
+		  // Solo cambiamos el src si verdaderamente cambia el video o es forzado
+		  if (cambioDeVideo ) {
+			currentVideo = data.video_id;
+			video.src = `/videos/${data.video_id}.mp4`;
+			video.load();
+			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			setChannelBadgeText(data.canal_nombre);
+			
+			// --- armado del umbral de “play real” ---
+			playedReportedFor = null;
+			playedArmed = false;
+			clearTimeout(playedTimer);
+
+			// A) 10 segundos
+			playedTimer = setTimeout(() => {
+			  if (currentVideo && playedReportedFor !== currentVideo) {
+				playedReportedFor = currentVideo;
+				reportPlayed(currentVideo);
+			  }
+			}, 10000);
+
+			// B) 30% de duración (cuando se conozca el metadata)
+			const onTimeUpdate = () => {
+			  const dur = video.duration || 0;
+			  if (!playedArmed && dur > 0) {
+				playedArmed = true; // sólo armamos una vez cuando tengamos duración
+			  }
+			  if (dur > 0) {
+				const threshold = 0.30 * dur; // 30%
+				if (video.currentTime >= threshold && playedReportedFor !== currentVideo) {
+				  playedReportedFor = currentVideo;
+				  clearTimeout(playedTimer);
+				  reportPlayed(currentVideo);
+				  video.removeEventListener("timeupdate", onTimeUpdate);
+				}
+			  }
+			};
+
+			video.removeEventListener("timeupdate", onTimeUpdate);
+			video.addEventListener("timeupdate", onTimeUpdate);
+			
+		  }
+
+		  if (cambioDeCanal) {
+			ultimoCanal = data.modo;
+			mostrarOverlay(data.canal_nombre);
+			
+		  }
+		})
+		.catch(err => {
+		  console.error("Error al obtener el siguiente video:", err);
+		  mostrarOverlay("overlay.net_error");
+		})
+		.finally(() => {
+		  ultimaCarga = Date.now();
+		  enPedido = false;
+		});
+	}
+
+
+	let overlayTimeout = null;
+
+	function mostrarOverlay(textoOClave, opts = {}) {
+	  const { timeout = 3000, persist = false } = opts;
+
+	  const msg = (typeof textoOClave === "string" && I18N.dict[textoOClave])
+		? tr(textoOClave)
+		: textoOClave;
+
+	  if (!msg) return;
+
+	  // limpia cualquier timeout anterior
+	  if (overlayTimeout) {
+		clearTimeout(overlayTimeout);
+		overlayTimeout = null;
+	  }
+
+	  overlay.textContent = msg;
+	  overlay.classList.add("show");
+
+	  if (!persist && timeout > 0) {
+		overlayTimeout = setTimeout(() => {
+		  overlay.classList.remove("show");
+		  overlayTimeout = null;
+		}, timeout);
+	  }
+	}
+
+	function ocultarOverlay() {
+	  if (overlayTimeout) {
+		clearTimeout(overlayTimeout);
+		overlayTimeout = null;
+	  }
+	  overlay.classList.remove("show");
+	}
+
+
+
+    video.addEventListener('ended', () => {
+      // Si por algún motivo no se reportó (video muy corto, etc.), reportá ahora:
+	  if (currentVideo && playedReportedFor !== currentVideo) {
+		playedReportedFor = currentVideo;
+		reportPlayed(currentVideo);
+	  }
+	  cargarSiguienteVideo(true);
+    });
+	
+	setInterval(async () => {
+	  try {
+		const res = await fetch("/api/should_reload");
+		const data = await res.json();
+		if (data.should_reload) {
+		  const ahora = Date.now();
+		  const restante = MIN_INTERVAL_MS - (ahora - ultimaCarga);
+
+		  // Si ya pasó la ventana, forzamos ahora; si no, agendamos un único intento
+		  if (restante <= 0) {
+			cargarSiguienteVideo(false);
+		  } else {
+			clearTimeout(reloadTimer);
+			reloadTimer = setTimeout(() => cargarSiguienteVideo(false), restante + 50);
+		  }
+		}
+	  } catch (e) {
+		console.error("Error checking reload trigger", e);
+	  }
+	}, 300);
+
+	
+	let volumenTimer = null;
+
+	function mostrarVolumen(valor) {
+	  const barra = document.getElementById("barra-volumen");
+	  const contenedor = barra.querySelector(".bloques");
+
+	  barra.classList.remove("oculto");
+
+	  const total = 20;
+	  const activos = Math.round((valor / 100) * total);
+
+	  contenedor.innerHTML = "";
+
+	  for (let i = 0; i < total; i++) {
+		const b = document.createElement("div");
+		b.classList.add("bloque");
+		if (i < activos) b.classList.add("activo");
+		contenedor.appendChild(b);
+	  }
+
+	  video.volume = valor / 100;
+	  updateMuteIndicatorFromVol(valor); 	
+	  clearTimeout(volumenTimer);
+	  volumenTimer = setTimeout(() => {
+		barra.classList.add("oculto");
+	  }, 3000);
+	}
+
+
+	setInterval(async () => {
+	  const res = await fetch("/api/volumen_ping");
+	  const data = await res.json();
+	  if (data.ping) {
+		const resVol = await fetch("/api/volumen");
+		const volData = await resVol.json();
+		mostrarVolumen(volData.valor);
+	  }
+	}, 300);
+	
+	// --- Estado del menú ---
+	let menuVisible = false;
+	let menuTimer = null;
+	const MENU_AUTOHIDE_MS = 5000;
+	let menuAutohideEnabled = true;
+	const menuEl = document.getElementById("menu-osd");
+
+	function resetMenuTimer() {
+	  clearTimeout(menuTimer);
+
+	  if (!menuAutohideEnabled) {
+		// si el autohide está deshabilitado (estamos esperando scan/pairing),
+		// NO armamos la bomba de 5s
+		return;
+	  }
+
+	  menuTimer = setTimeout(() => {
+		if (menuVisible) ocultarMenu();
+	  }, MENU_AUTOHIDE_MS);
+	}
+
+
+	const menuListEl = document.getElementById("menu-list");
+	let menuIndex = 0;
+
+	function renderMenu() {
+	  const items = menuListEl.querySelectorAll(".menu-item");
+	  items.forEach((li, idx) => {
+		const cur = li.querySelector(".cursor");
+		if (idx === menuIndex) {
+		  cur.textContent = "►";
+		  li.classList.add("activo");
+		} else {
+		  cur.textContent = " ";
+		  li.classList.remove("activo");
+		}
+	  });
+	}
+
+	async function setMenuOpenState(open) {
+	  try {
+		await fetch("/api/menu_state", {
+		  method: "POST",
+		  headers: {"Content-Type": "application/json"},
+		  body: JSON.stringify({open})
+		});
+	  } catch (e) {
+		console.warn("menu_state POST falló:", e);
+	  }
+	}
+	
+	let menuMode = "main"; // "main" | "config"
+	
+	// ----------------------
+	// BLUETOOTH: estado front
+	// ----------------------
+
+	// modos extra que vamos a usar:
+	// "bt_root", "bt_paired_list", "bt_scan_list",
+	// "bt_device_actions", "bt_newdevice_actions"
+	// Nuevo modo de configuración de idioma
+	// "lang_root": lista de idiomas
+
+	let btPairedCache = [];      // lista de emparejados [{mac,name,connected},...]
+	let btScanCache = [];        // lista de nuevos sin emparejar [{mac,name},...]
+	let btSelectedIndex = null;  // qué item eligió el usuario dentro de esas listas
+	// WiFi
+	let wifiKnownCache = [];
+
+
+	// Asegura que el adaptador esté encendido y con agent/default-agent
+	async function btEnsureAdapter() {
+	  try {
+		await fetch("/api/bt/ensure", { method: "POST" });
+	  } catch (e) {
+		console.warn("[BT] no pude asegurar adaptador:", e);
+	  }
+	}
+
+	// Cargar lista de emparejados (paired devices)
+	async function btLoadPaired() {
+	  try {
+		const r = await fetch("/api/bt/paired");
+		const d = await r.json();
+		if (d.ok) {
+		  btPairedCache = d.devices || [];
+		} else {
+		  btPairedCache = [];
+		}
+	  } catch (e) {
+		console.error("[BT] paired fail:", e);
+		btPairedCache = [];
+	  }
+	}
+
+	// Escanear y traer dispositivos nuevos (no emparejados todavía)
+	async function btLoadScan() {
+	  try {
+		const r = await fetch("/api/bt/scan");
+		const d = await r.json();
+		if (d.ok) {
+		  btScanCache = d.devices || [];
+		} else {
+		  btScanCache = [];
+		}
+	  } catch (e) {
+		console.error("[BT] scan fail:", e);
+		btScanCache = [];
+	  }
+	}
+
+	// Acciones sobre dispositivos emparejados
+	async function btConnect(mac) {
+	  await fetch("/api/bt/connect", {
+		method: "POST",
+		headers: {"Content-Type":"application/json"},
+		body: JSON.stringify({mac})
+	  });
+	  mostrarOverlay("overlay.connecting");
+	}
+
+	async function btDisconnect(mac) {
+	  await fetch("/api/bt/disconnect", {
+		method: "POST",
+		headers: {"Content-Type":"application/json"},
+		body: JSON.stringify({mac})
+	  });
+	  mostrarOverlay("overlay.disconnecting");
+	}
+
+	async function btForget(mac) {
+	  await fetch("/api/bt/forget", {
+		method: "POST",
+		headers: {"Content-Type":"application/json"},
+		body: JSON.stringify({mac})
+	  });
+	  mostrarOverlay("overlay.forgotten");
+	}
+
+	// Emparejar y conectar un dispositivo nuevo
+	async function btPairAndConnect(mac) {
+	  const r = await fetch("/api/bt/pairconnect", {
+		method: "POST",
+		headers: {"Content-Type":"application/json"},
+		body: JSON.stringify({mac})
+		
+	  });
+	  mostrarOverlay("overlay.pairing");
+	  const data = await r.json();
+	  return data;
+	}
+
+	// ----------------------
+	// WIFI helpers (OSD)
+	// ----------------------
+
+	async function wifiFetchStatus() {
+	  try {
+		const r = await fetch("/api/wifi/status");
+		const d = await r.json();
+		return d;
+	  } catch (e) {
+		return { ok: false, error: String(e) };
+	  }
+	}
+
+	async function wifiShowStatusOverlay() {
+	  const d = await wifiFetchStatus();
+	  if (!d.ok) {
+		mostrarOverlay(tr("wifi.status_error") || "Wi-Fi: error de estado");
+		return;
+	  }
+
+	  let msg = "";
+	  if (d.mode === "client") {
+		msg = (tr("wifi.status_client") || "Conectado a {ssid}")
+		  .replace("{ssid}", d.ssid || "?");
+	  } else if (d.mode === "ap") {
+		msg = (tr("wifi.status_ap") || "Punto de acceso activo: {ssid}")
+		  .replace("{ssid}", d.ssid || "?");
+	  } else if (d.mode === "disconnected") {
+		msg = tr("wifi.status_disconnected") || "Sin conexión Wi-Fi";
+	  } else {
+		msg = tr("wifi.status_error") || "Wi-Fi: error de estado";
+	  }
+	  mostrarOverlay(msg);
+	}
+	
+	// ---------- Modal QR helpers ----------
+	
+	async function wifiShowGestionQRCode() {
+	  try {
+		const r = await fetch("/api/wifi/qr?target=gestion");
+		const d = await r.json();
+
+		if (d.offline) {
+		  mostrarOverlay(
+			tr("wifi.qr_offline") ||
+			"TVArgenta está funcionando offline. Conectala a una red para acceder desde otro dispositivo."
+		  );
+		  return;
+		}		
+		
+		if (!d.ok || !d.url) {
+		  mostrarOverlay(tr("wifi.qr_error") || "No pude generar el QR de gestión");
+		  return;
+		}
+		showGestionQrModal(d.url, d.qr_data);
+	  } catch (e) {
+		console.error("[WiFi] qr gestion error:", e);
+		mostrarOverlay(tr("wifi.qr_error") || "No pude generar el QR de gestión");
+	  }
+	}
+
+	
+	let wifiApModalCountdown = null;
+	let wifiApModalVisible = false;
+	let gestionQrVisible = false;
+
+	function showWifiApModal({ ap_ssid, ap_password, ap_ip, ap_url, qr_ap_url, qr_wifi }) {
+	  const wrap    = document.getElementById("wifi-ap-modal");
+	  const titleEl = document.getElementById("wifi-ap-title");
+	  const desc    = document.getElementById("wifi-ap-desc");
+	  const img     = document.getElementById("wifi-ap-qr");
+	  const urlEl   = document.getElementById("wifi-ap-url");
+	  const timerEl = document.getElementById("wifi-ap-timer");
+
+	  // URL donde el usuario configura WiFi mientras está en el AP
+	  const url = ap_url || (ap_ip ? `http://${ap_ip}:5000/wifi_setup` : "");
+
+	  // 🡒 Título específico para flujo AP (multi-idioma)
+	  titleEl.textContent =
+		tr("wifi.ap_qr_title") || "Manage WiFi connections";
+
+	  // 🡒 Texto explicando claramente que es el AP / onboarding WiFi
+	  const tpl =
+		tr("wifi.ap_qr_desc") ||
+		"1) Conectá tu dispositivo a la red {ssid} (clave {password})\n2) Escaneá el código o abrí la URL para configurar la conexión WiFi.";
+
+	  desc.textContent = tpl
+		.replace("{ssid}", ap_ssid || "?")
+		.replace("{password}", ap_password || "?");
+
+	  urlEl.textContent = url;
+	  img.src = qr_ap_url || qr_wifi || "";
+
+	  wrap.style.display = "flex";
+	  wifiApModalVisible = true;
+	  gestionQrVisible = false;   // aseguramos contexto correcto
+	  wifiApOverlayActive = true; // seguimos marcando que estamos en flujo AP
+
+	  // Timer 3 minutos (igual que antes)
+	  let remaining = 180;
+	  timerEl.textContent = formatTimer(remaining);
+
+	  if (wifiApModalCountdown) {
+		clearInterval(wifiApModalCountdown);
+		wifiApModalCountdown = null;
+	  }
+
+	  wifiApModalCountdown = setInterval(() => {
+		remaining -= 1;
+		timerEl.textContent = formatTimer(remaining);
+		if (remaining <= 0) {
+		  clearInterval(wifiApModalCountdown);
+		  wifiApModalCountdown = null;
+		  hideWifiApModal(true); // timeout → bajamos AP
+		}
+	  }, 1000);
+	}
+
+
+	function hideWifiApModal(requestStopAp = false) {
+	  const wrap = document.getElementById("wifi-ap-modal");
+	  wrap.style.display = "none";
+	  wifiApModalVisible = false;
+	  wifiApOverlayActive = false;
+
+	  if (wifiApModalCountdown) {
+		clearInterval(wifiApModalCountdown);
+		wifiApModalCountdown = null;
+	  }
+
+	  if (requestStopAp) {
+		fetch("/api/wifi/stop_ap", { method: "POST" }).catch(() => {});
+		ocultarOverlay(); // saca el overlay de texto si estaba
+	  }
+	}
+
+	function formatTimer(s) {
+	  const mm = Math.floor(s / 60).toString().padStart(2, "0");
+	  const ss = (s % 60).toString().padStart(2, "0");
+	  return `${mm}:${ss}`;
+	}
+
+		
+	// ---------- Modal QR GENÉRICO (para gestión, etc.) ----------
+
+	let genericQrCountdown = null;
+
+	function showGestionQrModal(url, qr_data) {
+	  const wrap    = document.getElementById("wifi-ap-modal");
+	  const titleEl = document.getElementById("wifi-ap-title");
+	  const desc    = document.getElementById("wifi-ap-desc");
+	  const img     = document.getElementById("wifi-ap-qr");
+	  const urlEl   = document.getElementById("wifi-ap-url");
+	  const timerEl = document.getElementById("wifi-ap-timer");
+
+	  titleEl.textContent = tr("wifi.qr_gestion_title") || "Gestión de Contenido";
+	  desc.textContent    = tr("wifi.qr_gestion_desc") || "Desde un dispositivo en la misma red, abrí esta dirección:";
+	  urlEl.textContent   = url;
+	  img.src             = qr_data || "";
+
+	  wrap.style.display  = "flex";
+
+	  gestionQrVisible    = true;
+	  wifiApModalVisible  = false; // por las dudas
+
+	  // Timer 3 minutos
+	  let remaining = 180;
+	  timerEl.textContent = formatTimer(remaining);
+
+	  if (genericQrCountdown) {
+		clearInterval(genericQrCountdown);
+		genericQrCountdown = null;
+	  }
+
+	  genericQrCountdown = setInterval(() => {
+		remaining -= 1;
+		timerEl.textContent = formatTimer(remaining);
+		if (remaining <= 0) {
+		  hideGestionQrModal();
+		}
+	  }, 1000);
+	}
+
+	function hideGestionQrModal() {
+	  const wrap    = document.getElementById("wifi-ap-modal");
+	  const timerEl = document.getElementById("wifi-ap-timer");
+
+	  wrap.style.display = "none";
+	  gestionQrVisible   = false;
+
+	  if (genericQrCountdown) {
+		clearInterval(genericQrCountdown);
+		genericQrCountdown = null;
+	  }
+	  if (timerEl) timerEl.textContent = "";
+	  // NO tocamos wifiApOverlayActive
+	}
+			
+	// ------------------------------------------------------------------
+	// 🧠  WATCHER y control de overlay persistente para modo hotspot
+	// ------------------------------------------------------------------
+
+	let wifiApOverlayActive = false;
+	let wifiApWatcher = null;
+
+	function startWifiApWatcher() {
+	  if (wifiApWatcher) return; // ya corriendo
+
+	  wifiApWatcher = setInterval(async () => {
+		if (!wifiApOverlayActive) {
+		  clearInterval(wifiApWatcher);
+		  wifiApWatcher = null;
+		  return;
+		}
+
+		try {
+		  const r = await fetch("/api/wifi/status");
+		  const d = await r.json();
+		  if (d.ok && d.mode === "client" && d.ssid) {
+		    // Salimos de modo AP y volvimos a modo cliente
+		    wifiApOverlayActive = false;
+		  
+		    // Si el modal de AP está visible, lo cerramos sin forzar stop_ap (el backend ya lo manejó)
+		    if (wifiApModalVisible) {
+		  	console.log("[WIFI][AP] Cliente conectado. Cerrando modal AP.");
+		  	hideWifiApModal(false);
+		    }
+		  
+		    ocultarOverlay();
+		  
+		    const tpl = tr("wifi.ap_done") || "Conectado a {ssid}";
+		    mostrarOverlay(
+		  	tpl.replace("{ssid}", d.ssid),
+		  	{ timeout: 4000, persist: false }
+		    );
+		  
+		    clearInterval(wifiApWatcher);
+		    wifiApWatcher = null;
+		  }
+
+		} catch (e) {
+		  // ignorar errores de red temporales
+		}
+	  }, 3000);
+	}
+
+	// ------------------------------------------------------------------
+	// 🔥 Función principal: iniciar modo hotspot y overlay fijo
+	// ------------------------------------------------------------------
+
+
+	async function wifiStartApFromMenu() {
+	  try {
+		const r = await fetch("/api/wifi/start_ap", { method: "POST" });
+		const d = await r.json();
+		if (!d.ok) {
+		  mostrarOverlay(tr("wifi.ap_error") || "No se pudo iniciar el hotspot");
+		  return;
+		}
+
+		const tpl =
+		  tr("wifi.ap_started") ||
+		  "Conectá tu celu a {ssid} (clave {password}) y abrí la página de configuración.";
+
+		const msg = tpl
+		  .replace("{ssid}", d.ap_ssid)
+		  .replace("{password}", d.ap_password);
+
+		// Overlay FIJO hasta éxito o cancelación
+		wifiApOverlayActive = true;
+		// mostrar modal con QR (si el backend devolvió qr_ap_url etc.)
+		if (d && (d.qr_ap_url || d.ap_url)) {
+		  showWifiApModal({
+			ap_ssid: d.ap_ssid,
+			ap_password: d.ap_password,
+			ap_ip: d.ap_ip,
+			ap_url: d.ap_url,
+			qr_ap_url: d.qr_ap_url,
+			qr_wifi: d.qr_wifi,
+			qr_text_wifi: d.qr_text_wifi
+		  });
+		} else {
+		  // fallback al overlay de texto tradicional
+		  mostrarOverlay(msg, { persist: true });
+		}
+		startWifiApWatcher();
+	  } catch (e) {
+		mostrarOverlay(tr("wifi.ap_error") || "No se pudo iniciar el hotspot");
+	  }
+	}
+
+
+	async function wifiApplyBestKnown() {
+	  try {
+		const r = await fetch("/api/wifi/apply_best", { method: "POST" });
+		const d = await r.json();
+		if (!d.ok) {
+		  const err = d.error || "";
+		  if (err === "no_known_networks") {
+			mostrarOverlay(tr("wifi.no_known") || "No hay redes guardadas");
+		  } else if (err === "no_known_visible") {
+			mostrarOverlay(tr("wifi.no_known_visible") || "Ninguna red guardada está disponible");
+		  } else {
+			mostrarOverlay(tr("wifi.best_error") || "No se pudo conectar a una red conocida");
+		  }
+		  return;
+		}
+		const tpl =
+		  tr("wifi.best_ok") || "Conectando a {ssid}…";
+		mostrarOverlay(tpl.replace("{ssid}", d.ssid || "?"));
+	  } catch (e) {
+		mostrarOverlay(tr("wifi.best_error") || "No se pudo conectar a una red conocida");
+	  }
+	}
+
+	async function wifiLoadKnown() {
+	  try {
+		const r = await fetch("/api/wifi/known");
+		const d = await r.json();
+		if (d.ok) {
+		  wifiKnownCache = d.networks || [];
+		} else {
+		  wifiKnownCache = [];
+		}
+	  } catch {
+		wifiKnownCache = [];
+	  }
+	}
+
+	async function wifiForget(ssid) {
+	  try {
+		const r = await fetch("/api/wifi/forget", {
+		  method: "POST",
+		  headers: { "Content-Type": "application/json" },
+		  body: JSON.stringify({ ssid })
+		});
+		const d = await r.json();
+		if (d.ok) {
+		  const tpl = tr("wifi.forget_ok") || "Red olvidada: {ssid}";
+		  mostrarOverlay(tpl.replace("{ssid}", ssid));
+		} else {
+		  mostrarOverlay(tr("wifi.forget_error") || "No se pudo olvidar la red");
+		}
+	  } catch (e) {
+		mostrarOverlay(tr("wifi.forget_error") || "No se pudo olvidar la red");
+	  }
+	}
+
+
+
+	function buildMenu() {
+	  const ul = menuListEl;
+	  ul.innerHTML = "";
+
+	  const items = []; // cada item será un string (rápida) — ver nota al final para mejorar con keys
+
+	  switch (menuMode) {
+	  
+		  
+		// =========================
+		// MENÚ PRINCIPAL
+		// =========================
+		case "main": {
+		
+		  items.push(tr("menu.predefined"));
+		  items.push(tr("menu.mine"));
+		  items.push(tr("menu.settings"));
+		  items.push(tr("menu.gaming"));
+		  items.push(tr("menu.poweroff"));
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// CONFIG
+		// =========================
+		case "config": {
+		  const onOff = uiShowChannelName ? tr("settings.yes") : tr("settings.no");
+		  items.push(`${tr("settings.show_channel_name")}: ${onOff}`);
+		  items.push(tr("settings.language"));
+		  items.push(tr("settings.wifi"));
+		  items.push(tr("menu.bt"));       
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// lang_root
+		// =========================
+
+		case "lang_root": {
+		  for (const lang of AVAILABLE_LANGS) {
+			const isCur = (lang.code === I18N.lang);
+			const bullet = isCur ? " ●" : ""; // marca el activo
+			items.push(`${tr(lang.key) || lang.label}${bullet}`);
+		  }
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// POWER CONFIRM
+		// =========================
+		case "power_confirm": {
+		  items.push(tr("power.confirm"));
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// BLUETOOTH ROOT
+		// =========================
+		case "bt_root": {
+		  items.push(tr("bt.root.known"));
+		  items.push(tr("bt.root.scan"));
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// BLUETOOTH: LISTA EMPAREJADOS
+		// =========================
+		case "bt_paired_list": {
+		  const list = Array.isArray(btPairedCache) ? btPairedCache : [];
+		  for (const dev of list) {
+		  const status = dev?.connected ? tr("bt.status_on") : tr("bt.status_off");
+		  const name = dev?.name || dev?.mac || tr("bt.unknown");
+			items.push(`${name} ${status}`);
+		  }
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// BLUETOOTH: LISTA ESCANEADA
+		// =========================
+		case "bt_scan_list": {
+		  const list = Array.isArray(btScanCache) ? btScanCache : [];
+		  for (const dev of list) {
+			const name = dev?.name || dev?.mac || tr("bt.unknown");
+			items.push(name);
+		  }
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// BLUETOOTH: ACCIONES EMPAREJADO
+		// =========================
+		case "bt_device_actions": {
+		  items.push(tr("bt.dev.connect"));
+		  items.push(tr("bt.dev.disconnect"));
+		  items.push(tr("bt.dev.forget"));
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// BLUETOOTH: ACCIONES NUEVO DISPOSITIVO
+		// =========================
+		case "bt_newdevice_actions": {
+		  items.push(tr("bt.new.pairconnect"));
+		  items.push(tr("menu.back"));
+		  break;
+		}
+		
+		case "wifi_root": {
+		  items.push(tr("wifi.show_status"));   // Ver estado actual
+		  items.push(tr("wifi.start_ap"));      // Iniciar AP / onboarding
+		  items.push(tr("wifi.apply_best"));    // Conectar a mejor conocida
+		  items.push(tr("wifi.manage_known"));  // Ver/olvidar redes guardadas
+		  items.push(tr("wifi.show_gestion_qr"));
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		case "wifi_known_list": {
+		  if (Array.isArray(wifiKnownCache) && wifiKnownCache.length) {
+			wifiKnownCache.forEach(ssid => items.push(ssid));
+		  } else {
+			items.push(tr("wifi.no_known") || "No hay redes guardadas");
+		  }
+		  items.push(tr("menu.back"));
+		  break;
+		}
+		
+		
+
+		// =========================
+		// DESCONOCIDO → fallback
+		// =========================
+		default: {
+		  // si algo raro pasó con menuMode, volvemos al main
+		  items.splice(0, items.length, tr("menu.back"));
+		  break;
+		}
+	  }
+
+	  // Render común
+	  for (const label of items) {
+		const li = document.createElement("li");
+		li.className = "menu-item";
+		li.dataset.label = label; // Nota: es frágil si el texto cambia por i18n
+		li.innerHTML = `<span class="cursor"> </span> ${label}`;
+		ul.appendChild(li);
+	  }
+	}
+
+
+	
+
+	function mostrarMenu() {
+	  if (menuVisible) {
+		ocultarMenu();
+		return;
+	  }
+	  menuVisible = true;
+	  menuMode = "main"; // siempre entra al principal
+	  menuEl.style.display = "block";
+	  buildMenu();
+	  menuIndex = 0;
+	  renderMenu();
+	  setMenuOpenState(true);
+	  resetMenuTimer();
+	}
+	function ocultarMenu() {
+	  menuVisible = false;
+	  menuEl.style.display = "none";
+	  clearTimeout(menuTimer);
+	  setMenuOpenState(false);
+	}
+
+	function moverCursor(delta) {
+	  const total = menuListEl.querySelectorAll(".menu-item").length;
+	  menuIndex = (menuIndex + (delta > 0 ? 1 : -1) + total) % total;
+	  renderMenu();
+	  resetMenuTimer();
+	}
+
+
+  // Helpers DRY
+  function go(mode) {
+    menuMode = mode;
+    buildMenu();
+    menuIndex = 0;
+    renderMenu();
+    resetMenuTimer();
+  }
+  function isBack(label) {
+    return label === tr("menu.back");
+  }
+
+	function goBackFrom(mode) {
+	  switch (mode) {
+		case "main":
+		  ocultarMenu();
+		  return;
+
+		case "config":
+		  return go("main");
+
+		case "lang_root":
+		  return go("config");
+
+		case "bt_root":
+		  return go("config");
+		  
+		case "power_confirm":
+		  return go("main");
+
+		case "bt_paired_list":
+		case "bt_scan_list":
+		  return go("bt_root");
+
+		case "bt_device_actions":
+		  return go("bt_paired_list");
+
+		case "bt_newdevice_actions":
+		  return go("bt_scan_list");
+
+		case "wifi_root":
+		  wifiApOverlayActive = false;
+		  ocultarOverlay();
+		  return go("config");
+
+		case "wifi_known_list":
+		  wifiApOverlayActive = false;
+		  ocultarOverlay();
+		  return go("wifi_root");
+
+		default:
+		  return go("main");
+	  }
+	}
+
+
+
+function ejecutarSeleccion() {
+  const items = [...menuListEl.querySelectorAll(".menu-item")];
+  if (!items.length) {
+    resetMenuTimer();
+    return;
+  }
+
+  const label =
+    items[menuIndex]?.dataset?.label ||
+    items[menuIndex]?.textContent?.trim() ||
+    "";
+	
+  console.log("[MENU] ejecutarSeleccion", {
+    mode: menuMode,
+    index: menuIndex,
+    label: label
+  });
+
+  if (!label) {
+    resetMenuTimer();
+    return;
+  }
+
+  // =========================
+  // MENÚ PRINCIPAL
+  // =========================
+  if (menuMode === "main") {
+    if (isBack(label)) return ocultarMenu();
+
+    if (label === tr("menu.settings")) return go("config");
+    if (label === tr("menu.poweroff")) return go("power_confirm");
+
+    if (label === tr("menu.gaming")) {
+      mostrarOverlay("Entrando en Modo Juegos…");
+      ocultarMenu();
+      fetch("/api/gaming", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "enter" })
+      }).catch(() => {});
+      return;
+    }
+
+    // resto (predefinidos, etc.) todavía WIP
+
+    resetMenuTimer();
+    return;
+  }
+
+  // =========================
+  // SUBMENÚ CONFIG
+  // =========================
+  if (menuMode === "config") {
+    if (isBack(label)) return goBackFrom("config");
+
+    if (label.startsWith(tr("settings.show_channel_name"))) {
+      uiShowChannelName = !uiShowChannelName;
+      if (!uiShowChannelName) {
+        channelBadgeEl.style.display = "none";
+      } else if (channelBadgeEl.textContent) {
+        showChannelBadgeFor(3);
+      }
+      guardarUiPrefs();
+      return go("config");
+    }
+
+    if (label === tr("settings.language")) {
+      return go("lang_root");
+    }
+
+    if (label === tr("settings.wifi")) {
+      wifiShowStatusOverlay();
+      return go("wifi_root");
+    }
+	
+	if (label === tr("menu.bt")) {
+      btEnsureAdapter().then(() => go("bt_root"));
+      return;
+    }
+
+    return;
+  }
+
+  // =========================
+  // SUBMENÚ IDIOMA
+  // =========================
+  if (menuMode === "lang_root") {
+    const last = items.length - 1;
+    const isBackItem = (menuIndex === last) || isBack(label);
+    if (isBackItem) return goBackFrom("lang_root");
+
+    const idx = menuIndex;
+    const lang = AVAILABLE_LANGS[idx];
+    if (lang && lang.code !== I18N.lang) {
+      setLanguage(lang.code).then(() => go("config"));
+    } else {
+      go("config");
+    }
+    return;
+  }
+
+  // =========================
+  // SUBMENÚ WIFI ROOT
+  // =========================
+  if (menuMode === "wifi_root") {
+    const last = items.length - 1;
+
+    if (menuIndex === last || isBack(label)) {
+	  console.log("[WIFI][MENU] Volver desde wifi_root");	
+      return goBackFrom("wifi_root");
+    }
+	
+	console.log("[WIFI][MENU] Opción wifi_root seleccionada", {
+		index: menuIndex,
+		label
+	  });
+
+    // 0: show_status
+    if (menuIndex === 0) {
+	  console.log("[WIFI][MENU] -> show_status");
+      wifiShowStatusOverlay();
+      resetMenuTimer();
+      return;
+    }
+
+    // 1: start_ap
+    if (menuIndex === 1) {
+	  console.log("[WIFI][MENU] -> start_ap");
+      menuAutohideEnabled = false;
+      clearTimeout(menuTimer);
+      wifiStartApFromMenu()
+        .finally(() => {
+          menuAutohideEnabled = true;
+          resetMenuTimer();
+        });
+      return;
+    }
+
+    // 2: apply_best
+    if (menuIndex === 2) {
+	  console.log("[WIFI][MENU] -> apply_best");
+      wifiApplyBestKnown();
+      resetMenuTimer();
+      return;
+    }
+
+    // 3: manage_known
+    if (menuIndex === 3) {
+	  console.log("[WIFI][MENU] -> manage_known");
+      wifiLoadKnown().then(() => {
+        go("wifi_known_list");
+      });
+      return;
+    }
+	
+	// 4: show gestion QR
+	if (menuIndex === 4) {
+	  console.log("[WIFI][MENU] -> show_gestion_qr");
+	  wifiShowGestionQRCode();
+	  resetMenuTimer();
+	  return;
+	}
+	
+	console.warn("[WIFI][MENU] Índice inesperado en wifi_root", {
+		index: menuIndex,
+		label
+	  });
+
+    return;
+  }
+
+  // =========================
+  // SUBMENÚ WIFI: LISTA DE REDES GUARDADAS
+  // =========================
+  if (menuMode === "wifi_known_list") {
+    const last = items.length - 1;
+
+    if (menuIndex === last || isBack(label)) {
+      return goBackFrom("wifi_known_list");
+    }
+
+    const ssid = wifiKnownCache[menuIndex];
+    if (!ssid) {
+      resetMenuTimer();
+      return;
+    }
+
+    wifiForget(ssid).then(() => {
+      wifiLoadKnown().then(() => {
+        go("wifi_known_list");
+      });
+    });
+    return;
+  }
+
+  // =========================
+  // SUBMENÚ POWER_CONFIRM
+  // =========================
+  if (menuMode === "power_confirm") {
+    if (isBack(label)) return goBackFrom("power_confirm");
+
+    if (label === tr("power.confirm")) {
+      mostrarOverlay(tr("overlay.shutting_down") || "…");
+      ocultarMenu();
+      if (!window.__haltDispatched) {
+        window.__haltDispatched = true;
+        fetch("/api/power", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "halt" })
+        }).catch(() => {});
+      }
+      return;
+    }
+    return;
+  }
+
+  // =========================
+  // BLUETOOTH ROOT
+  // =========================
+  if (menuMode === "bt_root") {
+    if (isBack(label)) return goBackFrom("bt_root");
+
+    if (label === tr("bt.root.known")) {
+      btLoadPaired().then(() => go("bt_paired_list"));
+      return;
+    }
+
+    if (label === tr("bt.root.scan")) {
+      mostrarOverlay("overlay.searching");
+      menuAutohideEnabled = false;
+      clearTimeout(menuTimer);
+
+      btLoadScan().then(() => {
+        go("bt_scan_list");
+        menuAutohideEnabled = true;
+        resetMenuTimer();
+      });
+      return;
+    }
+    return;
+  }
+
+  // =========================
+  // BLUETOOTH: LISTA EMPAREJADOS
+  // =========================
+  if (menuMode === "bt_paired_list") {
+    const esVolver =
+      (menuIndex === items.length - 1) || isBack(label);
+    if (esVolver) return goBackFrom("bt_paired_list");
+
+    btSelectedIndex = menuIndex;
+    return go("bt_device_actions");
+  }
+
+  // =========================
+  // BLUETOOTH: LISTA ESCANEADA
+  // =========================
+  if (menuMode === "bt_scan_list") {
+    const esVolver =
+      (menuIndex === items.length - 1) || isBack(label);
+    if (esVolver) return goBackFrom("bt_scan_list");
+
+    btSelectedIndex = menuIndex;
+    return go("bt_newdevice_actions");
+  }
+
+  // =========================
+  // BLUETOOTH: ACCIONES EMPAREJADO
+  // =========================
+  if (menuMode === "bt_device_actions") {
+    const dev = btPairedCache?.[btSelectedIndex];
+    if (!dev) return go("bt_paired_list");
+
+    if (isBack(label)) return goBackFrom("bt_device_actions");
+
+    if (label === tr("bt.dev.connect")) {
+      btConnect(dev.mac).then(async () => {
+        await btLoadPaired();
+        go("bt_paired_list");
+      });
+      return;
+    }
+    if (label === tr("bt.dev.disconnect")) {
+      btDisconnect(dev.mac).then(async () => {
+        await btLoadPaired();
+        go("bt_paired_list");
+      });
+      return;
+    }
+    if (label === tr("bt.dev.forget")) {
+      btForget(dev.mac).then(async () => {
+        await btLoadPaired();
+        go("bt_paired_list");
+      });
+      return;
+    }
+    return;
+  }
+
+  // =========================
+  // BLUETOOTH: ACCIONES NUEVO DISPOSITIVO
+  // =========================
+  if (menuMode === "bt_newdevice_actions") {
+    const dev = btScanCache?.[btSelectedIndex];
+    if (!dev) return go("bt_scan_list");
+
+    if (isBack(label)) return goBackFrom("bt_newdevice_actions");
+
+    if (label === tr("bt.new.pairconnect")) {
+      mostrarOverlay("overlay.pairing");
+      menuAutohideEnabled = false;
+      clearTimeout(menuTimer);
+
+      btPairAndConnect(dev.mac)
+        .then(async (res) => {
+          console.log("[BT] pairconnect result:", res);
+          await btLoadPaired();
+          mostrarOverlay("overlay.paired_ok");
+          go("bt_paired_list");
+        })
+        .catch(e => {
+          console.error("[BT] pairconnect error:", e);
+          mostrarOverlay("overlay.pair_error");
+        })
+        .finally(() => {
+          menuAutohideEnabled = true;
+          resetMenuTimer();
+        });
+      return;
+    }
+    return;
+  }
+
+  // Fallback
+  go("main");
+}
+
+
+	let lastMenuPingTs = 0;
+	let menuPollingArmed = false;              
+	setTimeout(() => { menuPollingArmed = true; }, 800);
+
+	// Poll de eventos del encoder (flanco de bajada sin giro)
+	// Prioridad:
+	// 1) Si hay modal AP visible       -> cerrar modal AP (y bajar AP si corresponde)
+	// 2) Si hay modal gestión visible  -> cerrar modal gestión
+	// 3) Sino, toggle del menú como siempre
+	setInterval(async () => {
+	  try {
+		const res = await fetch("/api/menu_ping");
+		const data = await res.json();
+		if (!data.ping || !data.ts || data.ts === lastMenuPingTs) return;
+
+		lastMenuPingTs = data.ts;
+
+		// 1) Cerrar QR de AP si está visible
+		if (wifiApModalVisible) {
+		  console.log("[WIFI][QR] Cerrar modal AP por menu_ping");
+		  hideWifiApModal(true); // true => stop_ap en backend
+		  return;
+		}
+
+		// 2) Cerrar QR de gestión si está visible
+		if (gestionQrVisible) {
+		  console.log("[WIFI][QR] Cerrar modal gestión por menu_ping");
+		  hideGestionQrModal();
+		  return;
+		}
+
+		// 3) Si aún no habilitamos el toggle global, no hacemos nada más
+		if (!menuPollingArmed) {
+		  return;
+		}
+
+		// 4) Toggle del menú normal
+		if (menuVisible) {
+		  ocultarMenu();
+		} else {
+		  mostrarMenu();
+		}
+
+	  } catch (e) {
+		console.error("Error en /api/menu_ping:", e);
+	  }
+	}, 200);
+
+	
+	// NAV por giro cuando el menú está visible
+	setInterval(async () => {
+	  if (!menuVisible) return;
+	  try {
+		const r = await fetch("/api/menu_nav");
+		const d = await r.json();
+		if (d.ping && typeof d.delta === "number") {
+		  moverCursor(d.delta);
+		}
+	  } catch (e) {
+		console.error("Error /api/menu_nav:", e);
+	  }
+	}, 120);
+
+
+	// SELECT (apretar/soltar)
+	// - Si hay modal AP visible  -> cierra modal y (si corresponde) baja AP
+	// - Si hay modal gestión QR  -> cierra modal
+	// - Sino, si menú visible    -> ejecutarSeleccion() como siempre
+	setInterval(async () => {
+	  try {
+		const r = await fetch("/api/menu_select");
+		const d = await r.json();
+		if (!d.ping) return;
+
+		// 1) Prioridad: cerrar QR de AP
+		if (wifiApModalVisible) {
+		  console.log("[WIFI][QR] Cerrar modal AP por encoder");
+		  hideWifiApModal(true);  // true => stop_ap en backend
+		  return;
+		}
+
+		// 2) Cerrar QR de gestión
+		if (gestionQrVisible) {
+		  console.log("[WIFI][QR] Cerrar modal gestión por encoder");
+		  hideGestionQrModal();
+		  return;
+		}
+
+		// 3) Si el menú está visible, usamos el select como antes
+		if (menuVisible) {
+		  ejecutarSeleccion();
+		}
+
+		// Si no hay menú ni modal, ignoramos el select (o podrías togglear menú acá si quisieras)
+
+	  } catch (e) {
+		console.error("Error /api/menu_select:", e);
+	  }
+	}, 120);
+
+	
+	// --- Preferencias UI ---
+	let uiShowChannelName = true;
+	const channelBadgeEl = document.getElementById("channel-badge");
+
+	async function cargarUiPrefs() {
+	  try {
+		const r = await fetch("/api/ui_prefs");
+		const d = await r.json();
+		uiShowChannelName = !!d.show_channel_name;
+		aplicarVisibilidadBadge();
+	  } catch {}
+	}
+
+	async function guardarUiPrefs() {
+	  try {
+		await fetch("/api/ui_prefs", {
+		  method: "POST",
+		  headers: {"Content-Type": "application/json"},
+		  body: JSON.stringify({ show_channel_name: uiShowChannelName })
+		});
+	  } catch {}
+	}
+
+	function aplicarVisibilidadBadge() {
+	  if (!uiShowChannelName) {
+		channelBadgeEl.style.display = "none"; // si está off, ocultar
+	  }
+	  // si está on, no lo mostramos acá: lo muestra setChannelBadgeText() por 10s
+	}
+
+	let badgeTimer = null;
+	function showChannelBadgeFor(seconds = 10) {
+	  if (!uiShowChannelName) return;
+	  channelBadgeEl.style.display = "block";
+	  clearTimeout(badgeTimer);
+	  badgeTimer = setTimeout(() => { channelBadgeEl.style.display = "none"; }, seconds * 1000);
+	}
+	
+	function setChannelBadgeText(nombre) {
+	  channelBadgeEl.textContent = nombre || "";
+	  showChannelBadgeFor(10);
+	}
+	
+	const muteIndicator = document.getElementById("mute-indicator");
+
+	function setMuteVisible(show){
+	  muteIndicator.style.display = show ? "flex" : "none";
+	}
+
+	// volumen en 0 o video.muted => mostrar
+	function updateMuteIndicatorFromVol(volPercent){
+	  const vol0to1 = (typeof volPercent === "number" ? volPercent/100 : video.volume);
+	  const shouldShow = video.muted || vol0to1 <= 0.001;
+	  setMuteVisible(shouldShow);
+	}
+	
+	fetch("/api/kiosk_ping?src=player", {method:"POST", keepalive:true}).catch(()=>{});
+	setInterval(()=>{ navigator.sendBeacon("/api/kiosk_ping?src=player"); }, 2000);
+
+  // --- PING watchdog ---
+  function wdPing() {
+    try {
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify({at: Date.now()})], {type: 'application/json'});
+        navigator.sendBeacon("{{ url_for('api_ping') }}", blob);
+      } else {
+        fetch("{{ url_for('api_ping') }}", {method: "POST", headers:{'Content-Type':'application/json'}, body: JSON.stringify({at: Date.now()}), keepalive: true});
+      }
+    } catch(e) {}
+  }
+  wdPing();                 // ping inmediato al cargar player
+  const wdTimer = setInterval(wdPing, 5000);
+  window.addEventListener('beforeunload', () => clearInterval(wdTimer));
+
+	
+  (function bootProbe(){
+    try {
+      const url = "/api/boot_probe";
+      const payload = JSON.stringify({ stage: "player_loaded" });
+      if (navigator.sendBeacon) {
+        const blob = new Blob([payload], {type: "application/json"});
+        navigator.sendBeacon(url, blob);
+      } else {
+        fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body:payload, keepalive:true});
+      }
+    } catch(e) {}
+  })();
+  
+  
+    async function updateWifiStatusIcon() {
+    const icon = document.getElementById("wifi-icon");
+    const label = document.getElementById("wifi-status-label");
+    if (!icon || !label) return;
+
+    try {
+      const res = await fetch("/api/wifi/status", { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+
+      // Reset clases
+      icon.classList.remove("wifi-on", "wifi-off", "wifi-ap");
+      label.classList.remove("wifi-on-text", "wifi-offline-text", "wifi-ap-text");
+
+      if (!data.ok) {
+        // Error en backend -> tratamos como offline
+        icon.classList.add("wifi-off");
+        label.classList.add("wifi-offline-text");
+        label.textContent = "Sin conexión";
+        return;
+      }
+
+      const mode = data.mode;
+      const ssid = data.ssid || "";
+
+      if (mode === "client" && ssid) {
+        // Conectado como cliente WiFi
+        icon.classList.add("wifi-on");
+        label.classList.add("wifi-on-text");
+        label.textContent = ssid;
+      } else if (mode === "ap") {
+        // Modo AP propio: dejar clarísimo que es setup, no “online”
+        icon.classList.add("wifi-ap");
+        label.classList.add("wifi-ap-text");
+        label.textContent = "Modo Setup WiFi";
+      } else {
+        // disconnected / error
+        icon.classList.add("wifi-off");
+        label.classList.add("wifi-offline-text");
+        label.textContent = "Offline";
+      }
+    } catch (e) {
+      // Si no responde el backend, asumimos offline
+      const icon = document.getElementById("wifi-icon");
+      const label = document.getElementById("wifi-status-label");
+      if (!icon || !label) return;
+      icon.classList.remove("wifi-on", "wifi-ap");
+      icon.classList.add("wifi-off");
+      label.classList.remove("wifi-on-text", "wifi-ap-text");
+      label.classList.add("wifi-offline-text");
+      label.textContent = "Offline";
+    }
+  }
+
+  // Llamar al cargar y luego cada pocos segundos
+  document.addEventListener("DOMContentLoaded", () => {
+    updateWifiStatusIcon();
+    setInterval(updateWifiStatusIcon, 5000); // 5s es razonable
+  });
+  
+  </script>
+</body>
+</html>
