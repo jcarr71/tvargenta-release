@@ -65,7 +65,7 @@ Creative Commons Attribution – NonCommercial – NoDerivs 4.0 International
 (CC BY-NC-ND 4.0)
 
 -------------------------------------------------------------
-# For anyone who prefers building everything manually
+# For anyone who prefers building everything manually (only applicable to Release 1.0)
 
 # Part One: Basic Raspberry Pi Configuration
 
