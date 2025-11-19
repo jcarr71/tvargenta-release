@@ -87,7 +87,7 @@ Creative Commons Attribution – NonCommercial – NoDerivs 4.0 International
 (CC BY-NC-ND 4.0)
 
 -------------------------------------------------------------
-# Para quienes quieran hacerlo todo a mano
+# Para quienes quieran hacerlo todo a mano (Aplicable para Release 1.0)
 
 # Primera parte: Configuracion basica de la Raspberry Pi
 
