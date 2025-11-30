@@ -331,7 +331,127 @@
 	.wifi-on-text {
 	  color: #8affb3; /* verde pastel */
 	}
-	
+
+	/* ==================== VHS MODE STYLES ==================== */
+
+	/* Channel number display (top-left, for VHS channel "03") */
+	#vhs-channel-number {
+	  position: absolute;
+	  top: 24px;
+	  left: 24px;
+	  font-family: "VT323", "Courier New", monospace;
+	  font-size: 72px;
+	  font-weight: bold;
+	  color: #ffffff;
+	  text-shadow:
+		4px 4px 0 #000000,
+		-2px -2px 0 #000000,
+		2px -2px 0 #000000,
+		-2px 2px 0 #000000;
+	  z-index: 10000;
+	  display: none;
+	  letter-spacing: 4px;
+	}
+
+	/* VHS rewind overlay */
+	#vhs-rewind-overlay {
+	  position: fixed;
+	  inset: 0;
+	  background: #000000;
+	  display: none;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  z-index: 15000;
+	}
+
+	#vhs-rewind-overlay .rewind-content {
+	  text-align: center;
+	  color: #00ff00;
+	  font-family: "VT323", "Courier New", monospace;
+	}
+
+	#vhs-rewind-overlay .rewind-icon {
+	  font-size: 96px;
+	  margin-bottom: 20px;
+	  animation: rewindBlink 0.5s ease-in-out infinite;
+	}
+
+	#vhs-rewind-overlay .rewind-text {
+	  font-size: 48px;
+	  margin-bottom: 30px;
+	  letter-spacing: 8px;
+	}
+
+	#vhs-rewind-overlay .rewind-timer {
+	  font-size: 72px;
+	  font-weight: bold;
+	}
+
+	#vhs-rewind-overlay .rewind-bar {
+	  width: 400px;
+	  height: 20px;
+	  background: #003300;
+	  border: 2px solid #00ff00;
+	  margin-top: 30px;
+	  overflow: hidden;
+	}
+
+	#vhs-rewind-overlay .rewind-bar-fill {
+	  height: 100%;
+	  background: #00ff00;
+	  width: 100%;
+	  transition: width 1s linear;
+	}
+
+	@keyframes rewindBlink {
+	  0%, 100% { opacity: 1; }
+	  50% { opacity: 0.5; }
+	}
+
+	/* "PUSH AGAIN TO REWIND" message */
+	#vhs-rewind-prompt {
+	  position: fixed;
+	  top: 50%;
+	  left: 50%;
+	  transform: translate(-50%, -50%);
+	  background: rgba(0, 0, 0, 0.85);
+	  border: 4px solid #ffffff;
+	  padding: 30px 50px;
+	  font-family: "VT323", "Courier New", monospace;
+	  font-size: 36px;
+	  color: #ffffff;
+	  text-align: center;
+	  z-index: 14000;
+	  display: none;
+	  letter-spacing: 3px;
+	  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+	}
+
+	/* VHS tracking lines effect (subtle) */
+	#vhs-tracking-lines {
+	  position: fixed;
+	  inset: 0;
+	  pointer-events: none;
+	  z-index: 14500;
+	  display: none;
+	  background: repeating-linear-gradient(
+		0deg,
+		transparent,
+		transparent 2px,
+		rgba(0, 0, 0, 0.1) 2px,
+		rgba(0, 0, 0, 0.1) 4px
+	  );
+	  animation: vhsTracking 0.1s linear infinite;
+	}
+
+	@keyframes vhsTracking {
+	  0% { transform: translateY(0); }
+	  100% { transform: translateY(4px); }
+	}
+
+	/* ==================== END VHS MODE STYLES ==================== */
+
   </style>
   
 </head>
@@ -376,6 +496,24 @@
  </div>
   
   <div id="channel-badge"></div>
+
+  <!-- VHS Mode Elements -->
+  <div id="vhs-channel-number">03</div>
+
+  <div id="vhs-rewind-prompt">PUSH AGAIN TO REWIND</div>
+
+  <div id="vhs-rewind-overlay">
+    <div class="rewind-content">
+      <div class="rewind-icon">&#9668;&#9668;</div>
+      <div class="rewind-text">REWIND</div>
+      <div class="rewind-timer" id="vhs-rewind-timer">02:00</div>
+      <div class="rewind-bar">
+        <div class="rewind-bar-fill" id="vhs-rewind-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="vhs-tracking-lines"></div>
 	
  <!-- Indicador de mute -->
   <div id="mute-indicator" aria-hidden="true" title="{{ tr('vol.mute_title') }}">
@@ -455,8 +593,393 @@
 	  // sumá más si querés: {code:"it", key:"lang.it", label:"Italiano"}
 	];
 
-	
-	
+	// ==================== VHS MODE STATE ====================
+	let vhsMode = false;              // Are we on the VHS channel?
+	let vhsTapeInserted = false;      // Is a tape currently inserted?
+	let vhsVideoId = null;            // Current tape's UUID
+	let vhsPlaylist = [];             // List of videos on current tape
+	let vhsCurrentIndex = 0;          // Current video index in playlist
+	let vhsCurrentPosition = 0;       // Current playback position in seconds
+	let vhsTapeFinished = false;      // Has the tape played to the end?
+	let vhsLastTapeTimestamp = 0;     // For detecting tape state changes
+	let vhsRewindActive = false;      // Is rewind animation playing?
+	let vhsRewindTimer = null;        // Rewind countdown timer
+	let vhsRewindPromptTimer = null;  // "Push again" timeout
+	let vhsRewindPromptVisible = false;
+	let vhsSavePositionTimer = null;  // Periodic position save
+	const VHS_REWIND_DURATION = 120;  // 2 minutes in seconds
+	const VHS_REWIND_PROMPT_TIMEOUT = 3000; // 3 seconds to confirm rewind
+	const VHS_POSITION_SAVE_INTERVAL = 5000; // Save position every 5 seconds
+	const VHS_POLL_INTERVAL = 200;    // Poll tape state every 200ms
+
+	// VHS DOM elements
+	const vhsChannelNumber = document.getElementById('vhs-channel-number');
+	const vhsRewindPrompt = document.getElementById('vhs-rewind-prompt');
+	const vhsRewindOverlay = document.getElementById('vhs-rewind-overlay');
+	const vhsRewindTimerEl = document.getElementById('vhs-rewind-timer');
+	const vhsRewindBarFill = document.getElementById('vhs-rewind-bar-fill');
+	const vhsTrackingLines = document.getElementById('vhs-tracking-lines');
+
+	// ==================== VHS FUNCTIONS ====================
+
+	function isVhsChannel() {
+	  return ultimoCanal === 'VHS';
+	}
+
+	async function vhsFetchStatus() {
+	  try {
+		const r = await fetch('/api/vhs/status');
+		return await r.json();
+	  } catch (e) {
+		console.error('[VHS] Status fetch error:', e);
+		return { inserted: false, video_id: null };
+	  }
+	}
+
+	async function vhsSavePosition() {
+	  if (!vhsVideoId || vhsRewindActive) return;
+
+	  const position = video.currentTime || 0;
+	  try {
+		await fetch(`/api/vhs/state/${vhsVideoId}`, {
+		  method: 'POST',
+		  headers: { 'Content-Type': 'application/json' },
+		  body: JSON.stringify({
+			current_file_index: vhsCurrentIndex,
+			position_seconds: position
+		  })
+		});
+	  } catch (e) {
+		console.warn('[VHS] Save position error:', e);
+	  }
+	}
+
+	async function vhsLoadSavedPosition() {
+	  if (!vhsVideoId) return null;
+
+	  try {
+		const r = await fetch(`/api/vhs/state/${vhsVideoId}`);
+		return await r.json();
+	  } catch (e) {
+		console.warn('[VHS] Load position error:', e);
+		return null;
+	  }
+	}
+
+	function vhsShowChannelNumber(show) {
+	  vhsChannelNumber.style.display = show ? 'block' : 'none';
+	}
+
+	function vhsPlayStatic() {
+	  console.log('[VHS] Playing static');
+	  video.src = '/videos/vhs_static.mp4';
+	  video.loop = true;
+	  video.load();
+	  video.play().catch(e => console.warn('[VHS] Static play error:', e));
+	}
+
+	async function vhsStartTapePlayback() {
+	  if (!vhsVideoId || vhsPlaylist.length === 0) {
+		console.warn('[VHS] No tape or empty playlist');
+		vhsPlayStatic();
+		return;
+	  }
+
+	  console.log('[VHS] Starting tape playback:', vhsVideoId);
+	  vhsTapeFinished = false;
+	  video.loop = false;
+
+	  // Load saved position
+	  const savedState = await vhsLoadSavedPosition();
+	  if (savedState && savedState.current_file_index !== undefined) {
+		vhsCurrentIndex = Math.min(savedState.current_file_index, vhsPlaylist.length - 1);
+		vhsCurrentPosition = savedState.position_seconds || 0;
+	  } else {
+		vhsCurrentIndex = 0;
+		vhsCurrentPosition = 0;
+	  }
+
+	  vhsPlayCurrentFile();
+	}
+
+	function vhsPlayCurrentFile() {
+	  if (vhsCurrentIndex >= vhsPlaylist.length) {
+		// Tape finished
+		console.log('[VHS] Tape finished - showing static');
+		vhsTapeFinished = true;
+		vhsPlayStatic();
+		return;
+	  }
+
+	  const file = vhsPlaylist[vhsCurrentIndex];
+	  console.log(`[VHS] Playing file ${vhsCurrentIndex + 1}/${vhsPlaylist.length}: ${file.filename}`);
+
+	  video.src = file.path;
+	  video.loop = false;
+	  video.load();
+
+	  // Set position if resuming
+	  if (vhsCurrentPosition > 0) {
+		video.currentTime = vhsCurrentPosition;
+		vhsCurrentPosition = 0; // Only use once
+	  }
+
+	  video.play().catch(e => console.warn('[VHS] Play error:', e));
+
+	  // Start position saving
+	  clearInterval(vhsSavePositionTimer);
+	  vhsSavePositionTimer = setInterval(vhsSavePosition, VHS_POSITION_SAVE_INTERVAL);
+	}
+
+	function vhsOnVideoEnded() {
+	  if (!vhsMode || !vhsTapeInserted) return;
+
+	  // Save position at end of file
+	  vhsSavePosition();
+
+	  // Move to next file
+	  vhsCurrentIndex++;
+	  vhsCurrentPosition = 0;
+
+	  if (vhsCurrentIndex < vhsPlaylist.length) {
+		// Play next file (gapless)
+		vhsPlayCurrentFile();
+	  } else {
+		// Tape finished
+		console.log('[VHS] All files played - tape finished');
+		vhsTapeFinished = true;
+		vhsPlayStatic();
+	  }
+	}
+
+	function vhsStopPlayback() {
+	  console.log('[VHS] Stopping playback');
+	  clearInterval(vhsSavePositionTimer);
+	  vhsSavePosition(); // Final save
+	  video.pause();
+	}
+
+	async function vhsOnTapeInserted(videoId) {
+	  console.log('[VHS] Tape inserted:', videoId);
+	  vhsTapeInserted = true;
+	  vhsVideoId = videoId;
+	  vhsTapeFinished = false;
+
+	  // Fetch playlist
+	  try {
+		const r = await fetch(`/api/vhs/playlist/${videoId}`);
+		const data = await r.json();
+		vhsPlaylist = data.playlist || [];
+	  } catch (e) {
+		console.error('[VHS] Playlist fetch error:', e);
+		vhsPlaylist = [];
+	  }
+
+	  if (vhsMode) {
+		vhsStartTapePlayback();
+	  }
+	}
+
+	function vhsOnTapeRemoved() {
+	  console.log('[VHS] Tape removed');
+	  vhsSavePosition(); // Save before clearing
+	  clearInterval(vhsSavePositionTimer);
+
+	  vhsTapeInserted = false;
+	  vhsVideoId = null;
+	  vhsPlaylist = [];
+	  vhsCurrentIndex = 0;
+	  vhsCurrentPosition = 0;
+	  vhsTapeFinished = false;
+
+	  // Cancel any rewind prompt
+	  vhsHideRewindPrompt();
+
+	  if (vhsMode) {
+		vhsPlayStatic();
+	  }
+	}
+
+	function vhsEnterChannel() {
+	  console.log('[VHS] Entering VHS channel');
+	  vhsMode = true;
+	  vhsShowChannelNumber(true);
+
+	  // Hide regular channel badge
+	  channelBadgeEl.style.display = 'none';
+
+	  if (vhsTapeInserted && vhsPlaylist.length > 0) {
+		vhsStartTapePlayback();
+	  } else {
+		vhsPlayStatic();
+	  }
+	}
+
+	function vhsExitChannel() {
+	  console.log('[VHS] Exiting VHS channel');
+
+	  // Save position before leaving
+	  if (vhsTapeInserted) {
+		vhsSavePosition();
+	  }
+
+	  clearInterval(vhsSavePositionTimer);
+	  vhsMode = false;
+	  vhsShowChannelNumber(false);
+	  vhsHideRewindPrompt();
+	  vhsCancelRewind();
+
+	  video.loop = false;
+	}
+
+	// ==================== VHS REWIND ====================
+
+	function vhsShowRewindPrompt() {
+	  if (!vhsMode || !vhsTapeInserted || vhsRewindActive) return;
+
+	  console.log('[VHS] Showing rewind prompt');
+	  vhsRewindPromptVisible = true;
+	  vhsRewindPrompt.style.display = 'block';
+
+	  // Auto-hide after timeout
+	  clearTimeout(vhsRewindPromptTimer);
+	  vhsRewindPromptTimer = setTimeout(() => {
+		vhsHideRewindPrompt();
+	  }, VHS_REWIND_PROMPT_TIMEOUT);
+	}
+
+	function vhsHideRewindPrompt() {
+	  vhsRewindPromptVisible = false;
+	  vhsRewindPrompt.style.display = 'none';
+	  clearTimeout(vhsRewindPromptTimer);
+	}
+
+	function vhsStartRewind() {
+	  if (!vhsMode || !vhsTapeInserted || vhsRewindActive) return;
+
+	  console.log('[VHS] Starting 2-minute rewind');
+	  vhsHideRewindPrompt();
+	  vhsRewindActive = true;
+
+	  // Pause current playback
+	  video.pause();
+	  clearInterval(vhsSavePositionTimer);
+
+	  // Show rewind overlay with tracking lines
+	  vhsRewindOverlay.style.display = 'flex';
+	  vhsTrackingLines.style.display = 'block';
+
+	  let remaining = VHS_REWIND_DURATION;
+	  vhsUpdateRewindDisplay(remaining);
+
+	  vhsRewindTimer = setInterval(() => {
+		remaining--;
+		vhsUpdateRewindDisplay(remaining);
+
+		if (remaining <= 0) {
+		  vhsCompleteRewind();
+		}
+	  }, 1000);
+	}
+
+	function vhsUpdateRewindDisplay(remaining) {
+	  const mins = Math.floor(remaining / 60).toString().padStart(2, '0');
+	  const secs = (remaining % 60).toString().padStart(2, '0');
+	  vhsRewindTimerEl.textContent = `${mins}:${secs}`;
+
+	  const progress = ((VHS_REWIND_DURATION - remaining) / VHS_REWIND_DURATION) * 100;
+	  vhsRewindBarFill.style.width = `${100 - progress}%`;
+	}
+
+	async function vhsCompleteRewind() {
+	  console.log('[VHS] Rewind complete');
+	  clearInterval(vhsRewindTimer);
+
+	  // Reset position on server
+	  if (vhsVideoId) {
+		try {
+		  await fetch(`/api/vhs/reset/${vhsVideoId}`, { method: 'POST' });
+		} catch (e) {
+		  console.warn('[VHS] Reset error:', e);
+		}
+	  }
+
+	  // Reset local state
+	  vhsCurrentIndex = 0;
+	  vhsCurrentPosition = 0;
+	  vhsTapeFinished = false;
+	  vhsRewindActive = false;
+
+	  // Hide rewind overlay
+	  vhsRewindOverlay.style.display = 'none';
+	  vhsTrackingLines.style.display = 'none';
+
+	  // Start playback from beginning
+	  vhsPlayCurrentFile();
+	}
+
+	function vhsCancelRewind() {
+	  if (!vhsRewindActive) return;
+
+	  console.log('[VHS] Rewind cancelled (channel change)');
+	  clearInterval(vhsRewindTimer);
+	  vhsRewindActive = false;
+	  vhsRewindOverlay.style.display = 'none';
+	  vhsTrackingLines.style.display = 'none';
+	}
+
+	// Handle BTN_NEXT for VHS double-tap rewind
+	function vhsHandleNextButton() {
+	  if (!vhsMode || !vhsTapeInserted) return false;
+	  if (vhsRewindActive) return true; // Ignore during rewind
+
+	  if (vhsRewindPromptVisible) {
+		// Second tap - start rewind!
+		vhsStartRewind();
+	  } else {
+		// First tap - show prompt
+		vhsShowRewindPrompt();
+	  }
+	  return true; // Handled
+	}
+
+	// ==================== VHS POLLING ====================
+
+	let vhsPollTimer = null;
+
+	function vhsStartPolling() {
+	  if (vhsPollTimer) return;
+
+	  vhsPollTimer = setInterval(async () => {
+		const status = await vhsFetchStatus();
+
+		// Detect tape insertion/removal
+		if (status.inserted && status.video_id) {
+		  if (!vhsTapeInserted || status.video_id !== vhsVideoId) {
+			// New tape inserted
+			vhsLastTapeTimestamp = status.timestamp;
+			await vhsOnTapeInserted(status.video_id);
+		  }
+		} else {
+		  if (vhsTapeInserted) {
+			// Tape removed
+			vhsOnTapeRemoved();
+		  }
+		}
+	  }, VHS_POLL_INTERVAL);
+	}
+
+	function vhsStopPolling() {
+	  clearInterval(vhsPollTimer);
+	  vhsPollTimer = null;
+	}
+
+	// Start VHS polling immediately
+	vhsStartPolling();
+
+	// ==================== END VHS MODE ====================
+
+
 	// ---- I18N CORE (mínimo) ----
 	let I18N = { lang: "es", dict: {} };
 	let lastLangSeen = null;
@@ -731,9 +1254,29 @@
 		  }
 
 		  if (cambioDeCanal) {
+			const wasVhs = ultimoCanal === 'VHS';
+			const isVhs = data.modo === 'VHS';
+
+			// Handle VHS channel transitions
+			if (wasVhs && !isVhs) {
+			  // Leaving VHS channel
+			  vhsExitChannel();
+			}
+
 			ultimoCanal = data.modo;
+
+			if (isVhs && !wasVhs) {
+			  // Entering VHS channel
+			  vhsEnterChannel();
+			  return; // VHS mode handles its own video loading
+			}
+
 			mostrarOverlay(data.canal_nombre);
-			
+		  }
+
+		  // If we're in VHS mode, don't load regular videos
+		  if (vhsMode) {
+			return;
 		  }
 		})
 		.catch(err => {
@@ -786,6 +1329,12 @@
 
 
     video.addEventListener('ended', () => {
+      // VHS mode handles its own ended logic
+      if (vhsMode) {
+        vhsOnVideoEnded();
+        return;
+      }
+
       // Si por algún motivo no se reportó (video muy corto, etc.), reportá ahora:
 	  if (currentVideo && playedReportedFor !== currentVideo) {
 		playedReportedFor = currentVideo;
@@ -799,6 +1348,15 @@
 		const res = await fetch("/api/should_reload");
 		const data = await res.json();
 		if (data.should_reload) {
+		  // Check if this is BTN_NEXT and we're in VHS mode
+		  if (data.reason === 'BTN_NEXT' && vhsMode) {
+			// Handle as VHS rewind double-tap
+			const handled = vhsHandleNextButton();
+			if (handled) {
+			  return; // VHS mode handled this
+			}
+		  }
+
 		  const ahora = Date.now();
 		  const restante = MIN_INTERVAL_MS - (ahora - ultimaCarga);
 

@@ -27,8 +27,9 @@ from pathlib import Path
 from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
     METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
-    SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE, 
-    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR
+    SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
+    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
+    VHS_DIR, VHS_PLAYBACK_STATE_FILE, VHS_STATE_PATH, VHS_STATIC_VIDEO
 ) 
 import bluetooth_manager        
 import wifi_manager
@@ -211,13 +212,23 @@ DEFAULT_TAGS = {
 
 # Canales predefinidos
 DEFAULT_CANALES = {
-
-        "Canal de Prueba": {
+    "Canal de Prueba": {
         "nombre": "Test",
         "descripcion": "Canal de prueba",
         "tags_prioridad": ["test"],
         "tags_excluidos": [],
         "icono": "mate.png",
+        "intro_video_id": ""
+    },
+    "VHS": {
+        "nombre": "VHS",
+        "descripcion": "VHS Tape Playback",
+        "tipo": "vhs",
+        "channel_number": "03",
+        "show_channel_number": True,
+        "tags_prioridad": [],
+        "tags_excluidos": [],
+        "icono": "vhs.png",
         "intro_video_id": ""
     }
 }
@@ -1516,7 +1527,7 @@ def api_should_reload():
             _force_next_once = True
 
         _last_trigger_mtime_served = mtime
-        return jsonify({"should_reload": True})
+        return jsonify({"should_reload": True, "reason": _last_trigger_reason})
 
     return jsonify({"should_reload": False})
 
@@ -2063,7 +2074,266 @@ def api_wifi_qr():
 
 
 # ---[END] API WiFi ---------------------------------------------------------------
-    
+
+
+# ==================================================================================
+# VHS / NFC Tape Playback API
+# ==================================================================================
+
+import uuid as uuid_module
+
+# Ensure VHS directory exists
+VHS_DIR.mkdir(parents=True, exist_ok=True)
+
+def load_vhs_playback_state():
+    """Load persisted playback positions for all tapes."""
+    try:
+        if VHS_PLAYBACK_STATE_FILE.exists():
+            with open(VHS_PLAYBACK_STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"[VHS] Error loading playback state: {e}")
+    return {}
+
+def save_vhs_playback_state(state):
+    """Save playback positions for all tapes."""
+    try:
+        _write_json_atomic(VHS_PLAYBACK_STATE_FILE, state)
+    except Exception as e:
+        logger.error(f"[VHS] Error saving playback state: {e}")
+
+def get_vhs_tape_state():
+    """Read current NFC tape state from temp file (written by nfc_reader.py)."""
+    try:
+        if VHS_STATE_PATH.exists():
+            with open(VHS_STATE_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.debug(f"[VHS] Error reading tape state: {e}")
+    return {"inserted": False, "video_id": None, "timestamp": 0}
+
+def get_vhs_playlist(video_id: str) -> list:
+    """Get sorted list of video files for a tape."""
+    tape_dir = VHS_DIR / video_id
+    if not tape_dir.exists():
+        return []
+
+    videos = []
+    for f in sorted(tape_dir.iterdir()):
+        if f.suffix.lower() in ('.mp4', '.mkv', '.avi', '.webm', '.mov'):
+            videos.append({
+                "filename": f.name,
+                "path": f"/videos/vhs/{video_id}/{f.name}"
+            })
+    return videos
+
+@app.route("/api/vhs/status")
+def api_vhs_status():
+    """Get current VHS tape status - polled by frontend."""
+    tape_state = get_vhs_tape_state()
+    video_id = tape_state.get("video_id")
+
+    result = {
+        "inserted": tape_state.get("inserted", False),
+        "video_id": video_id,
+        "timestamp": tape_state.get("timestamp", 0),
+        "playlist": [],
+        "playback_state": None
+    }
+
+    if video_id:
+        result["playlist"] = get_vhs_playlist(video_id)
+        # Get saved playback position
+        all_state = load_vhs_playback_state()
+        result["playback_state"] = all_state.get(video_id)
+
+    return jsonify(result)
+
+@app.route("/api/vhs/playlist/<video_id>")
+def api_vhs_playlist(video_id):
+    """Get playlist for a specific tape."""
+    playlist = get_vhs_playlist(video_id)
+    return jsonify({"video_id": video_id, "playlist": playlist})
+
+@app.route("/api/vhs/state/<video_id>", methods=["GET", "POST"])
+def api_vhs_state(video_id):
+    """Get or save playback position for a tape."""
+    all_state = load_vhs_playback_state()
+
+    if request.method == "POST":
+        data = request.json or {}
+        all_state[video_id] = {
+            "current_file_index": data.get("current_file_index", 0),
+            "position_seconds": data.get("position_seconds", 0),
+            "last_updated": datetime.now(UTC).isoformat()
+        }
+        save_vhs_playback_state(all_state)
+        logger.info(f"[VHS] Saved state for {video_id}: idx={data.get('current_file_index')}, pos={data.get('position_seconds'):.1f}s")
+        return jsonify({"ok": True})
+
+    # GET
+    state = all_state.get(video_id, {
+        "current_file_index": 0,
+        "position_seconds": 0,
+        "last_updated": None
+    })
+    return jsonify(state)
+
+@app.route("/api/vhs/reset/<video_id>", methods=["POST"])
+def api_vhs_reset(video_id):
+    """Reset playback position to beginning (after rewind)."""
+    all_state = load_vhs_playback_state()
+    all_state[video_id] = {
+        "current_file_index": 0,
+        "position_seconds": 0,
+        "last_updated": datetime.now(UTC).isoformat()
+    }
+    save_vhs_playback_state(all_state)
+    logger.info(f"[VHS] Reset state for {video_id} (rewind complete)")
+    return jsonify({"ok": True})
+
+@app.route("/api/vhs/tapes")
+def api_vhs_tapes():
+    """List all registered VHS tapes."""
+    tapes = []
+    try:
+        for tape_dir in VHS_DIR.iterdir():
+            if tape_dir.is_dir():
+                playlist = get_vhs_playlist(tape_dir.name)
+                tapes.append({
+                    "video_id": tape_dir.name,
+                    "video_count": len(playlist),
+                    "videos": playlist
+                })
+    except Exception as e:
+        logger.error(f"[VHS] Error listing tapes: {e}")
+
+    return jsonify({"tapes": tapes})
+
+@app.route("/api/vhs/scan")
+def api_vhs_scan():
+    """Read currently inserted tape's UUID (for registration UI)."""
+    tape_state = get_vhs_tape_state()
+    if tape_state.get("inserted") and tape_state.get("video_id"):
+        return jsonify({
+            "ok": True,
+            "video_id": tape_state["video_id"],
+            "already_registered": (VHS_DIR / tape_state["video_id"]).exists()
+        })
+    return jsonify({"ok": False, "message": "No tape inserted"})
+
+@app.route("/api/vhs/register", methods=["POST"])
+def api_vhs_register():
+    """Register a new tape (create directory for its UUID)."""
+    data = request.json or {}
+    video_id = data.get("video_id")
+
+    if not video_id:
+        # Try to get from currently inserted tape
+        tape_state = get_vhs_tape_state()
+        video_id = tape_state.get("video_id")
+
+    if not video_id:
+        return jsonify({"ok": False, "error": "No video_id provided and no tape inserted"}), 400
+
+    # Validate UUID format
+    try:
+        uuid_module.UUID(video_id)
+    except ValueError:
+        return jsonify({"ok": False, "error": "Invalid UUID format"}), 400
+
+    tape_dir = VHS_DIR / video_id
+    if tape_dir.exists():
+        return jsonify({"ok": True, "video_id": video_id, "message": "Tape already registered"})
+
+    try:
+        tape_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"[VHS] Registered new tape: {video_id}")
+        return jsonify({"ok": True, "video_id": video_id, "message": "Tape registered"})
+    except Exception as e:
+        logger.error(f"[VHS] Error registering tape: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/vhs/upload/<video_id>", methods=["POST"])
+def api_vhs_upload(video_id):
+    """Upload a video file to a tape's directory."""
+    tape_dir = VHS_DIR / video_id
+    if not tape_dir.exists():
+        return jsonify({"ok": False, "error": "Tape not registered"}), 404
+
+    if 'file' not in request.files:
+        return jsonify({"ok": False, "error": "No file provided"}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"ok": False, "error": "No file selected"}), 400
+
+    # Secure the filename and ensure proper ordering
+    filename = secure_filename(file.filename)
+
+    # Count existing files to determine prefix
+    existing = list(tape_dir.glob("*.mp4")) + list(tape_dir.glob("*.mkv")) + \
+               list(tape_dir.glob("*.avi")) + list(tape_dir.glob("*.webm"))
+    next_num = len(existing) + 1
+
+    # Prefix with number for ordering
+    base, ext = os.path.splitext(filename)
+    numbered_filename = f"{next_num:03d}_{base}{ext}"
+
+    filepath = tape_dir / numbered_filename
+
+    try:
+        file.save(str(filepath))
+        logger.info(f"[VHS] Uploaded {numbered_filename} to tape {video_id}")
+        return jsonify({
+            "ok": True,
+            "filename": numbered_filename,
+            "video_id": video_id
+        })
+    except Exception as e:
+        logger.error(f"[VHS] Upload error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/vhs/delete/<video_id>/<filename>", methods=["POST"])
+def api_vhs_delete_video(video_id, filename):
+    """Delete a video from a tape."""
+    filepath = VHS_DIR / video_id / secure_filename(filename)
+    if not filepath.exists():
+        return jsonify({"ok": False, "error": "File not found"}), 404
+
+    try:
+        filepath.unlink()
+        logger.info(f"[VHS] Deleted {filename} from tape {video_id}")
+        return jsonify({"ok": True})
+    except Exception as e:
+        logger.error(f"[VHS] Delete error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/videos/vhs/<video_id>/<filename>")
+def serve_vhs_video(video_id, filename):
+    """Serve VHS video files."""
+    tape_dir = VHS_DIR / video_id
+    return send_from_directory(str(tape_dir), filename)
+
+@app.route("/videos/vhs_static.mp4")
+def serve_vhs_static():
+    """Serve the static noise video for VHS channel."""
+    if VHS_STATIC_VIDEO.exists():
+        return send_from_directory(str(VHS_STATIC_VIDEO.parent), VHS_STATIC_VIDEO.name)
+    # Fallback: return 404 if static video not generated yet
+    return "Static video not found. Run generate_static.py", 404
+
+@app.route("/vhs_manage")
+def vhs_manage():
+    """VHS tape management page."""
+    lang = load_config_i18n().get("language", "es")
+    translations = load_translations(lang)
+    page_trans = load_page_translations(lang, "vhs_manage")
+    trans = {**translations, **page_trans}
+    return render_template("vhs_manage.html", tr=trans.get)
+
+# ---[END] VHS API ---------------------------------------------------------------
+
 
 @app.before_request
 def _i18n_before_request():
@@ -2100,7 +2370,10 @@ def _i18n_before_request():
          # modo tele
         "vertele": "vertele",
         
-        "wifi_setup": "wifi_setup"
+        "wifi_setup": "wifi_setup",
+
+        # VHS management
+        "vhs_manage": "vhs_manage"
 
         # Si después querés i18n por página:
         # "canales": "canales",

@@ -53,3 +53,9 @@ INTRO_PATH          = SPLASH_DIR / "splash_1.mp4"
 USER = os.environ.get("TVARGENTA_USER") or getpass.getuser()
 
 UPLOAD_STATUS = TMP_DIR / "upload_status.txt"
+
+# VHS / NFC Tape Playback
+VHS_DIR = CONTENT_DIR / "vhs"
+VHS_PLAYBACK_STATE_FILE = CONTENT_DIR / "vhs_playback_state.json"
+VHS_STATE_PATH = TMP_DIR / "vhs_state.json"
+VHS_STATIC_VIDEO = ROOT_DIR / "static" / "videos" / "vhs_static.mp4"

@@ -1,0 +1,489 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VHS Tape Management - TVArgenta</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #ffffff;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      text-align: center;
+      color: #00ff88;
+      margin-bottom: 30px;
+      font-size: 2em;
+      text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+    }
+
+    h2 {
+      color: #88ccff;
+      border-bottom: 2px solid #88ccff;
+      padding-bottom: 10px;
+      margin-top: 40px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .btn {
+      background: #0066cc;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1em;
+      transition: all 0.3s ease;
+      margin: 5px;
+    }
+
+    .btn:hover {
+      background: #0088ff;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 102, 204, 0.4);
+    }
+
+    .btn:disabled {
+      background: #444;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-success {
+      background: #00aa44;
+    }
+
+    .btn-success:hover {
+      background: #00cc55;
+    }
+
+    .btn-danger {
+      background: #cc3333;
+    }
+
+    .btn-danger:hover {
+      background: #ff4444;
+    }
+
+    .status {
+      padding: 15px;
+      border-radius: 8px;
+      margin: 15px 0;
+      font-family: monospace;
+    }
+
+    .status.info {
+      background: rgba(0, 102, 204, 0.3);
+      border: 1px solid #0066cc;
+    }
+
+    .status.success {
+      background: rgba(0, 170, 68, 0.3);
+      border: 1px solid #00aa44;
+    }
+
+    .status.warning {
+      background: rgba(204, 170, 0, 0.3);
+      border: 1px solid #ccaa00;
+    }
+
+    .status.error {
+      background: rgba(204, 51, 51, 0.3);
+      border: 1px solid #cc3333;
+    }
+
+    .tape-list {
+      display: grid;
+      gap: 15px;
+    }
+
+    .tape-item {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 15px;
+      border-left: 4px solid #00ff88;
+    }
+
+    .tape-item h3 {
+      margin: 0 0 10px 0;
+      color: #00ff88;
+      font-size: 0.9em;
+      word-break: break-all;
+    }
+
+    .tape-item .video-count {
+      color: #88ccff;
+      font-size: 0.9em;
+    }
+
+    .video-list {
+      margin-top: 10px;
+      padding-left: 20px;
+    }
+
+    .video-list li {
+      color: #cccccc;
+      margin: 5px 0;
+      font-size: 0.85em;
+    }
+
+    .upload-zone {
+      border: 3px dashed rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: #00ff88;
+      background: rgba(0, 255, 136, 0.1);
+    }
+
+    .upload-zone input[type="file"] {
+      display: none;
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+
+    .scan-result {
+      font-family: monospace;
+      font-size: 1.2em;
+      color: #00ff88;
+      margin: 15px 0;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      word-break: break-all;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #00ff88;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 10px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-bottom: 20px;
+      color: #88ccff;
+      text-decoration: none;
+    }
+
+    .back-link:hover {
+      color: #aaddff;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00ff88, #00ccff);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/gestion" class="back-link">&larr; Back to Content Management</a>
+
+    <h1>VHS Tape Management</h1>
+
+    <!-- Scan & Register Section -->
+    <div class="card">
+      <h2>Register New Tape</h2>
+      <p>Place a VHS tape on the NFC reader, then click "Scan Tape" to read its UUID.</p>
+
+      <button class="btn" id="scanBtn" onclick="scanTape()">Scan Tape</button>
+      <button class="btn btn-success" id="registerBtn" onclick="registerTape()" disabled>Register Tape</button>
+
+      <div id="scanResult" class="status info" style="display: none;"></div>
+    </div>
+
+    <!-- Upload Section -->
+    <div class="card" id="uploadSection" style="display: none;">
+      <h2>Upload Videos to Tape</h2>
+      <p>Current tape: <span id="currentTapeId" class="scan-result"></span></p>
+
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-icon">📼</div>
+        <p>Click to select video files or drag & drop here</p>
+        <p style="font-size: 0.8em; color: #888;">Supported: MP4, MKV, AVI, WebM, MOV</p>
+        <input type="file" id="fileInput" accept=".mp4,.mkv,.avi,.webm,.mov" multiple onchange="handleFiles(this.files)">
+      </div>
+
+      <div id="uploadProgress" style="display: none;">
+        <p><span class="loading"></span>Uploading: <span id="uploadFileName"></span></p>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+      </div>
+
+      <div id="uploadResult" class="status" style="display: none;"></div>
+    </div>
+
+    <!-- Existing Tapes Section -->
+    <div class="card">
+      <h2>Registered Tapes</h2>
+      <button class="btn" onclick="loadTapes()">Refresh List</button>
+
+      <div id="tapeList" class="tape-list" style="margin-top: 20px;">
+        <p style="color: #888;">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let scannedTapeId = null;
+
+    // Scan for tape
+    async function scanTape() {
+      const scanBtn = document.getElementById('scanBtn');
+      const resultDiv = document.getElementById('scanResult');
+      const registerBtn = document.getElementById('registerBtn');
+
+      scanBtn.disabled = true;
+      scanBtn.innerHTML = '<span class="loading"></span>Scanning...';
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'status info';
+      resultDiv.textContent = 'Scanning for NFC tag...';
+
+      try {
+        const res = await fetch('/api/vhs/scan');
+        const data = await res.json();
+
+        if (data.ok && data.video_id) {
+          scannedTapeId = data.video_id;
+          resultDiv.className = 'status success';
+
+          if (data.already_registered) {
+            resultDiv.innerHTML = `<strong>Tape Found:</strong> ${data.video_id}<br><em>(Already registered)</em>`;
+            registerBtn.disabled = true;
+            // Show upload section for existing tape
+            showUploadSection(data.video_id);
+          } else {
+            resultDiv.innerHTML = `<strong>New Tape Found:</strong> ${data.video_id}<br><em>Click "Register Tape" to add it.</em>`;
+            registerBtn.disabled = false;
+          }
+        } else {
+          resultDiv.className = 'status warning';
+          resultDiv.textContent = data.message || 'No tape detected. Please place a VHS tape on the reader.';
+          registerBtn.disabled = true;
+          scannedTapeId = null;
+        }
+      } catch (e) {
+        resultDiv.className = 'status error';
+        resultDiv.textContent = 'Error scanning: ' + e.message;
+        registerBtn.disabled = true;
+        scannedTapeId = null;
+      }
+
+      scanBtn.disabled = false;
+      scanBtn.textContent = 'Scan Tape';
+    }
+
+    // Register tape
+    async function registerTape() {
+      if (!scannedTapeId) return;
+
+      const registerBtn = document.getElementById('registerBtn');
+      const resultDiv = document.getElementById('scanResult');
+
+      registerBtn.disabled = true;
+      registerBtn.innerHTML = '<span class="loading"></span>Registering...';
+
+      try {
+        const res = await fetch('/api/vhs/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ video_id: scannedTapeId })
+        });
+        const data = await res.json();
+
+        if (data.ok) {
+          resultDiv.className = 'status success';
+          resultDiv.innerHTML = `<strong>Tape Registered!</strong> ${scannedTapeId}<br>You can now upload videos to this tape.`;
+          showUploadSection(scannedTapeId);
+          loadTapes();
+        } else {
+          resultDiv.className = 'status error';
+          resultDiv.textContent = 'Registration failed: ' + (data.error || 'Unknown error');
+        }
+      } catch (e) {
+        resultDiv.className = 'status error';
+        resultDiv.textContent = 'Error registering: ' + e.message;
+      }
+
+      registerBtn.disabled = true;
+      registerBtn.textContent = 'Register Tape';
+    }
+
+    // Show upload section
+    function showUploadSection(tapeId) {
+      document.getElementById('uploadSection').style.display = 'block';
+      document.getElementById('currentTapeId').textContent = tapeId;
+      scannedTapeId = tapeId;
+    }
+
+    // Handle file selection
+    async function handleFiles(files) {
+      if (!scannedTapeId || files.length === 0) return;
+
+      const progressDiv = document.getElementById('uploadProgress');
+      const resultDiv = document.getElementById('uploadResult');
+      const fileNameSpan = document.getElementById('uploadFileName');
+      const progressFill = document.getElementById('progressFill');
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        progressDiv.style.display = 'block';
+        resultDiv.style.display = 'none';
+        fileNameSpan.textContent = `${file.name} (${i + 1}/${files.length})`;
+        progressFill.style.width = '0%';
+
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+
+          // Use XMLHttpRequest for progress tracking
+          await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `/api/vhs/upload/${scannedTapeId}`);
+
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const percent = (e.loaded / e.total) * 100;
+                progressFill.style.width = percent + '%';
+              }
+            };
+
+            xhr.onload = () => {
+              if (xhr.status === 200) {
+                resolve(JSON.parse(xhr.responseText));
+              } else {
+                reject(new Error('Upload failed'));
+              }
+            };
+
+            xhr.onerror = () => reject(new Error('Upload failed'));
+            xhr.send(formData);
+          });
+
+          resultDiv.className = 'status success';
+          resultDiv.textContent = `Uploaded: ${file.name}`;
+          resultDiv.style.display = 'block';
+
+        } catch (e) {
+          resultDiv.className = 'status error';
+          resultDiv.textContent = `Error uploading ${file.name}: ${e.message}`;
+          resultDiv.style.display = 'block';
+        }
+      }
+
+      progressDiv.style.display = 'none';
+      loadTapes();
+    }
+
+    // Drag and drop
+    const uploadZone = document.getElementById('uploadZone');
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('dragover');
+    });
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      if (scannedTapeId) {
+        handleFiles(e.dataTransfer.files);
+      }
+    });
+
+    // Load existing tapes
+    async function loadTapes() {
+      const listDiv = document.getElementById('tapeList');
+
+      try {
+        const res = await fetch('/api/vhs/tapes');
+        const data = await res.json();
+
+        if (data.tapes && data.tapes.length > 0) {
+          listDiv.innerHTML = data.tapes.map(tape => `
+            <div class="tape-item">
+              <h3>${tape.video_id}</h3>
+              <span class="video-count">${tape.video_count} video(s)</span>
+              ${tape.videos.length > 0 ? `
+                <ul class="video-list">
+                  ${tape.videos.map(v => `<li>${v.filename}</li>`).join('')}
+                </ul>
+              ` : ''}
+              <button class="btn" style="margin-top: 10px;" onclick="showUploadSection('${tape.video_id}')">
+                Upload to this tape
+              </button>
+            </div>
+          `).join('');
+        } else {
+          listDiv.innerHTML = '<p style="color: #888;">No tapes registered yet. Scan a tape to get started!</p>';
+        }
+      } catch (e) {
+        listDiv.innerHTML = `<p class="status error">Error loading tapes: ${e.message}</p>`;
+      }
+    }
+
+    // Load tapes on page load
+    loadTapes();
+  </script>
+</body>
+</html>

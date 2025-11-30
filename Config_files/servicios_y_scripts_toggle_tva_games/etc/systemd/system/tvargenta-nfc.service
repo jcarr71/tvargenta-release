@@ -1,0 +1,25 @@
+# /etc/systemd/system/tvargenta-nfc.service
+# NFC Reader Daemon for VHS Tape Playback
+[Unit]
+Description=TVArgenta NFC Reader Daemon
+Wants=network-online.target
+After=network-online.target tvargenta.service
+
+[Service]
+User=rs
+WorkingDirectory=/srv/tvargenta
+ExecStart=/srv/tvargenta/venv/bin/python /srv/tvargenta/nfc_reader.py
+
+# PATH for system commands
+Environment="PATH=/srv/tvargenta/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+KillSignal=SIGINT
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
