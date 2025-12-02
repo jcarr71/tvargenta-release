@@ -630,12 +630,12 @@
     const overlay = document.getElementById('overlay');
     let currentVideo = null;
 	let ultimoCanal = null;
-	
-	let enPedido = false;           // evita pedidos simultáneos
+
+	let currentFetchController = null;  // AbortController for cancelling pending requests
 	let ultimaCarga = 0;            // timestamp de última carga efectiva
-	const MIN_INTERVAL_MS = 1200;   // ventana para ignorar pedidos repetidos
+	const MIN_INTERVAL_MS = 100;    // minimal debounce (reduced from 1200ms for responsiveness)
 	let reloadTimer = null;         // timer para reintento diferido de reload
-	
+
 	let playedReportedFor = null;   // video_id para el que ya se reportó play
 	let playedTimer = null;         // timeout a 10s
 	let playedArmed = false;        // evita múltiples enganches
@@ -850,21 +850,24 @@
 	function cargarSiguienteVideo(force = false) {
 	  const ahora = Date.now();
 
-	  // Si ya hay un fetch en vuelo, no encimamos otro
-	  if (enPedido) {
-		console.debug("[TV] Skip: pedido en curso");
-		return;
-	  }
-
-	  // Throttle: si fue hace muy poco y no es forzado, lo ignoramos
+	  // Minimal debounce to prevent double-triggers
 	  if (!force && (ahora - ultimaCarga) < MIN_INTERVAL_MS) {
-		console.debug("[TV] Skip: throttle activo", { msDesdeUltima: ahora - ultimaCarga });
+		console.debug("[TV] Skip: debounce", { msDesdeUltima: ahora - ultimaCarga });
 		return;
 	  }
 
-	  enPedido = true;
+	  // Cancel any pending request - new channel change takes priority
+	  if (currentFetchController) {
+		currentFetchController.abort();
+	  }
+	  currentFetchController = new AbortController();
 
-	  fetch('/api/next_video')
+	  // Stop current video immediately for faster perceived response
+	  video.pause();
+
+	  ultimaCarga = Date.now();
+
+	  fetch('/api/next_video', { signal: currentFetchController.signal })
 		.then(res => res.json())
 		.then(data => {
 		  // Handle Channel 03 (AV input) specially
@@ -963,12 +966,16 @@
 		  }
 		})
 		.catch(err => {
+		  // Ignore abort errors (expected when user changes channel quickly)
+		  if (err.name === 'AbortError') {
+			console.debug("[TV] Request aborted (channel changed)");
+			return;
+		  }
 		  console.error("Error al obtener el siguiente video:", err);
 		  mostrarOverlay("overlay.net_error");
 		})
 		.finally(() => {
-		  ultimaCarga = Date.now();
-		  enPedido = false;
+		  currentFetchController = null;
 		});
 	}
 

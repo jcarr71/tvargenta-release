@@ -227,8 +227,8 @@ shown_videos_por_canal = {}
 
 # --- Anti-bounce / cooldown ---
 last_next_call = {}   # canal_id -> timestamp del Ãºltimo /api/next_video servido
-NEXT_COOLDOWN = 3.0   # segundos de ventana anti-encadenados
-STICKY_WINDOW = 3.0   # segundos
+NEXT_COOLDOWN = 0.5   # segundos de ventana anti-encadenados (reduced for responsiveness)
+STICKY_WINDOW = 1.0   # segundos (reduced for responsiveness)
 last_choice_per_canal = {}  # canal_id -> {"video_id": str, "ts": float}
 
 # --- De-dupe primer NEXT por canal ---
