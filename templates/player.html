@@ -331,12 +331,176 @@
 	.wifi-on-text {
 	  color: #8affb3; /* verde pastel */
 	}
-	
+
+	/* --- VCR (NFC Mini VHS) Styles --- */
+
+	.vcr-fullscreen {
+	  position: fixed;
+	  top: 0;
+	  left: 0;
+	  width: 100vw;
+	  height: 100vh;
+	  z-index: 9990;
+	}
+
+	#vcr-noise {
+	  background: black;
+	}
+
+	#vcr-blue-screen {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	}
+
+	#vcr-blue-text {
+	  font-size: 48px;
+	  letter-spacing: 4px;
+	  text-shadow: 2px 2px 0 #000066;
+	  animation: vcr-blink 1.5s ease-in-out infinite;
+	}
+
+	@keyframes vcr-blink {
+	  0%, 100% { opacity: 1; }
+	  50% { opacity: 0.6; }
+	}
+
+	#vcr-rewind-screen {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	}
+
+	.vcr-rewind-bars {
+	  display: flex;
+	  gap: 8px;
+	  margin-bottom: 30px;
+	}
+
+	.vcr-rewind-bar {
+	  width: 20px;
+	  height: 60px;
+	  background: white;
+	  animation: vcr-bar-slide 0.3s linear infinite;
+	}
+
+	.vcr-rewind-bar:nth-child(2) { animation-delay: 0.1s; }
+	.vcr-rewind-bar:nth-child(3) { animation-delay: 0.2s; }
+
+	@keyframes vcr-bar-slide {
+	  0% { transform: translateX(0); opacity: 1; }
+	  100% { transform: translateX(-30px); opacity: 0.3; }
+	}
+
+	.vcr-rewind-text {
+	  font-size: 36px;
+	  letter-spacing: 3px;
+	}
+
+	.vcr-rewind-progress {
+	  margin-top: 20px;
+	  width: 300px;
+	  height: 10px;
+	  background: #000066;
+	  border: 2px solid white;
+	  border-radius: 5px;
+	  overflow: hidden;
+	}
+
+	.vcr-rewind-progress-fill {
+	  height: 100%;
+	  background: white;
+	  transition: width 0.5s linear;
+	}
+
+	#vcr-counter {
+	  position: absolute;
+	  top: 24px;
+	  right: 24px;
+	  background: rgba(0, 0, 0, 0.7);
+	  border: 2px solid #00aa00;
+	  padding: 8px 16px;
+	  font-family: "Lucida Console", monospace;
+	  font-size: 24px;
+	  color: #00ff00;
+	  letter-spacing: 2px;
+	  z-index: 9995;
+	  text-shadow: 0 0 10px #00ff00;
+	}
+
+	#vcr-paused {
+	  position: absolute;
+	  top: 50%;
+	  left: 50%;
+	  transform: translate(-50%, -50%);
+	  background: rgba(0, 0, 0, 0.8);
+	  border: 3px solid white;
+	  padding: 20px 40px;
+	  font-family: "Lucida Console", monospace;
+	  font-size: 48px;
+	  color: white;
+	  letter-spacing: 4px;
+	  z-index: 9996;
+	  animation: vcr-pause-blink 1s ease-in-out infinite;
+	}
+
+	@keyframes vcr-pause-blink {
+	  0%, 100% { opacity: 1; }
+	  50% { opacity: 0.5; }
+	}
+
+	#vcr-countdown {
+	  position: absolute;
+	  bottom: 100px;
+	  left: 50%;
+	  transform: translateX(-50%);
+	  background: rgba(0, 0, 100, 0.9);
+	  border: 2px solid white;
+	  padding: 12px 24px;
+	  font-family: "Lucida Console", monospace;
+	  font-size: 24px;
+	  color: white;
+	  z-index: 9997;
+	  border-radius: 8px;
+	}
+
+	#vcr-countdown-num {
+	  font-size: 32px;
+	  font-weight: bold;
+	  color: #ffff00;
+	}
+
+	#channel-indicator {
+	  position: fixed;
+	  top: 24px;
+	  left: 24px;
+	  font-family: "Lucida Console", monospace;
+	  font-size: 48px;
+	  font-weight: bold;
+	  color: #32CD32;  /* Lime green */
+	  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 10px rgba(50, 205, 50, 0.5);
+	  z-index: 2147483647;  /* Maximum z-index to stay above video */
+	  letter-spacing: 2px;
+	}
+
+	.hidden {
+	  display: none !important;
+	}
+
   </style>
   
 </head>
 <body>
   <video id="tvVideo" autoplay playsinline></video>
+  <div id="channel-indicator" class="hidden" style="position:fixed !important; z-index:2147483647 !important;"></div>
   <div id="overlay">{{ tr("overlay.loading_channel") }}</div>
   <div id="barra-volumen" class="oculto">
     <span class="label-volumen">{{ tr("vol.label") }}</span>
@@ -387,6 +551,35 @@
     </svg>
     <span class="label" id="mute-label">{{ tr("vol.mute_badge") }}</span>
   </div>
+
+<!-- VCR (NFC Mini VHS) Elements -->
+<canvas id="vcr-noise" class="vcr-fullscreen hidden"></canvas>
+
+<div id="vcr-blue-screen" class="vcr-fullscreen hidden">
+  <div id="vcr-blue-text">INSERT TAPE</div>
+</div>
+
+<div id="vcr-rewind-screen" class="vcr-fullscreen hidden">
+  <div class="vcr-rewind-bars">
+    <div class="vcr-rewind-bar"></div>
+    <div class="vcr-rewind-bar"></div>
+    <div class="vcr-rewind-bar"></div>
+  </div>
+  <div class="vcr-rewind-text">◀◀ REWIND</div>
+  <div class="vcr-rewind-progress">
+    <div class="vcr-rewind-progress-fill" id="vcr-rewind-fill"></div>
+  </div>
+</div>
+
+<div id="vcr-counter" class="hidden">
+  <span id="vcr-time">00:00:00</span>
+</div>
+
+<div id="vcr-paused" class="hidden">PAUSED</div>
+
+<div id="vcr-countdown" class="hidden">
+  Rewind in <span id="vcr-countdown-num">3</span>...
+</div>
 
 <!-- QR Code -->
 
@@ -674,6 +867,31 @@
 	  fetch('/api/next_video')
 		.then(res => res.json())
 		.then(data => {
+		  // Handle Channel 03 (AV input) specially
+		  if (data.channel_type === "av_input") {
+			const cambioDeCanal = data.modo !== ultimoCanal;
+			if (cambioDeCanal) {
+			  ultimoCanal = data.modo;
+			  currentVideo = null;
+			  // Show channel indicator (VCR mode may override this)
+			  if (typeof showChannelNumber === 'function') {
+				showChannelNumber(data.canal_numero || "03");
+			  }
+			  // Start VCR/AV input mode
+			  if (typeof updateVcrChannelMode === 'function') {
+				updateVcrChannelMode("03");
+			  }
+			}
+			return;
+		  }
+
+		  // If we were on Channel 03 and now switching away, stop VCR mode
+		  if (ultimoCanal === "03" && data.modo !== "03") {
+			if (typeof updateVcrChannelMode === 'function') {
+			  updateVcrChannelMode(data.modo);
+			}
+		  }
+
 		  if (data.cooldown) {
 			// Pequeño retry para salir del bache inicial
 			setTimeout(() => cargarSiguienteVideo(true), 700);
@@ -693,9 +911,9 @@
 			video.src = `/videos/${data.video_id}.mp4`;
 			video.load();
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
-			setChannelBadgeText(data.canal_nombre);
-			
-			// --- armado del umbral de “play real” ---
+			// Channel badge removed for immersion
+
+			// --- armado del umbral de "play real" ---
 			playedReportedFor = null;
 			playedArmed = false;
 			clearTimeout(playedTimer);
@@ -727,13 +945,21 @@
 
 			video.removeEventListener("timeupdate", onTimeUpdate);
 			video.addEventListener("timeupdate", onTimeUpdate);
-			
+
 		  }
 
 		  if (cambioDeCanal) {
 			ultimoCanal = data.modo;
-			mostrarOverlay(data.canal_nombre);
-			
+
+			// Show channel number indicator for 2 seconds
+			if (typeof showChannelNumber === 'function') {
+			  showChannelNumber(data.canal_numero);
+			}
+
+			// Check if switching to/from VCR channel
+			if (typeof updateVcrChannelMode === 'function') {
+			  updateVcrChannelMode(data.modo);
+			}
 		  }
 		})
 		.catch(err => {
@@ -2132,8 +2358,288 @@ function ejecutarSeleccion() {
       }
     } catch(e) {}
   })();
-  
-  
+
+
+  // --- VCR (NFC Mini VHS) System ---
+  const VCR_CHANNEL_ID = "03";
+  let vcrState = null;
+  let vcrPollInterval = null;
+  let vcrNoiseInterval = null;
+  let currentChannelId = null;
+  let lastVcrTriggerMtime = 0;
+
+  // VCR DOM elements
+  const vcrNoiseCanvas = document.getElementById("vcr-noise");
+  const vcrBlueScreen = document.getElementById("vcr-blue-screen");
+  const vcrBlueText = document.getElementById("vcr-blue-text");
+  const vcrRewindScreen = document.getElementById("vcr-rewind-screen");
+  const vcrRewindFill = document.getElementById("vcr-rewind-fill");
+  const vcrCounter = document.getElementById("vcr-counter");
+  const vcrTime = document.getElementById("vcr-time");
+  const vcrPausedEl = document.getElementById("vcr-paused");
+  const vcrCountdown = document.getElementById("vcr-countdown");
+  const vcrCountdownNum = document.getElementById("vcr-countdown-num");
+  const channelIndicator = document.getElementById("channel-indicator");
+  let channelIndicatorTimeout = null;
+
+  function formatVcrTime(seconds) {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+  }
+
+  // Show channel number indicator (lime green like old TVs)
+  function showChannelNumber(numero, persistent = false) {
+    if (!channelIndicator) return;
+
+    // Clear any existing timeout
+    if (channelIndicatorTimeout) {
+      clearTimeout(channelIndicatorTimeout);
+      channelIndicatorTimeout = null;
+    }
+
+    // Set the channel number text
+    channelIndicator.textContent = numero || "";
+    channelIndicator.classList.remove("hidden");
+
+    // If not persistent, hide after 2 seconds
+    if (!persistent) {
+      channelIndicatorTimeout = setTimeout(() => {
+        channelIndicator.classList.add("hidden");
+        channelIndicatorTimeout = null;
+      }, 2000);
+    }
+  }
+
+  function hideChannelNumber() {
+    // Don't hide here - let showChannelNumber's timeout handle it
+    // This prevents hideAllVcrScreens from prematurely hiding the indicator
+  }
+
+  function renderWhiteNoise() {
+    if (!vcrNoiseCanvas) return;
+    const ctx = vcrNoiseCanvas.getContext('2d');
+    vcrNoiseCanvas.width = window.innerWidth;
+    vcrNoiseCanvas.height = window.innerHeight;
+
+    const imageData = ctx.createImageData(vcrNoiseCanvas.width, vcrNoiseCanvas.height);
+    for (let i = 0; i < imageData.data.length; i += 4) {
+      const v = Math.random() * 255;
+      imageData.data[i] = v;     // R
+      imageData.data[i+1] = v;   // G
+      imageData.data[i+2] = v;   // B
+      imageData.data[i+3] = 255; // A
+    }
+    ctx.putImageData(imageData, 0, 0);
+  }
+
+  function startWhiteNoise() {
+    if (vcrNoiseInterval) return;
+    vcrNoiseInterval = setInterval(renderWhiteNoise, 50);
+  }
+
+  function stopWhiteNoise() {
+    if (vcrNoiseInterval) {
+      clearInterval(vcrNoiseInterval);
+      vcrNoiseInterval = null;
+    }
+  }
+
+  function hideAllVcrScreens() {
+    vcrNoiseCanvas?.classList.add("hidden");
+    vcrBlueScreen?.classList.add("hidden");
+    vcrRewindScreen?.classList.add("hidden");
+    vcrCounter?.classList.add("hidden");
+    vcrPausedEl?.classList.add("hidden");
+    hideChannelNumber();
+    stopWhiteNoise();
+  }
+
+  function showVcrWhiteNoise() {
+    hideAllVcrScreens();
+    vcrNoiseCanvas?.classList.remove("hidden");
+    showChannelNumber("03", true);  // Persistent display for white noise
+    startWhiteNoise();
+    video.style.display = "none";
+  }
+
+  function showVcrBlueScreen(text = "INSERT TAPE") {
+    hideAllVcrScreens();
+    if (vcrBlueText) vcrBlueText.textContent = text;
+    vcrBlueScreen?.classList.remove("hidden");
+    // Don't show "03" when VCR is attached
+    video.style.display = "none";
+  }
+
+  function showVcrRewindScreen(progress = 0) {
+    hideAllVcrScreens();
+    vcrRewindScreen?.classList.remove("hidden");
+    // Don't show "03" when VCR is attached
+    if (vcrRewindFill) {
+      vcrRewindFill.style.width = `${progress * 100}%`;
+    }
+    video.style.display = "none";
+  }
+
+  function showVcrPlayback(state) {
+    hideAllVcrScreens();
+    video.style.display = "block";
+
+    // Don't show counter or "03" - just track state internally
+    // Position is still tracked in vcrState for persistence
+
+    // Show paused indicator if paused
+    if (state.is_paused) {
+      vcrPausedEl?.classList.remove("hidden");
+    }
+
+    // Handle video playback sync
+    const videoId = state.video_id;
+    const position = state.position_sec || 0;
+
+    // If video source doesn't match, load it
+    const expectedSrc = `/videos/${videoId}.mp4`;
+    if (video.src !== window.location.origin + expectedSrc) {
+      video.src = expectedSrc;
+      video.load();
+    }
+
+    // Sync position if off by more than 2 seconds
+    if (Math.abs(video.currentTime - position) > 2) {
+      video.currentTime = position;
+    }
+
+    // Handle play/pause state
+    if (state.is_paused) {
+      video.pause();
+    } else {
+      video.play().catch(e => console.warn("[VCR] play() rejected:", e));
+    }
+  }
+
+  function updateVcrDisplay(state) {
+    if (!state) return;
+
+    if (!state.reader_attached) {
+      // No NFC reader - show white noise
+      showVcrWhiteNoise();
+    } else if (!state.tape_inserted) {
+      // Reader attached but no tape
+      showVcrBlueScreen("INSERT TAPE");
+    } else if (state.is_rewinding) {
+      // Rewinding
+      const progress = state.rewind_progress?.progress || 0;
+      showVcrRewindScreen(progress);
+    } else {
+      // Tape inserted and playing/paused
+      showVcrPlayback(state);
+    }
+  }
+
+  async function pollVcrState() {
+    try {
+      const res = await fetch("/api/vcr/state");
+      const data = await res.json();
+      if (data.ok) {
+        vcrState = data;
+        updateVcrDisplay(data);
+      } else {
+        // API error - show snow (no reader attached state)
+        updateVcrDisplay({ reader_attached: false });
+      }
+    } catch (e) {
+      console.error("[VCR] poll error:", e);
+      // Network error - show snow
+      updateVcrDisplay({ reader_attached: false });
+    }
+  }
+
+  async function checkVcrTrigger() {
+    try {
+      const res = await fetch("/api/vcr/trigger");
+      const data = await res.json();
+      if (data.ok && data.mtime > lastVcrTriggerMtime) {
+        lastVcrTriggerMtime = data.mtime;
+        pollVcrState();
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+  }
+
+  function startVcrPolling() {
+    if (vcrPollInterval) return;
+    pollVcrState(); // Initial poll
+    vcrPollInterval = setInterval(pollVcrState, 500);
+  }
+
+  function stopVcrPolling() {
+    if (vcrPollInterval) {
+      clearInterval(vcrPollInterval);
+      vcrPollInterval = null;
+    }
+    hideAllVcrScreens();
+    video.style.display = "block";
+  }
+
+  // Poll for VCR countdown trigger (from encoder)
+  async function checkVcrCountdown() {
+    try {
+      const res = await fetch("/api/vcr/countdown_trigger");
+      const data = await res.json();
+      if (data.ok && data.countdown !== null && data.countdown !== undefined) {
+        vcrCountdown?.classList.remove("hidden");
+        if (vcrCountdownNum) vcrCountdownNum.textContent = data.countdown;
+      } else {
+        vcrCountdown?.classList.add("hidden");
+      }
+    } catch (e) {
+      // Countdown trigger file may not exist
+      vcrCountdown?.classList.add("hidden");
+    }
+  }
+
+  // Monitor pause trigger from encoder
+  async function checkVcrPauseTrigger() {
+    try {
+      const res = await fetch("/api/vcr/pause", { method: "POST" });
+      // Trigger is consumed by posting to it
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  // Check current channel and manage VCR mode
+  function updateVcrChannelMode(channelId) {
+    currentChannelId = channelId;
+    if (channelId === VCR_CHANNEL_ID) {
+      startVcrPolling();
+    } else {
+      stopVcrPolling();
+    }
+  }
+
+  // Override channel change detection
+  const originalCargarSiguienteVideo = cargarSiguienteVideo;
+  // Note: We'll hook into channel changes via the API response
+
+  // Poll for VCR trigger changes (more efficient than constant state polling)
+  setInterval(checkVcrTrigger, 500);
+
+  // Poll for countdown trigger
+  setInterval(async () => {
+    if (currentChannelId === VCR_CHANNEL_ID) {
+      try {
+        const res = await fetch("/tmp/trigger_vcr_countdown.json");
+        // This won't work directly from browser - need API endpoint
+      } catch (e) {}
+    }
+  }, 200);
+
+  // --- End VCR System ---
+
+
     async function updateWifiStatusIcon() {
     const icon = document.getElementById("wifi-icon");
     const label = document.getElementById("wifi-status-label");

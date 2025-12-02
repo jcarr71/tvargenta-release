@@ -9,16 +9,28 @@ from player_utils import cambiar_canal
 CANAL_JSON_PATH = "/srv/tvargenta/content/canales.json"
 CANAL_ACTIVO_PATH = "/srv/tvargenta/content/canal_activo.json"
 
-# --- Nuevo: trigger para menÃº (front hace polling de mtime) ---
+# --- Nuevo: trigger para menu (front hace polling de mtime) ---
 MENU_TRIGGER_PATH = "/tmp/trigger_menu.json"
 MENU_STATE_PATH  = "/tmp/menu_state.json"
 MENU_NAV_PATH    = "/tmp/trigger_menu_nav.json"
 MENU_SELECT_PATH = "/tmp/trigger_menu_select.json"
 
-estado = "idle"          # idle | evaluando | volume
+# --- VCR (NFC Mini VHS) paths ---
+VCR_STATE_PATH = "/tmp/vcr_state.json"
+VCR_PAUSE_TRIGGER = "/tmp/trigger_vcr_pause.json"
+VCR_REWIND_TRIGGER = "/tmp/trigger_vcr_rewind.json"
+VCR_COUNTDOWN_TRIGGER = "/tmp/trigger_vcr_countdown.json"
+VCR_CHANNEL_ID = "03"  # Channel 3 is VCR input
+VCR_REWIND_HOLD_SECONDS = 3.0  # Hold button for 3 seconds to start rewind
+
+estado = "idle"          # idle | evaluando | volume | vcr_hold
 hubo_giro = False
 ultimo_estado = "idle"
 last_volume_activity = 0.0
+
+# VCR-specific state
+vcr_btn_press_time = 0.0  # When button was pressed on VCR channel
+vcr_countdown_active = False
 
 DEFAULT_VOL = 25  # porcentaje
 
@@ -34,8 +46,13 @@ def get_canal_actual():
     return "default"
 
 def get_lista_canales():
+    """Get list of channels with system channel 03 always at the beginning."""
     with open(CANAL_JSON_PATH, "r", encoding="utf-8") as f:
-        return list(json.load(f).keys())
+        user_channels = list(json.load(f).keys())
+    # Remove 03 if it somehow exists in user channels (shouldn't, but safety)
+    user_channels = [c for c in user_channels if c != "03"]
+    # Always inject 03 (AV input) at the beginning
+    return ["03"] + user_channels
 
 def cambiar_al_siguiente(delta):
     canales = get_lista_canales()
@@ -124,6 +141,81 @@ def trigger_next_video():
     except Exception as e:
         print(f"[{ts()}] [NEXT] Error al disparar next: {e}")
 
+
+# --- VCR (NFC Mini VHS) functions ---
+
+def is_vcr_channel():
+    """Check if current channel is the VCR input (Channel 03)."""
+    return get_canal_actual() == VCR_CHANNEL_ID
+
+
+def get_vcr_state():
+    """Load current VCR state from temp file."""
+    if Path(VCR_STATE_PATH).exists():
+        try:
+            with open(VCR_STATE_PATH, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def vcr_has_tape():
+    """Check if a tape is currently inserted in VCR."""
+    state = get_vcr_state()
+    return state.get("tape_inserted", False)
+
+
+def vcr_is_paused():
+    """Check if VCR is currently paused."""
+    state = get_vcr_state()
+    return state.get("is_paused", False)
+
+
+def vcr_is_rewinding():
+    """Check if VCR is currently rewinding."""
+    state = get_vcr_state()
+    return state.get("is_rewinding", False)
+
+
+def trigger_vcr_pause():
+    """Trigger VCR pause/play toggle."""
+    try:
+        with open(VCR_PAUSE_TRIGGER, "w") as f:
+            json.dump({"timestamp": time.time()}, f)
+        print(f"[{ts()}] [VCR] Pause/Play triggered")
+    except Exception as e:
+        print(f"[{ts()}] [VCR] Error triggering pause: {e}")
+
+
+def trigger_vcr_rewind():
+    """Trigger VCR rewind start."""
+    try:
+        with open(VCR_REWIND_TRIGGER, "w") as f:
+            json.dump({"timestamp": time.time()}, f)
+        print(f"[{ts()}] [VCR] Rewind triggered")
+    except Exception as e:
+        print(f"[{ts()}] [VCR] Error triggering rewind: {e}")
+
+
+def trigger_vcr_countdown(seconds_remaining):
+    """
+    Update VCR countdown display.
+    seconds_remaining: Number to show (3, 2, 1) or None to hide countdown.
+    """
+    try:
+        with open(VCR_COUNTDOWN_TRIGGER, "w") as f:
+            json.dump({
+                "countdown": seconds_remaining,
+                "timestamp": time.time()
+            }, f)
+        if seconds_remaining is not None:
+            print(f"[{ts()}] [VCR] Countdown: {seconds_remaining}")
+        else:
+            print(f"[{ts()}] [VCR] Countdown cancelled")
+    except Exception as e:
+        print(f"[{ts()}] [VCR] Error updating countdown: {e}")
+
 if __name__ == "__main__":
     print(f"[{ts()}] [ENCODER] Escuchando salida de ./encoder_reader")
     proc = subprocess.Popen(["./encoder_reader"], stdout=subprocess.PIPE, text=True)
@@ -134,8 +226,24 @@ if __name__ == "__main__":
             if estado == "volume" and last_volume_activity and (time.time() - last_volume_activity) > 3.2:
                 estado = ultimo_estado
                 last_volume_activity = 0.0
-                print(f"[{ts()}] [ENCODER] Volume timeout â†’ volvemos a {estado}")
-            
+                print(f"[{ts()}] [ENCODER] Volume timeout -> volvemos a {estado}")
+
+            # --- VCR hold watchdog: update countdown while button held ---
+            if estado == "vcr_hold" and vcr_btn_press_time > 0:
+                elapsed = time.time() - vcr_btn_press_time
+                if elapsed >= VCR_REWIND_HOLD_SECONDS:
+                    # Held long enough - trigger rewind
+                    trigger_vcr_rewind()
+                    trigger_vcr_countdown(None)  # Clear countdown
+                    vcr_btn_press_time = 0.0
+                    vcr_countdown_active = False
+                    estado = "idle"
+                    print(f"[{ts()}] [VCR] Rewind initiated after {VCR_REWIND_HOLD_SECONDS}s hold")
+                else:
+                    # Update countdown display
+                    remaining = int(VCR_REWIND_HOLD_SECONDS - elapsed) + 1
+                    trigger_vcr_countdown(remaining)
+
             line = raw.strip()
             if not line:
                 continue
@@ -158,7 +266,7 @@ if __name__ == "__main__":
                     # Se estaba apretando: si gira, esto es volumen
                     estado = "volume"
                     hubo_giro = True
-                    last_volume_activity = time.time()  
+                    last_volume_activity = time.time()
                     print(f"[{ts()}] [ENCODER] Gesto = volumen (entrando a modo volume)")
 
                 elif estado == "volume":
@@ -167,22 +275,61 @@ if __name__ == "__main__":
                     ajustar_volumen(delta)
                     last_volume_activity = time.time()
 
-            # --- BotÃ³n: flanco ascendente (apretÃ³) ---
+                elif estado == "vcr_hold":
+                    # Rotation while holding on VCR - cancel rewind countdown, switch to volume
+                    trigger_vcr_countdown(None)
+                    vcr_btn_press_time = 0.0
+                    vcr_countdown_active = False
+                    estado = "volume"
+                    hubo_giro = True
+                    last_volume_activity = time.time()
+                    print(f"[{ts()}] [VCR] Hold cancelled, switching to volume mode")
+
+            # --- Boton: flanco ascendente (apreto) ---
             elif line == "BTN_PRESS":
                 if estado == "idle":
-                    ultimo_estado = estado
-                    estado = "evaluando"
-                    hubo_giro = False
-                    print(f"[{ts()}] [ENCODER] Entrando en modo evaluando (BTN_PRESS)")
+                    # Check if we're on VCR channel with tape inserted
+                    if is_vcr_channel() and vcr_has_tape() and not vcr_is_rewinding():
+                        # VCR mode: start tracking hold time for rewind
+                        estado = "vcr_hold"
+                        vcr_btn_press_time = time.time()
+                        vcr_countdown_active = True
+                        hubo_giro = False
+                        print(f"[{ts()}] [VCR] Button pressed, starting hold timer for rewind")
+                        # Show initial countdown
+                        trigger_vcr_countdown(int(VCR_REWIND_HOLD_SECONDS))
+                    else:
+                        # Normal mode
+                        ultimo_estado = estado
+                        estado = "evaluando"
+                        hubo_giro = False
+                        print(f"[{ts()}] [ENCODER] Entrando en modo evaluando (BTN_PRESS)")
 
-            # --- BotÃ³n: flanco descendente (soltÃ³) ---
+            # --- Boton: flanco descendente (solto) ---
             elif line == "BTN_RELEASE":
-                if estado == "evaluando":
+                if estado == "vcr_hold":
+                    # VCR mode: check how long button was held
+                    elapsed = time.time() - vcr_btn_press_time
+                    trigger_vcr_countdown(None)  # Clear countdown
+                    vcr_btn_press_time = 0.0
+                    vcr_countdown_active = False
+
+                    if elapsed >= VCR_REWIND_HOLD_SECONDS:
+                        # Already triggered rewind in watchdog
+                        pass
+                    elif not hubo_giro:
+                        # Short press without rotation: toggle pause
+                        trigger_vcr_pause()
+                        print(f"[{ts()}] [VCR] Short press -> pause/play toggle")
+
+                    estado = "idle"
+
+                elif estado == "evaluando":
                     if not hubo_giro:
                         if menu_is_open():
                             trigger_menu_select()
                             estado = "idle"
-                            print(f"[{ts()}] [ENCODER] Select en menÃº. Estado=idle")
+                            print(f"[{ts()}] [ENCODER] Select en menu. Estado=idle")
                         else:
                             trigger_menu()
                             estado = "idle"
@@ -193,14 +340,13 @@ if __name__ == "__main__":
                         print(f"[{ts()}] [ENCODER] Fin de volumen; volvemos a {estado}")
 
                 elif estado == "volume":
-                    # <<--- esta rama te falta
                     estado = ultimo_estado
                     hubo_giro = False
                     print(f"[{ts()}] [ENCODER] Fin de ajuste de volumen, volvemos a {estado}")
-               
+
             elif line == "BTN_NEXT":
-                # Saltar al próximo video dentro del canal actual
-                trigger_next_video() 
+                # Saltar al proximo video dentro del canal actual
+                trigger_next_video()
                 print(f"[{ts()}] [BTN_NEXT] Pulsado")
 
 

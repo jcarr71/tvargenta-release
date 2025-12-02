@@ -27,11 +27,13 @@ from pathlib import Path
 from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
     METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
-    SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE, 
-    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR
-) 
-import bluetooth_manager        
+    SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
+    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
+    VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE,
+)
+import bluetooth_manager
 import wifi_manager
+import vcr_manager
 
 
        
@@ -209,10 +211,9 @@ DEFAULT_TAGS = {
     }
 }
 
-# Canales predefinidos
+# Canales predefinidos (Channel 03 is a system channel, not stored here)
 DEFAULT_CANALES = {
-
-        "Canal de Prueba": {
+    "Canal de Prueba": {
         "nombre": "Test",
         "descripcion": "Canal de prueba",
         "tags_prioridad": ["test"],
@@ -299,11 +300,14 @@ def _bootstrap_config_from_tags_if_empty():
         logger.warning(f"[BOOT] No pude poblar configuracion desde tags.json: {e}")
 
 # Semillas de JSONs (no pisan si ya existen)
-_ensure_json(TAGS_FILE,       DEFAULT_TAGS)         
-_ensure_json(CONFIG_FILE,     DEFAULT_CONFIG)       
-_ensure_json(CANALES_FILE,    DEFAULT_CANALES)      
-_ensure_json(METADATA_FILE,   {})                   
-_ensure_json(CANAL_ACTIVO_FILE, DEFAULT_CANAL_ACTIVO)  
+_ensure_json(TAGS_FILE,       DEFAULT_TAGS)
+_ensure_json(CONFIG_FILE,     DEFAULT_CONFIG)
+_ensure_json(CANALES_FILE,    DEFAULT_CANALES)
+_ensure_json(METADATA_FILE,   {})
+_ensure_json(CANAL_ACTIVO_FILE, DEFAULT_CANAL_ACTIVO)
+
+# Note: Channel 03 is a system channel (AV input) - it's injected at runtime
+# by the encoder and handled specially by /api/next_video. It's not stored in canales.json.  
 
 
 def load_config_i18n():
@@ -522,6 +526,33 @@ def get_canal_activo():
 def set_canal_activo(canal_id):
     with open(CANAL_ACTIVO_FILE, "w", encoding="utf-8") as f:
         json.dump({"canal_id": canal_id}, f, indent=2, ensure_ascii=False)
+
+
+def get_canal_numero(canal_id, canales=None):
+    """
+    Get the display channel number for a given canal_id.
+    - Channel "03" is always "03" (system AV input channel)
+    - User channels can specify a custom "numero" field
+    - Otherwise auto-assigned starting from "04" based on position
+    """
+    if canal_id == "03":
+        return "03"
+
+    if canales is None:
+        canales = load_canales()
+
+    # Check if channel has explicit numero
+    canal_config = canales.get(canal_id, {})
+    if canal_config.get("numero"):
+        return str(canal_config["numero"]).zfill(2)
+
+    # Auto-assign based on position (starting from 04, since 03 is system)
+    canal_ids = list(canales.keys())
+    try:
+        idx = canal_ids.index(canal_id)
+        return str(idx + 4).zfill(2)  # 04, 05, 06, ...
+    except ValueError:
+        return "04"  # fallback
 
 
 def sanity_check_thumbnails(video_id=None):
@@ -1185,9 +1216,24 @@ def vertele():
 
 @app.route("/api/next_video")
 def api_next_video():
+    # Check if we're on Channel 03 (system AV input channel)
+    canal_activo_path = str(CANAL_ACTIVO_FILE)
+    if os.path.exists(canal_activo_path):
+        with open(canal_activo_path, "r", encoding="utf-8") as f:
+            activo = json.load(f)
+            if activo.get("canal_id") == "03":
+                # Channel 03 is the AV input - frontend handles display based on VCR state
+                return jsonify({
+                    "channel_type": "av_input",
+                    "modo": "03",
+                    "canal_nombre": "03",
+                    "canal_id": "03",
+                    "canal_numero": "03",
+                })
+
     metadata = load_metadata()
     canales = load_canales()
-    
+
     global _force_next_once
     force_next = _force_next_once
     _force_next_once = False
@@ -1196,7 +1242,6 @@ def api_next_video():
     canal_id = "canal_base"
     config = load_config()
 
-    canal_activo_path = str(CANAL_ACTIVO_FILE)
     if os.path.exists(canal_activo_path):
         with open(canal_activo_path, "r", encoding="utf-8") as f:
             activo = json.load(f)
@@ -1217,6 +1262,7 @@ def api_next_video():
             "tags": info.get("tags", []),
             "modo": canal_id,
             "canal_nombre": canales[canal_id].get("nombre", canal_id),
+            "canal_numero": get_canal_numero(canal_id, canales),
             "reused": True,
             "do_not_restart": True
         })
@@ -1237,6 +1283,7 @@ def api_next_video():
                 "fair_last_ts": 0.0,
                 "modo": canal_id,
                 "canal_nombre": canales[canal_id].get("nombre", canal_id),
+                "canal_numero": get_canal_numero(canal_id, canales),
                 "sticky": True
             })
 
@@ -1347,6 +1394,7 @@ def api_next_video():
         "overlap_prev": elegido_overlap,
         "modo": canal_id,
         "canal_nombre": canales[canal_id].get("nombre", canal_id),
+        "canal_numero": get_canal_numero(canal_id, canales),
         "min_gap_minutes": MIN_GAP_MIN,        # debug útil
         "age_seconds": None if edad_s == float('inf') else int(edad_s)
     })
@@ -2063,7 +2111,230 @@ def api_wifi_qr():
 
 
 # ---[END] API WiFi ---------------------------------------------------------------
-    
+
+
+# --- API VCR (NFC Mini VHS Tapes) --------------------------------------------
+
+@app.get("/api/vcr/state")
+def api_vcr_state():
+    """Get current VCR state for frontend."""
+    try:
+        state = vcr_manager.load_vcr_state()
+        # Include rewind progress if rewinding
+        if state.get("is_rewinding"):
+            progress = vcr_manager.check_rewind_progress()
+            state["rewind_progress"] = progress
+        return jsonify({"ok": True, **state})
+    except Exception as e:
+        logger.error(f"[API][VCR] state error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/pause")
+def api_vcr_pause():
+    """Toggle pause state."""
+    try:
+        is_paused = vcr_manager.toggle_pause()
+        logger.info(f"[API][VCR] pause toggled -> is_paused={is_paused}")
+        return jsonify({"ok": True, "is_paused": is_paused})
+    except Exception as e:
+        logger.error(f"[API][VCR] pause error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/rewind")
+def api_vcr_rewind():
+    """Start the rewind process (2 minutes)."""
+    try:
+        started = vcr_manager.start_rewind()
+        logger.info(f"[API][VCR] rewind started={started}")
+        return jsonify({"ok": True, "started": started})
+    except Exception as e:
+        logger.error(f"[API][VCR] rewind error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/seek")
+def api_vcr_seek():
+    """Seek to a specific position (for admin/debug)."""
+    data = request.get_json(force=True) or {}
+    position = data.get("position_sec", 0)
+    try:
+        actual_pos = vcr_manager.seek_to_position(float(position))
+        logger.info(f"[API][VCR] seek to {position} -> actual={actual_pos}")
+        return jsonify({"ok": True, "position_sec": actual_pos})
+    except Exception as e:
+        logger.error(f"[API][VCR] seek error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/tapes")
+def api_vcr_tapes():
+    """List all registered tapes."""
+    try:
+        tapes = vcr_manager.get_all_tapes()
+        # Enrich with video metadata
+        for tape in tapes:
+            video_info = vcr_manager.get_video_info(tape.get("video_id", ""))
+            if video_info:
+                tape["video_title"] = video_info.get("title", tape.get("video_id"))
+                tape["video_duration"] = video_info.get("duracion", 0)
+        return jsonify({"ok": True, "tapes": tapes})
+    except Exception as e:
+        logger.error(f"[API][VCR] tapes list error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/tapes/register")
+def api_vcr_tapes_register():
+    """Register a new tape (map NFC UID to video)."""
+    data = request.get_json(force=True) or {}
+    uid = (data.get("uid") or "").strip()
+    video_id = (data.get("video_id") or "").strip()
+    title = data.get("title")  # Optional, will be fetched from metadata if not provided
+
+    if not uid:
+        return jsonify({"ok": False, "error": "missing_uid"}), 400
+    if not video_id:
+        return jsonify({"ok": False, "error": "missing_video_id"}), 400
+
+    try:
+        tape = vcr_manager.register_tape(uid, video_id, title)
+        logger.info(f"[API][VCR] tape registered: uid={uid} video={video_id}")
+        return jsonify({"ok": True, "tape": tape})
+    except Exception as e:
+        logger.error(f"[API][VCR] tape register error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.delete("/api/vcr/tapes/<uid>")
+def api_vcr_tapes_delete(uid):
+    """Remove a tape mapping."""
+    try:
+        # URL decode the UID (colons may be encoded)
+        uid = urllib.parse.unquote(uid)
+        removed = vcr_manager.unregister_tape(uid)
+        logger.info(f"[API][VCR] tape deleted: uid={uid} removed={removed}")
+        return jsonify({"ok": True, "removed": removed})
+    except Exception as e:
+        logger.error(f"[API][VCR] tape delete error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/tapes/scan")
+def api_vcr_tapes_scan():
+    """Get currently detected but unregistered tape (for admin registration)."""
+    try:
+        state = vcr_manager.load_vcr_state()
+        unknown_uid = state.get("unknown_tape_uid")
+        if unknown_uid:
+            return jsonify({"ok": True, "detected": True, "uid": unknown_uid})
+        return jsonify({"ok": True, "detected": False, "uid": None})
+    except Exception as e:
+        logger.error(f"[API][VCR] tape scan error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/trigger")
+def api_vcr_trigger():
+    """Check if VCR state has changed (for frontend polling)."""
+    try:
+        if VCR_TRIGGER_FILE.exists():
+            mtime = VCR_TRIGGER_FILE.stat().st_mtime
+            return jsonify({"ok": True, "mtime": mtime})
+        return jsonify({"ok": True, "mtime": 0})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/countdown_trigger")
+def api_vcr_countdown_trigger():
+    """Get countdown value for rewind (from encoder button hold)."""
+    from settings import VCR_COUNTDOWN_TRIGGER
+    try:
+        if VCR_COUNTDOWN_TRIGGER.exists():
+            with open(VCR_COUNTDOWN_TRIGGER, "r") as f:
+                data = json.load(f)
+            return jsonify({"ok": True, "countdown": data.get("countdown")})
+        return jsonify({"ok": True, "countdown": None})
+    except Exception as e:
+        return jsonify({"ok": False, "countdown": None, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/videos")
+def api_vcr_videos():
+    """Get list of videos available for tape registration."""
+    try:
+        metadata = vcr_manager._read_json(METADATA_FILE, {})
+        videos = []
+        for video_id, info in metadata.items():
+            videos.append({
+                "video_id": video_id,
+                "title": info.get("title", video_id),
+                "duration": info.get("duracion", 0),
+            })
+        # Sort by title
+        videos.sort(key=lambda v: v.get("title", "").lower())
+        return jsonify({"ok": True, "videos": videos})
+    except Exception as e:
+        logger.error(f"[API][VCR] videos list error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/vcr_admin")
+def vcr_admin():
+    """VCR tape management admin page."""
+    return render_template("vcr_admin.html")
+
+
+# --- VCR Background Position Tracker -----------------------------------------
+
+_vcr_tracker_running = False
+
+
+def _vcr_position_tracker():
+    """Background thread to increment tape position and check rewind completion."""
+    global _vcr_tracker_running
+    _vcr_tracker_running = True
+    logger.info("[VCR] Position tracker thread started")
+
+    while _vcr_tracker_running:
+        try:
+            state = vcr_manager.load_vcr_state()
+
+            if state.get("tape_inserted"):
+                if state.get("is_rewinding"):
+                    # Check if rewind is complete
+                    progress = vcr_manager.check_rewind_progress()
+                    if progress.get("complete"):
+                        vcr_manager.complete_rewind()
+                        logger.info("[VCR] Rewind complete")
+
+                elif not state.get("is_paused"):
+                    # Tape is playing - increment position
+                    vcr_manager.increment_position(1.0)
+
+                    # Periodically persist position to disk
+                    if vcr_manager.should_persist_position():
+                        vcr_manager.persist_current_position()
+
+        except Exception as e:
+            logger.error(f"[VCR] Position tracker error: {e}")
+
+        time.sleep(1)
+
+    logger.info("[VCR] Position tracker thread stopped")
+
+
+def _start_vcr_tracker():
+    """Start the VCR position tracker thread."""
+    tracker_thread = threading.Thread(target=_vcr_position_tracker, daemon=True)
+    tracker_thread.start()
+    return tracker_thread
+
+
+# ---[END] API VCR ------------------------------------------------------------
+
 
 @app.before_request
 def _i18n_before_request():
@@ -2208,10 +2479,29 @@ if __name__ == "__main__":
         print(f"[APP] No se pudo lanzar el encoder: {e}")
         encoder_proc = None
 
+    # Lanzar NFC reader daemon para VCR
+    nfc_reader_path = str(Path(APP_DIR, "nfc_reader.py"))
+    nfc_proc = None
+    try:
+        # Kill any existing NFC reader process
+        subprocess.run(["pkill", "-f", "nfc_reader.py"], check=False)
+        time.sleep(0.2)
+        nfc_proc = subprocess.Popen(["python3", nfc_reader_path], start_new_session=True)
+        print("[APP] NFC reader daemon launched")
+    except Exception as e:
+        print(f"[APP] No se pudo lanzar el NFC reader: {e}")
+
+    # Start VCR position tracker thread
+    _start_vcr_tracker()
+    print("[APP] VCR position tracker started")
+
     def cleanup():
         if encoder_proc:
             print("[APP] Terminando proceso del encoder...")
             encoder_proc.terminate()
+        if nfc_proc:
+            print("[APP] Terminando proceso del NFC reader...")
+            nfc_proc.terminate()
 
     atexit.register(cleanup)
 

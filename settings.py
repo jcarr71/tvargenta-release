@@ -53,3 +53,11 @@ INTRO_PATH          = SPLASH_DIR / "splash_1.mp4"
 USER = os.environ.get("TVARGENTA_USER") or getpass.getuser()
 
 UPLOAD_STATUS = TMP_DIR / "upload_status.txt"
+
+# VCR / NFC paths
+VCR_STATE_FILE = TMP_DIR / "vcr_state.json"
+VCR_TRIGGER_FILE = TMP_DIR / "trigger_vcr.json"
+VCR_PAUSE_TRIGGER = TMP_DIR / "trigger_vcr_pause.json"
+VCR_REWIND_TRIGGER = TMP_DIR / "trigger_vcr_rewind.json"
+VCR_COUNTDOWN_TRIGGER = TMP_DIR / "trigger_vcr_countdown.json"
+TAPES_FILE = CONTENT_DIR / "tapes.json"
