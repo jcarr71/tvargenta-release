@@ -2246,6 +2246,20 @@ def api_vcr_tapes_register():
     try:
         tape = vcr_manager.register_tape(uid, video_id, title)
         logger.info(f"[API][VCR] tape registered: uid={uid} video={video_id}")
+
+        # Check if this tape is currently inserted (unknown_tape_uid matches)
+        # If so, auto-transition to playback mode
+        state = vcr_manager.load_vcr_state()
+        if state.get("unknown_tape_uid") == uid:
+            # Get video duration and title for playback
+            duration = vcr_manager.get_video_duration(video_id)
+            video_title = tape.get("title", video_id)
+            position = vcr_manager.get_tape_position(uid)
+
+            # Transition to tape inserted state - this will trigger playback
+            vcr_manager.set_tape_inserted(uid, video_id, video_title, duration, position)
+            logger.info(f"[API][VCR] auto-started playback for newly registered tape: {uid}")
+
         return jsonify({"ok": True, "tape": tape})
     except Exception as e:
         logger.error(f"[API][VCR] tape register error: {e}")
