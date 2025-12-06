@@ -23,6 +23,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import math
 import base64, urllib.parse
+import socket
 from pathlib import Path
 from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
@@ -2339,6 +2340,69 @@ def api_vcr_videos():
         return jsonify({"ok": True, "videos": videos})
     except Exception as e:
         logger.error(f"[API][VCR] videos list error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/api/vcr/empty_tape_qr")
+def api_vcr_empty_tape_qr():
+    """
+    Generate QR code for VCR admin page when an empty tape is inserted.
+    Returns WiFi status, SSID, and QR code for the admin page.
+    Tries mDNS hostname first, falls back to IP address.
+    """
+    try:
+        # Get WiFi status
+        wifi_status = wifi_manager.get_status()
+        mode = wifi_status.get("mode", "disconnected")
+        ssid = wifi_status.get("ssid", "")
+
+        # If not connected to WiFi, return status without QR
+        if mode != "client" or not ssid:
+            return jsonify({
+                "ok": True,
+                "wifi_connected": False,
+                "mode": mode,
+                "ssid": None,
+                "qr_data": None,
+                "url": None,
+            })
+
+        # Try mDNS hostname first
+        try:
+            hostname = socket.gethostname()
+            mdns_hostname = f"{hostname}.local"
+            # Verify mDNS is resolvable (quick check)
+            socket.gethostbyname(mdns_hostname)
+            url = f"http://{mdns_hostname}:5000/vcr_admin"
+        except (socket.gaierror, OSError):
+            # mDNS not available, fall back to IP
+            ip = wifi_manager._get_iface_ipv4_addr(wifi_manager.WIFI_IFACE)
+            if not ip:
+                return jsonify({
+                    "ok": True,
+                    "wifi_connected": True,
+                    "mode": mode,
+                    "ssid": ssid,
+                    "qr_data": None,
+                    "url": None,
+                    "error": "No IP address available",
+                })
+            url = f"http://{ip}:5000/vcr_admin"
+
+        # Generate QR code
+        qr_data = wifi_manager._make_qr_data_url(url)
+
+        return jsonify({
+            "ok": True,
+            "wifi_connected": True,
+            "mode": mode,
+            "ssid": ssid,
+            "qr_data": qr_data,
+            "url": url,
+        })
+
+    except Exception as e:
+        logger.error(f"[API][VCR] empty_tape_qr error: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
