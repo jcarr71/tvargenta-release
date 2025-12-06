@@ -1574,7 +1574,7 @@ def api_should_reload():
 def api_volumen():
     if request.method == "POST":
         data = request.get_json()
-        nuevo_valor = max(0, min(100, data.get("valor", 50)))  # rango 0â€“100
+        nuevo_valor = max(0, min(150, data.get("valor", 50)))  # rango 0â€“100
         with open(VOLUMEN_PATH, "w") as f:
             json.dump({"valor": nuevo_valor}, f)
         return jsonify({"ok": True, "valor": nuevo_valor})

@@ -86,7 +86,7 @@ def ajustar_volumen(delta):
         except Exception:
             valor = DEFAULT_VOL  # por si el JSON se dañó
 
-    nuevo_valor = max(0, min(100, valor + delta))
+    nuevo_valor = max(0, min(150, valor + delta))  # 150% max for boost mode
 
     # Guardar y notificar si cambió o si el archivo no existía
     if (not os.path.exists(path)) or (nuevo_valor != valor):

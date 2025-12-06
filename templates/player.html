@@ -109,6 +109,16 @@
 	  opacity: 1;
 	}
 
+	.bloques .bloque.bloque-boost {
+	  background: #ff6600;
+	  opacity: 0.25;
+	}
+
+	.bloques .bloque.bloque-boost.activo {
+	  background: #ff3300;
+	  opacity: 1;
+	}
+
 	#barra-volumen.oculto {
 	  display: none;
 	}
@@ -622,6 +632,42 @@
     const video = document.getElementById('tvVideo');
 	video.muted = false;
 	video.volume = 0.5;
+
+	// Web Audio API for volume boost (gain > 1.0)
+	let audioContext = null;
+	let gainNode = null;
+	let audioSourceConnected = false;
+
+	function initAudioGain() {
+	  if (audioContext) return; // already initialized
+	  try {
+		audioContext = new (window.AudioContext || window.webkitAudioContext)();
+		const source = audioContext.createMediaElementSource(video);
+		gainNode = audioContext.createGain();
+		gainNode.gain.value = 1.0;
+		source.connect(gainNode);
+		gainNode.connect(audioContext.destination);
+		audioSourceConnected = true;
+		console.log("[AUDIO] GainNode initialized for volume boost");
+	  } catch (e) {
+		console.error("[AUDIO] Failed to init GainNode:", e);
+	  }
+	}
+
+	function applyVolume(valor) {
+	  // valor is 0-150 (percentage)
+	  // 0-100: use video.volume (0-1), gain stays at 1.0
+	  // 100-150: video.volume = 1.0, gain = 1.0 to 1.5
+	  if (valor <= 100) {
+		video.volume = valor / 100;
+		if (gainNode) gainNode.gain.value = 1.0;
+	  } else {
+		video.volume = 1.0;
+		if (gainNode) {
+		  gainNode.gain.value = valor / 100; // 1.0 to 1.5
+		}
+	  }
+	}
 	
 	video.addEventListener('volumechange', () => {
 	  if (video.volume === 0 || video.muted) {
@@ -831,11 +877,12 @@
 		  // 4) arrancar el primer video
 		  cargarSiguienteVideo();
 
-		  // 5) aplicar volumen guardado
+		  // 5) aplicar volumen guardado (with gain boost support)
 		  try {
+			initAudioGain(); // Initialize Web Audio API for boost
 			const res = await fetch("/api/volumen");
 			const data = await res.json();
-			video.volume = data.valor / 100;
+			applyVolume(data.valor); // Use gain-aware volume function
 			updateMuteIndicatorFromVol(data.valor);
 		  } catch (e) {
 			console.warn("[PLAYER] no pude leer volumen:", e);
@@ -1079,23 +1126,53 @@
 	function mostrarVolumen(valor) {
 	  const barra = document.getElementById("barra-volumen");
 	  const contenedor = barra.querySelector(".bloques");
+	  const labelEl = barra.querySelector(".label-volumen");
 
 	  barra.classList.remove("oculto");
 
-	  const total = 20;
-	  const activos = Math.round((valor / 100) * total);
+	  // Initialize audio gain on first volume adjustment (requires user interaction)
+	  if (!audioSourceConnected) {
+		initAudioGain();
+	  }
+
+	  // 30 blocks total: 20 for 0-100%, 10 for 100-150% (boost)
+	  const totalNormal = 20;
+	  const totalBoost = 10;
+	  const total = totalNormal + totalBoost;
+
+	  // Calculate active blocks
+	  const activosNormal = Math.min(totalNormal, Math.round((Math.min(valor, 100) / 100) * totalNormal));
+	  const activosBoost = valor > 100 ? Math.round(((valor - 100) / 50) * totalBoost) : 0;
 
 	  contenedor.innerHTML = "";
 
-	  for (let i = 0; i < total; i++) {
+	  // Normal volume blocks (0-100%)
+	  for (let i = 0; i < totalNormal; i++) {
 		const b = document.createElement("div");
 		b.classList.add("bloque");
-		if (i < activos) b.classList.add("activo");
+		if (i < activosNormal) b.classList.add("activo");
 		contenedor.appendChild(b);
 	  }
 
-	  video.volume = valor / 100;
-	  updateMuteIndicatorFromVol(valor); 	
+	  // Boost blocks (100-150%) - shown in red/orange when active
+	  for (let i = 0; i < totalBoost; i++) {
+		const b = document.createElement("div");
+		b.classList.add("bloque", "bloque-boost");
+		if (i < activosBoost) b.classList.add("activo");
+		contenedor.appendChild(b);
+	  }
+
+	  // Update label to show percentage when in boost mode
+	  if (valor > 100) {
+		labelEl.textContent = `VOL ${valor}%`;
+	  } else {
+		labelEl.setAttribute("data-i18n", "vol.label");
+		labelEl.textContent = tr("vol.label") || "VOL";
+	  }
+
+	  // Apply volume with gain boost
+	  applyVolume(valor);
+	  updateMuteIndicatorFromVol(valor);
 	  clearTimeout(volumenTimer);
 	  volumenTimer = setTimeout(() => {
 		barra.classList.add("oculto");
