@@ -1617,7 +1617,8 @@ def _get_all_series():
 def _get_series_episode_count(series_name):
     """Count episodes for a given series."""
     count = 0
-    for video_id, data in metadata.items():
+    meta = load_metadata()
+    for video_id, data in meta.items():
         if data.get("series") == series_name:
             count += 1
     return count
