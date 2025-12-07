@@ -701,7 +701,14 @@ def sanity_check_thumbnails(video_id=None):
     targets = [video_id] if video_id else metadata.keys()
 
     for vid in targets:
-        video_path = os.path.join(VIDEO_DIR, vid + ".mp4")
+        # Check series_path first for series videos
+        vid_info = metadata.get(vid, {})
+        series_path = vid_info.get("series_path")
+        if series_path:
+            video_path = str(VIDEO_DIR / f"{series_path}.mp4")
+        else:
+            video_path = os.path.join(VIDEO_DIR, vid + ".mp4")
+
         thumbnail_path = os.path.join(CONTENT_DIR, "thumbnails", vid + ".jpg")
 
         if os.path.exists(video_path) and not os.path.exists(thumbnail_path):
@@ -743,14 +750,35 @@ def eliminar_estado():
     if UPLOAD_STATUS.exists(): UPLOAD_STATUS.unlink()
 
 def sincronizar_videos():
+    # Scan regular videos in VIDEO_DIR
     archivos_video = {
         os.path.splitext(f)[0] for f in os.listdir(VIDEO_DIR)
-        if f.lower().endswith(('.mp4', '.webm', '.mov'))
+        if f.lower().endswith(('.mp4', '.webm', '.mov')) and os.path.isfile(os.path.join(VIDEO_DIR, f))
     }
+
+    # Scan series videos in SERIES_VIDEO_DIR/<series_name>/
+    if SERIES_VIDEO_DIR.exists():
+        for series_dir in SERIES_VIDEO_DIR.iterdir():
+            if series_dir.is_dir():
+                for f in series_dir.iterdir():
+                    if f.is_file() and f.suffix.lower() in ('.mp4', '.webm', '.mov'):
+                        archivos_video.add(f.stem)
+
     entradas_metadata = set(metadata.keys())
 
-    videos_validos = {k: v for k, v in metadata.items() if k in archivos_video}
-    videos_fantasmas = {k: v for k, v in metadata.items() if k not in archivos_video}
+    # For series videos, check they exist at their series_path location
+    def video_exists(video_id, data):
+        series_path = data.get("series_path")
+        if series_path:
+            # Series video - check in series directory
+            full_path = VIDEO_DIR / f"{series_path}.mp4"
+            return full_path.exists()
+        else:
+            # Regular video - check in VIDEO_DIR
+            return video_id in archivos_video
+
+    videos_validos = {k: v for k, v in metadata.items() if video_exists(k, v)}
+    videos_fantasmas = {k: v for k, v in metadata.items() if not video_exists(k, v)}
     videos_nuevos = sorted(archivos_video - entradas_metadata)
 
     return videos_validos, videos_fantasmas, videos_nuevos
@@ -792,15 +820,20 @@ def ensure_durations():
     updated = False
     for video_id, info in metadata.items():
         if "duracion" not in info:
-            filepath = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
+            # Check series_path first, then fall back to VIDEO_DIR
+            series_path = info.get("series_path")
+            if series_path:
+                filepath = VIDEO_DIR / f"{series_path}.mp4"
+            else:
+                filepath = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
             if os.path.exists(filepath):
-                dur = get_video_duration(filepath)
+                dur = get_video_duration(str(filepath))
                 metadata[video_id]["duracion"] = dur
                 updated = True
     if updated:
         with open(METADATA_FILE, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
-        print("ðŸ•’ Duraciones actualizadas en metadata")
+        print("ðŸ•' Duraciones actualizadas en metadata")
 
 def get_total_recuerdos():
     total_sec = sum(v.get("duracion", 0) for v in metadata.values())
@@ -1083,7 +1116,13 @@ def serve_series_video(series_name, filename):
 
 @app.route("/delete_full/<video_id>")
 def delete_full_video(video_id):
-    video_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
+    # Check if it's a series video
+    vid_info = metadata.get(video_id, {})
+    series_path = vid_info.get("series_path")
+    if series_path:
+        video_path = str(VIDEO_DIR / f"{series_path}.mp4")
+    else:
+        video_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
     if os.path.exists(video_path):
         os.remove(video_path)
         print(f"ðŸ§¨ Video eliminado: {video_path}")
