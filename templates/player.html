@@ -2933,9 +2933,9 @@ function ejecutarSeleccion() {
       vcrRecordingFill.style.width = `${progress}%`;
     }
     if (vcrRecordingPercent) {
-      // Show "Processing..." when upload is done but server is still working
+      // Show "Finalizing..." when upload is done but server is still working
       if (status === "processing" || progress >= 100) {
-        vcrRecordingPercent.textContent = "Processing...";
+        vcrRecordingPercent.textContent = "Finalizing...";
       } else {
         vcrRecordingPercent.textContent = `${progress}%`;
       }
