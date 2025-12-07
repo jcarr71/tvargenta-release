@@ -1509,6 +1509,13 @@ def api_next_video():
     series_filter = config.get("series_filter", [])
     series_filter_set = set(series_filter) if series_filter else None
 
+    # Debug logging for series filter
+    if series_filter_set:
+        tv_episodes = [(vid, d.get("series")) for vid, d in metadata.items() if d.get("category") == "tv_episode"]
+        logger.info(f"[NEXT] Series filter active: {series_filter}, found {len(tv_episodes)} TV episodes in metadata")
+        for vid, ser in tv_episodes[:5]:  # Log first 5
+            logger.info(f"[NEXT]   - {vid}: series={ser}, match={ser in series_filter_set if ser else False}")
+
     # --- Candidatos por tags e inéditos en el canal ---
     candidatos = []
     for video_id, data in metadata.items():
@@ -1568,12 +1575,13 @@ def api_next_video():
     candidatos = candidatos_ok
     # ============================================================
 
-    # Si no quedan, limpiá “ya vistos” y reintentá
+    # Si no quedan, limpiá "ya vistos" y reintentá
     if not candidatos:
         if canal_shown:
             shown_videos_por_canal[canal_id] = []
             return api_next_video()
         else:
+            logger.warning(f"[NEXT] No videos found for canal={canal_id}, series_filter={series_filter}")
             return jsonify({"no_videos": True, "canal_id": canal_id})
 
     # --- Fairness + diversidad + prioridad + jitter ---
