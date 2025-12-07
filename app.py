@@ -2477,13 +2477,16 @@ def api_vcr_record_progress():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
-@app.post("/api/vcr/record/upload")
-def api_vcr_record_upload():
+@app.post("/api/vcr/record/start")
+def api_vcr_record_start():
     """
-    Upload a video file for VCR recording.
-    Stores the file as-is (no transcoding) and auto-registers the tape.
+    Initialize recording state before upload begins.
+    Called by the client before starting the actual file upload.
     """
-    tape_uid = request.form.get("tape_uid", "").strip()
+    data = request.get_json(force=True) or {}
+    tape_uid = (data.get("tape_uid") or "").strip()
+    filename = data.get("filename", "video")
+    file_size = data.get("file_size", 0)
 
     if not tape_uid:
         return jsonify({"ok": False, "error": "missing_tape_uid"}), 400
@@ -2491,6 +2494,98 @@ def api_vcr_record_upload():
     # Check if tape is still inserted
     vcr_state = vcr_manager.load_vcr_state()
     if vcr_state.get("unknown_tape_uid") != tape_uid:
+        return jsonify({"ok": False, "error": "tape_not_inserted"}), 400
+
+    try:
+        # Generate video ID
+        safe_filename = secure_filename(filename)
+        video_id = os.path.splitext(safe_filename)[0]
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_id = f"{video_id}_{timestamp}"
+
+        # Initialize recording state
+        _vcr_recording_state_write({
+            "recording": True,
+            "tape_uid": tape_uid,
+            "video_id": video_id,
+            "progress": 0,
+            "total_bytes": file_size,
+            "received_bytes": 0,
+            "status": "recording",
+            "error": None,
+        })
+
+        # Trigger VCR state update so TV shows recording screen
+        vcr_manager.trigger_vcr_update()
+
+        logger.info(f"[VCR] Recording initialized: tape={tape_uid} video={video_id}")
+
+        return jsonify({"ok": True, "video_id": video_id})
+
+    except Exception as e:
+        logger.error(f"[VCR] Recording start error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/record/client_progress")
+def api_vcr_record_client_progress():
+    """
+    Receive progress updates from the uploading client.
+    This allows the TV to show real-time progress during network upload.
+    """
+    data = request.get_json(force=True) or {}
+    progress = data.get("progress", 0)
+    received_bytes = data.get("received_bytes", 0)
+    total_bytes = data.get("total_bytes", 0)
+
+    try:
+        state = _vcr_recording_state_read()
+        if not state.get("recording"):
+            return jsonify({"ok": False, "error": "not_recording"}), 400
+
+        # Update progress from client
+        state["progress"] = progress
+        state["received_bytes"] = received_bytes
+        if total_bytes:
+            state["total_bytes"] = total_bytes
+
+        _vcr_recording_state_write(state)
+
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        logger.error(f"[VCR] Client progress error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/record/upload")
+def api_vcr_record_upload():
+    """
+    Upload a video file for VCR recording.
+    Stores the file as-is (no transcoding) and auto-registers the tape.
+    Note: Progress is tracked by the client via /api/vcr/record/client_progress.
+    """
+    tape_uid = request.form.get("tape_uid", "").strip()
+
+    if not tape_uid:
+        return jsonify({"ok": False, "error": "missing_tape_uid"}), 400
+
+    # Get recording state (should have been initialized by /start)
+    recording_state = _vcr_recording_state_read()
+    if not recording_state.get("recording"):
+        return jsonify({"ok": False, "error": "recording_not_started"}), 400
+
+    if recording_state.get("tape_uid") != tape_uid:
+        return jsonify({"ok": False, "error": "tape_uid_mismatch"}), 400
+
+    # Check if tape is still inserted
+    vcr_state = vcr_manager.load_vcr_state()
+    if vcr_state.get("unknown_tape_uid") != tape_uid:
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "failed",
+            "error": "tape_removed",
+        })
         return jsonify({"ok": False, "error": "tape_not_inserted"}), 400
 
     if "video" not in request.files:
@@ -2501,81 +2596,44 @@ def api_vcr_record_upload():
         return jsonify({"ok": False, "error": "empty_filename"}), 400
 
     if not file.filename.lower().endswith(".mp4"):
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "failed",
+            "error": "invalid_format",
+        })
         return jsonify({"ok": False, "error": "invalid_format", "message": "Only .mp4 files allowed"}), 400
 
-    # Check file size from Content-Length header
-    content_length = request.content_length
-    if content_length and content_length > VCR_MAX_UPLOAD_SIZE:
-        return jsonify({"ok": False, "error": "file_too_large", "message": "Max file size is 3GB"}), 400
-
     try:
-        # Generate video ID from filename
-        filename = secure_filename(file.filename)
-        video_id = os.path.splitext(filename)[0]
-        # Add timestamp to avoid conflicts
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        video_id = f"{video_id}_{timestamp}"
+        # Get video_id from recording state (set by /start)
+        video_id = recording_state.get("video_id")
+        if not video_id:
+            # Fallback: generate from filename
+            filename = secure_filename(file.filename)
+            video_id = os.path.splitext(filename)[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            video_id = f"{video_id}_{timestamp}"
+
         final_path = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
 
         # Ensure video directory exists
         os.makedirs(VIDEO_DIR, exist_ok=True)
 
-        # Initialize recording state
-        _vcr_recording_state_write({
-            "recording": True,
-            "tape_uid": tape_uid,
-            "video_id": video_id,
-            "progress": 0,
-            "total_bytes": content_length or 0,
-            "received_bytes": 0,
-            "status": "recording",
-            "error": None,
-        })
+        logger.info(f"[VCR] Receiving upload: tape={tape_uid} video={video_id}")
 
-        # Trigger VCR state update so TV shows recording screen
-        vcr_manager.trigger_vcr_update()
+        # Save the file (Flask has already buffered it)
+        file.save(final_path)
 
-        logger.info(f"[VCR] Recording started: tape={tape_uid} video={video_id}")
-
-        # Stream the file to disk while tracking progress
-        received = 0
-        chunk_size = 64 * 1024  # 64KB chunks
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-            temp_path = tmp.name
-            while True:
-                chunk = file.stream.read(chunk_size)
-                if not chunk:
-                    break
-                tmp.write(chunk)
-                received += len(chunk)
-
-                # Check size limit during upload
-                if received > VCR_MAX_UPLOAD_SIZE:
-                    os.unlink(temp_path)
-                    _vcr_recording_state_write({
-                        "recording": False,
-                        "status": "failed",
-                        "error": "file_too_large",
-                    })
-                    vcr_manager.trigger_vcr_update()
-                    return jsonify({"ok": False, "error": "file_too_large"}), 400
-
-                # Update progress
-                progress = int((received / content_length * 100)) if content_length else 0
-                _vcr_recording_state_write({
-                    "recording": True,
-                    "tape_uid": tape_uid,
-                    "video_id": video_id,
-                    "progress": progress,
-                    "total_bytes": content_length or 0,
-                    "received_bytes": received,
-                    "status": "recording",
-                    "error": None,
-                })
-
-        # Move temp file to final location
-        shutil.move(temp_path, final_path)
+        # Verify file size
+        file_size = os.path.getsize(final_path)
+        if file_size > VCR_MAX_UPLOAD_SIZE:
+            os.unlink(final_path)
+            _vcr_recording_state_write({
+                "recording": False,
+                "status": "failed",
+                "error": "file_too_large",
+            })
+            vcr_manager.trigger_vcr_update()
+            return jsonify({"ok": False, "error": "file_too_large", "message": "Max file size is 3GB"}), 400
 
         # Get video duration using ffprobe
         try:

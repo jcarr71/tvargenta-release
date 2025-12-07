@@ -145,6 +145,8 @@
     const errorMessage = document.getElementById('error-message');
     const retryBtn = document.getElementById('retry-btn');
 
+    let lastReportedProgress = -1;
+
     function showState(state) {
       stateInitial.classList.add('hidden');
       stateRecording.classList.add('hidden');
@@ -160,6 +162,25 @@
     function updateProgress(percent) {
       progressBar.style.width = `${percent}%`;
       progressText.textContent = `${percent}%`;
+    }
+
+    // Report progress to server (throttled - only when percent changes)
+    function reportProgressToServer(percent, receivedBytes) {
+      if (percent === lastReportedProgress) return;
+      lastReportedProgress = percent;
+
+      // Fire-and-forget: don't await, don't block upload
+      fetch('/api/vcr/record/client_progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tape_uid: tapeUid,
+          progress: percent,
+          received_bytes: receivedBytes
+        })
+      }).catch(() => {
+        // Ignore errors - progress reporting is best-effort
+      });
     }
 
     // Click record button -> trigger file input
@@ -199,9 +220,33 @@
         return;
       }
 
-      // Start upload
+      // Initialize recording on server BEFORE upload
+      try {
+        const startResp = await fetch('/api/vcr/record/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            tape_uid: tapeUid,
+            filename: file.name,
+            file_size: file.size
+          })
+        });
+        const startData = await startResp.json();
+        if (!startData.ok) {
+          errorMessage.textContent = startData.message || startData.error || 'Failed to start recording.';
+          showState('error');
+          return;
+        }
+      } catch (err) {
+        errorMessage.textContent = 'Failed to initialize recording: ' + (err.message || 'Network error');
+        showState('error');
+        return;
+      }
+
+      // Now show recording state and start upload
       showState('recording');
       updateProgress(0);
+      lastReportedProgress = -1;
 
       try {
         const formData = new FormData();
@@ -210,11 +255,12 @@
 
         const xhr = new XMLHttpRequest();
 
-        // Track upload progress
+        // Track upload progress and report to server
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
             updateProgress(percent);
+            reportProgressToServer(percent, e.loaded);
           }
         });
 
