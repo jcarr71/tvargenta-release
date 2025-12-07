@@ -1836,27 +1836,17 @@ def upload_series_post():
         video_id = video_id.replace(' ', '_')
         final_path = series_dir / f"{video_id}.mp4"
 
-        # Save directly to final path first, then check if transcoding needed
+        # Save directly to final location
         temp_path = str(final_path) + ".uploading"
         file.save(temp_path)
 
         try:
-            # Check resolution and resize if needed
-            width, height = get_video_resolution(temp_path)
+            # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
-            if width == 800 and height == 480:
-                # No transcoding needed - just rename
-                shutil.move(temp_path, final_path)
-            else:
-                # Transcode to correct resolution
-                subprocess.run([
-                    "ffmpeg", "-i", temp_path,
-                    "-vf", "scale=800:480:force_original_aspect_ratio=decrease,pad=800:480:(ow-iw)/2:(oh-ih)/2",
-                    "-c:a", "copy",
-                    "-y", str(final_path)
-                ], check=True)
-                os.unlink(temp_path)  # Remove temp file after transcode
+            # For series uploads, skip transcoding - just rename the file
+            # Series episodes are pre-made content that doesn't need resizing
+            shutil.move(temp_path, final_path)
 
             # Parse season/episode from filename
             season, episode = parse_episode_info(video_id)
