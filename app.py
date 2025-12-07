@@ -840,13 +840,37 @@ def edit_video(video_id):
     if request.method == "POST":
         form = request.form
         tags = form.get("tags", "")
-        metadata[video_id] = {
+        category = form.get("category", "vhs_tape")
+
+        video_data = {
             "title": form.get("title"),
             "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
             "personaje": form.get("personaje"),
             "fecha": form.get("fecha"),
-            "modo": form.getlist("modo")
+            "modo": form.getlist("modo"),
+            "category": category
         }
+
+        # Add TV Episode specific fields
+        if category == "tv_episode":
+            video_data["series"] = form.get("series", "").strip()
+            season_str = form.get("season", "").strip()
+            episode_str = form.get("episode", "").strip()
+            video_data["season"] = int(season_str) if season_str.isdigit() else None
+            video_data["episode"] = int(episode_str) if episode_str.isdigit() else None
+        else:
+            # Clear TV Episode fields for other categories
+            video_data["series"] = None
+            video_data["season"] = None
+            video_data["episode"] = None
+
+        # Preserve existing fields like duracion
+        if video_id in metadata:
+            for key in ["duracion"]:
+                if key in metadata[video_id]:
+                    video_data[key] = metadata[video_id][key]
+
+        metadata[video_id] = video_data
         with open(METADATA_FILE, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
         return redirect(url_for("index"))
@@ -860,7 +884,11 @@ def edit_video(video_id):
             "tags": [],
             "personaje": "",
             "fecha": "",
-            "modo": []
+            "modo": [],
+            "category": "vhs_tape",
+            "series": None,
+            "season": None,
+            "episode": None
         }
 
     selected_tags = video.get("tags", [])
@@ -877,6 +905,15 @@ def edit_video(video_id):
 @app.route("/api/videos")
 def api_videos():
     return jsonify(metadata)
+
+@app.route("/api/series")
+def api_series():
+    """Return list of unique series names from all TV Episode content."""
+    series_set = set()
+    for video_id, data in metadata.items():
+        if data.get("category") == "tv_episode" and data.get("series"):
+            series_set.add(data["series"])
+    return jsonify({"series": sorted(series_set)})
 
 @app.route("/thumbnails/<filename>")
 def serve_thumbnail(filename):
@@ -1310,11 +1347,24 @@ def api_next_video():
         prev_md = metadata.get(prev["video_id"], {})
         last_tags = set(prev_md.get("tags", []))
 
+    # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
+    series_filter = config.get("series_filter", [])
+    series_filter_set = set(series_filter) if series_filter else None
+
     # --- Candidatos por tags e inéditos en el canal ---
     candidatos = []
     for video_id, data in metadata.items():
         if video_id in canal_shown:
             continue
+
+        # Series filter: when active, only include TV Episodes with matching series
+        if series_filter_set:
+            if data.get("category") != "tv_episode":
+                continue
+            video_series = data.get("series")
+            if not video_series or video_series not in series_filter_set:
+                continue
+
         video_tags = set(data.get("tags", []))
         if not (video_tags & incluidos):
             continue
@@ -1402,13 +1452,22 @@ def api_next_video():
 
 
 
+def _get_all_series():
+    """Get list of unique series names from all TV Episode content."""
+    series_set = set()
+    for video_id, data in metadata.items():
+        if data.get("category") == "tv_episode" and data.get("series"):
+            series_set.add(data["series"])
+    return sorted(series_set)
+
 @app.route("/canales")
 def canales():
     canales_data = load_canales()  # ya lo tenÃ©s definido
     tags_data = load_tags()
     config_data = load_config()
+    all_series = _get_all_series()
 
-    return render_template("canales.html", canales=canales_data, tags=tags_data, config=config_data)
+    return render_template("canales.html", canales=canales_data, tags=tags_data, config=config_data, all_series=all_series)
 
 @app.route("/guardar_canal", methods=["POST"])
 def guardar_canal():
@@ -1417,6 +1476,7 @@ def guardar_canal():
     descripcion = request.form.get("descripcion", "").strip()
     icono = request.form.get("icono", "").strip()
     tags_prioridad = request.form.getlist("tags_prioridad")
+    series_filter = request.form.getlist("series_filter")
     intro = request.form.get("intro_video_id", "").strip()
 
     if not nombre:
@@ -1433,7 +1493,8 @@ def guardar_canal():
         "nombre": nombre,
         "descripcion": descripcion,
         "icono": icono,
-        "tags_prioridad": tags_prioridad
+        "tags_prioridad": tags_prioridad,
+        "series_filter": series_filter
     }
 
     if intro:
@@ -1461,6 +1522,7 @@ def editar_canal(canal_id):
 
     tags_data = load_tags()
     config = load_config()
+    all_series = _get_all_series()
 
     # lista plana de todos los tags del tags.json
     todos_los_tags = [t for grupo in tags_data.values() for t in grupo.get("tags", [])]
@@ -1478,7 +1540,8 @@ def editar_canal(canal_id):
                            canales=canales,
                            tags=tags_data,
                            tags_disponibles=tags_disponibles,
-                           config=config)
+                           config=config,
+                           all_series=all_series)
 
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():
