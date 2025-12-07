@@ -2551,6 +2551,7 @@ def api_vcr_record_client_progress():
     progress = data.get("progress", 0)
     received_bytes = data.get("received_bytes", 0)
     total_bytes = data.get("total_bytes", 0)
+    status = data.get("status", "recording")  # 'recording' or 'processing'
 
     try:
         state = _vcr_recording_state_read()
@@ -2561,11 +2562,12 @@ def api_vcr_record_client_progress():
         # Update progress from client
         state["progress"] = progress
         state["received_bytes"] = received_bytes
+        state["status"] = status
         if total_bytes:
             state["total_bytes"] = total_bytes
 
         _vcr_recording_state_write(state)
-        logger.debug(f"[VCR] /client_progress: updated to {progress}%")
+        logger.debug(f"[VCR] /client_progress: updated to {progress}% status={status}")
 
         return jsonify({"ok": True})
 

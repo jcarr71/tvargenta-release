@@ -161,7 +161,11 @@
 
     function updateProgress(percent) {
       progressBar.style.width = `${percent}%`;
-      progressText.textContent = `${percent}%`;
+      if (percent >= 100) {
+        progressText.textContent = 'Processing...';
+      } else {
+        progressText.textContent = `${percent}%`;
+      }
     }
 
     // Report progress to server (throttled - only when percent changes)
@@ -176,7 +180,8 @@
         body: JSON.stringify({
           tape_uid: tapeUid,
           progress: percent,
-          received_bytes: receivedBytes
+          received_bytes: receivedBytes,
+          status: percent >= 100 ? 'processing' : 'recording'
         })
       }).catch(() => {
         // Ignore errors - progress reporting is best-effort

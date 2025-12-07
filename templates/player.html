@@ -2922,7 +2922,7 @@ function ejecutarSeleccion() {
 
   // --- VCR Recording Screen Functions ---
 
-  function showVcrRecordingScreen(progress = 0) {
+  function showVcrRecordingScreen(progress = 0, status = "recording") {
     hideAllVcrScreens();
     vcrRecordingScreen?.classList.remove("hidden");
     video.style.display = "none";
@@ -2933,7 +2933,12 @@ function ejecutarSeleccion() {
       vcrRecordingFill.style.width = `${progress}%`;
     }
     if (vcrRecordingPercent) {
-      vcrRecordingPercent.textContent = `${progress}%`;
+      // Show "Processing..." when upload is done but server is still working
+      if (status === "processing" || progress >= 100) {
+        vcrRecordingPercent.textContent = "Processing...";
+      } else {
+        vcrRecordingPercent.textContent = `${progress}%`;
+      }
     }
   }
 
@@ -2971,9 +2976,9 @@ function ejecutarSeleccion() {
 
         if (!data.ok) return;
 
-        if (data.recording && data.status === "recording") {
-          // Show recording progress
-          showVcrRecordingScreen(data.progress || 0);
+        if (data.recording && (data.status === "recording" || data.status === "processing")) {
+          // Show recording progress (or processing state)
+          showVcrRecordingScreen(data.progress || 0, data.status);
         } else if (data.status === "complete") {
           // Recording complete - stop polling, VCR state poll will handle playback
           stopVcrRecordingPoll();
@@ -2998,8 +3003,8 @@ function ejecutarSeleccion() {
       const res = await fetch("/api/vcr/record/progress");
       const data = await res.json();
 
-      if (data.ok && data.recording && data.status === "recording") {
-        showVcrRecordingScreen(data.progress || 0);
+      if (data.ok && data.recording && (data.status === "recording" || data.status === "processing")) {
+        showVcrRecordingScreen(data.progress || 0, data.status);
         startVcrRecordingPoll();
         return true;  // Recording in progress
       } else if (data.ok && data.status === "failed") {
