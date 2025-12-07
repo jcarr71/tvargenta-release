@@ -488,6 +488,121 @@
 	  letter-spacing: 2px;
 	}
 
+	/* Empty tape screen styles */
+	#vcr-empty-tape-screen {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	  gap: 20px;
+	}
+
+	#vcr-empty-tape-title {
+	  font-size: 36px;
+	  letter-spacing: 2px;
+	  text-shadow: 2px 2px 0 #000066;
+	  text-align: center;
+	  padding: 0 20px;
+	}
+
+	#vcr-empty-tape-qr {
+	  width: 200px;
+	  height: 200px;
+	  background: white;
+	  border: 4px solid white;
+	  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+	}
+
+	#vcr-empty-tape-hint {
+	  font-size: 18px;
+	  font-style: italic;
+	  opacity: 0.85;
+	  text-align: center;
+	  padding: 0 20px;
+	  max-width: 80%;
+	}
+
+	/* VCR Recording screen styles */
+	#vcr-recording-screen {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	  gap: 30px;
+	}
+
+	.vcr-recording-indicator {
+	  display: flex;
+	  align-items: center;
+	  gap: 16px;
+	}
+
+	.vcr-recording-dot {
+	  width: 24px;
+	  height: 24px;
+	  background: #ff0000;
+	  border-radius: 50%;
+	  animation: vcr-recording-pulse 1s ease-in-out infinite;
+	}
+
+	@keyframes vcr-recording-pulse {
+	  0%, 100% { opacity: 1; box-shadow: 0 0 20px #ff0000; }
+	  50% { opacity: 0.5; box-shadow: 0 0 10px #ff0000; }
+	}
+
+	#vcr-recording-text {
+	  font-size: 48px;
+	  letter-spacing: 4px;
+	  text-shadow: 2px 2px 0 #000066;
+	  color: #ff3333;
+	}
+
+	.vcr-recording-progress {
+	  width: 400px;
+	  max-width: 80%;
+	  height: 20px;
+	  background: #000066;
+	  border: 3px solid white;
+	  border-radius: 10px;
+	  overflow: hidden;
+	}
+
+	.vcr-recording-progress-fill {
+	  height: 100%;
+	  background: linear-gradient(90deg, #ff0000, #ff3333);
+	  transition: width 0.3s ease;
+	}
+
+	#vcr-recording-percent {
+	  font-size: 28px;
+	  letter-spacing: 2px;
+	}
+
+	/* VCR Recording Failed screen */
+	#vcr-recording-failed {
+	  background: #0000aa;
+	  display: flex;
+	  flex-direction: column;
+	  align-items: center;
+	  justify-content: center;
+	  font-family: "Lucida Console", "Courier New", monospace;
+	  color: white;
+	  gap: 20px;
+	}
+
+	#vcr-recording-failed-text {
+	  font-size: 48px;
+	  letter-spacing: 4px;
+	  text-shadow: 2px 2px 0 #000066;
+	  color: #ff3333;
+	}
+
 	.hidden {
 	  display: none !important;
 	}
@@ -558,6 +673,27 @@
 
 <div id="vcr-blue-screen" class="vcr-fullscreen hidden">
   <div id="vcr-blue-text">INSERT TAPE</div>
+</div>
+
+<div id="vcr-empty-tape-screen" class="vcr-fullscreen hidden">
+  <div id="vcr-empty-tape-title">This tape is empty. Start a recording?</div>
+  <img id="vcr-empty-tape-qr" src="" alt="QR Code">
+  <div id="vcr-empty-tape-hint">Please connect to <span id="vcr-empty-tape-ssid"></span> to record</div>
+</div>
+
+<div id="vcr-recording-screen" class="vcr-fullscreen hidden">
+  <div class="vcr-recording-indicator">
+    <div class="vcr-recording-dot"></div>
+    <div id="vcr-recording-text">Recording...</div>
+  </div>
+  <div class="vcr-recording-progress">
+    <div class="vcr-recording-progress-fill" id="vcr-recording-fill"></div>
+  </div>
+  <div id="vcr-recording-percent">0%</div>
+</div>
+
+<div id="vcr-recording-failed" class="vcr-fullscreen hidden">
+  <div id="vcr-recording-failed-text">Recording Failed</div>
 </div>
 
 <div id="vcr-rewind-screen" class="vcr-fullscreen hidden">
@@ -2512,6 +2648,20 @@ function ejecutarSeleccion() {
   const channelIndicator = document.getElementById("channel-indicator");
   let channelIndicatorTimeout = null;
 
+  // Empty tape screen DOM elements
+  const vcrEmptyTapeScreen = document.getElementById("vcr-empty-tape-screen");
+  const vcrEmptyTapeQr = document.getElementById("vcr-empty-tape-qr");
+  const vcrEmptyTapeSsid = document.getElementById("vcr-empty-tape-ssid");
+  let vcrEmptyTapeWifiCheckActive = false;  // Track if we're in WiFi check loop
+
+  // Recording screen DOM elements
+  const vcrRecordingScreen = document.getElementById("vcr-recording-screen");
+  const vcrRecordingFill = document.getElementById("vcr-recording-fill");
+  const vcrRecordingPercent = document.getElementById("vcr-recording-percent");
+  const vcrRecordingFailed = document.getElementById("vcr-recording-failed");
+  let vcrRecordingPollInterval = null;
+  let vcrRecordingFailedTimeout = null;
+
   function formatVcrTime(seconds) {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -2581,11 +2731,15 @@ function ejecutarSeleccion() {
     vcrStaticVideo?.classList.add("hidden");
     if (vcrStaticVideo) vcrStaticVideo.pause();
     vcrBlueScreen?.classList.add("hidden");
+    vcrEmptyTapeScreen?.classList.add("hidden");
+    vcrRecordingScreen?.classList.add("hidden");
+    vcrRecordingFailed?.classList.add("hidden");
     vcrRewindScreen?.classList.add("hidden");
     vcrCounter?.classList.add("hidden");
     vcrPausedEl?.classList.add("hidden");
     hideChannelNumber();
     stopWhiteNoise();
+    stopVcrRecordingPoll();
   }
 
   function showVcrStatic(onComplete) {
@@ -2626,6 +2780,241 @@ function ejecutarSeleccion() {
     video.pause();  // Stop playback when tape is removed
     video.removeAttribute("src");  // Clear buffer to avoid stale frame on next play
     video.load();
+  }
+
+  function showVcrEmptyTapeScreen(ssid, qrData) {
+    hideAllVcrScreens();
+    vcrEmptyTapeScreen?.classList.remove("hidden");
+    video.style.display = "none";
+    video.pause();
+
+    // Update QR code image
+    if (vcrEmptyTapeQr && qrData) {
+      vcrEmptyTapeQr.src = qrData;
+    }
+
+    // Update SSID text
+    if (vcrEmptyTapeSsid && ssid) {
+      vcrEmptyTapeSsid.textContent = ssid;
+    }
+  }
+
+  // Check WiFi status and handle empty tape display
+  // If WiFi not configured, triggers WiFi setup and loops until configured
+  async function handleEmptyTapeWithWifiCheck() {
+    if (vcrEmptyTapeWifiCheckActive) return;  // Prevent multiple concurrent checks
+    vcrEmptyTapeWifiCheckActive = true;
+
+    try {
+      // Fetch QR code data (includes WiFi status check)
+      const res = await fetch("/api/vcr/empty_tape_qr");
+      const data = await res.json();
+
+      if (!data.ok) {
+        console.error("[VCR] empty_tape_qr API error:", data.error);
+        showVcrBlueScreen("ERROR");
+        vcrEmptyTapeWifiCheckActive = false;
+        return;
+      }
+
+      if (data.wifi_connected && data.qr_data && data.ssid) {
+        // WiFi is connected - show the empty tape screen with QR code
+        showVcrEmptyTapeScreen(data.ssid, data.qr_data);
+        vcrEmptyTapeWifiCheckActive = false;
+      } else {
+        // WiFi not connected - trigger WiFi setup flow
+        console.log("[VCR] WiFi not connected, triggering setup flow");
+        await triggerWifiSetupForEmptyTape();
+      }
+    } catch (e) {
+      console.error("[VCR] handleEmptyTapeWithWifiCheck error:", e);
+      showVcrBlueScreen("NETWORK ERROR");
+      vcrEmptyTapeWifiCheckActive = false;
+    }
+  }
+
+  // Trigger WiFi setup and wait for it to complete, then re-check
+  async function triggerWifiSetupForEmptyTape() {
+    try {
+      // Start AP mode for WiFi setup
+      const r = await fetch("/api/wifi/start_ap", { method: "POST" });
+      const d = await r.json();
+
+      if (!d.ok) {
+        console.error("[VCR] Failed to start AP:", d.error);
+        showVcrBlueScreen("WIFI SETUP ERROR");
+        vcrEmptyTapeWifiCheckActive = false;
+        return;
+      }
+
+      // Show WiFi AP modal for user to configure WiFi
+      wifiApOverlayActive = true;
+      showWifiApModal({
+        ap_ssid: d.ap_ssid,
+        ap_password: d.ap_password,
+        ap_ip: d.ap_ip,
+        ap_url: d.ap_url,
+        qr_ap_url: d.qr_ap_url,
+        qr_wifi: d.qr_wifi,
+        qr_text_wifi: d.qr_text_wifi
+      });
+
+      // Start watching for WiFi connection
+      startWifiCheckForEmptyTape();
+
+    } catch (e) {
+      console.error("[VCR] triggerWifiSetupForEmptyTape error:", e);
+      showVcrBlueScreen("WIFI ERROR");
+      vcrEmptyTapeWifiCheckActive = false;
+    }
+  }
+
+  // Poll WiFi status after setup modal is shown
+  // When WiFi connects (or modal dismissed), re-check and loop if needed
+  let emptyTapeWifiWatcher = null;
+
+  function startWifiCheckForEmptyTape() {
+    if (emptyTapeWifiWatcher) return;
+
+    emptyTapeWifiWatcher = setInterval(async () => {
+      try {
+        const res = await fetch("/api/wifi/status");
+        const data = await res.json();
+
+        // Check if WiFi is now connected
+        if (data.ok && data.mode === "client" && data.ssid) {
+          console.log("[VCR] WiFi connected:", data.ssid);
+
+          // Stop the watcher
+          clearInterval(emptyTapeWifiWatcher);
+          emptyTapeWifiWatcher = null;
+
+          // Hide WiFi modal if visible
+          hideWifiApModal(true);
+
+          // Stop AP if running
+          await fetch("/api/wifi/stop_ap", { method: "POST" }).catch(() => {});
+
+          // Re-trigger the empty tape check to show QR code
+          vcrEmptyTapeWifiCheckActive = false;
+          handleEmptyTapeWithWifiCheck();
+        }
+
+        // Check if modal was dismissed (wifiApModalVisible is false)
+        // If so, re-check WiFi status and loop back if still not connected
+        if (!wifiApModalVisible && !wifiApOverlayActive) {
+          console.log("[VCR] WiFi modal dismissed, re-checking...");
+          clearInterval(emptyTapeWifiWatcher);
+          emptyTapeWifiWatcher = null;
+
+          // Small delay then re-check
+          setTimeout(() => {
+            vcrEmptyTapeWifiCheckActive = false;
+            handleEmptyTapeWithWifiCheck();
+          }, 500);
+        }
+
+      } catch (e) {
+        // Ignore network errors during polling
+      }
+    }, 2000);
+  }
+
+  // --- VCR Recording Screen Functions ---
+
+  function showVcrRecordingScreen(progress = 0, status = "recording") {
+    hideAllVcrScreens();
+    vcrRecordingScreen?.classList.remove("hidden");
+    video.style.display = "none";
+    video.pause();
+
+    // Update progress
+    if (vcrRecordingFill) {
+      vcrRecordingFill.style.width = `${progress}%`;
+    }
+    if (vcrRecordingPercent) {
+      // Show "Finalizing..." when upload is done but server is still working
+      if (status === "processing" || progress >= 100) {
+        vcrRecordingPercent.textContent = "Finalizing...";
+      } else {
+        vcrRecordingPercent.textContent = `${progress}%`;
+      }
+    }
+  }
+
+  function showVcrRecordingFailed() {
+    hideAllVcrScreens();
+    vcrRecordingFailed?.classList.remove("hidden");
+    video.style.display = "none";
+    video.pause();
+
+    // Auto-hide after 5 seconds and return to empty tape screen
+    if (vcrRecordingFailedTimeout) {
+      clearTimeout(vcrRecordingFailedTimeout);
+    }
+    vcrRecordingFailedTimeout = setTimeout(() => {
+      vcrRecordingFailedTimeout = null;
+      // Re-poll VCR state to show appropriate screen
+      pollVcrState();
+    }, 5000);
+  }
+
+  function stopVcrRecordingPoll() {
+    if (vcrRecordingPollInterval) {
+      clearInterval(vcrRecordingPollInterval);
+      vcrRecordingPollInterval = null;
+    }
+  }
+
+  function startVcrRecordingPoll() {
+    if (vcrRecordingPollInterval) return;
+
+    vcrRecordingPollInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/vcr/record/progress");
+        const data = await res.json();
+
+        if (!data.ok) return;
+
+        if (data.recording && (data.status === "recording" || data.status === "processing")) {
+          // Show recording progress (or processing state)
+          showVcrRecordingScreen(data.progress || 0, data.status);
+        } else if (data.status === "complete") {
+          // Recording complete - stop polling, VCR state poll will handle playback
+          stopVcrRecordingPoll();
+          console.log("[VCR] Recording complete, waiting for playback...");
+        } else if (data.status === "failed") {
+          // Recording failed
+          stopVcrRecordingPoll();
+          showVcrRecordingFailed();
+        } else if (!data.recording) {
+          // Not recording - stop polling
+          stopVcrRecordingPoll();
+        }
+      } catch (e) {
+        console.error("[VCR] Recording poll error:", e);
+      }
+    }, 500);
+  }
+
+  // Check if a recording is in progress and start polling if so
+  async function checkVcrRecordingState() {
+    try {
+      const res = await fetch("/api/vcr/record/progress");
+      const data = await res.json();
+
+      if (data.ok && data.recording && (data.status === "recording" || data.status === "processing")) {
+        showVcrRecordingScreen(data.progress || 0, data.status);
+        startVcrRecordingPoll();
+        return true;  // Recording in progress
+      } else if (data.ok && data.status === "failed") {
+        showVcrRecordingFailed();
+        return true;  // Show failed screen
+      }
+      return false;  // No recording in progress
+    } catch (e) {
+      return false;
+    }
   }
 
   function showVcrRewindScreen(progress = 0) {
@@ -2705,6 +3094,15 @@ function ejecutarSeleccion() {
       // No NFC reader - show white noise
       stopVcrRewindAudio();  // Stop audio if reader disconnected
       showVcrWhiteNoise();
+    } else if (state.unknown_tape_uid) {
+      // Unknown/empty tape detected - check if recording in progress first
+      stopVcrRewindAudio();
+      checkVcrRecordingState().then(isRecording => {
+        if (!isRecording) {
+          // No recording in progress - show QR code for recording
+          handleEmptyTapeWithWifiCheck();
+        }
+      });
     } else if (!state.tape_inserted) {
       // Reader attached but no tape
       stopVcrRewindAudio();  // Stop audio if tape removed

@@ -23,13 +23,14 @@ import logging
 from logging.handlers import RotatingFileHandler
 import math
 import base64, urllib.parse
+import socket
 from pathlib import Path
 from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
     METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
-    VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE,
+    VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
 )
 import bluetooth_manager
 import wifi_manager
@@ -2245,6 +2246,20 @@ def api_vcr_tapes_register():
     try:
         tape = vcr_manager.register_tape(uid, video_id, title)
         logger.info(f"[API][VCR] tape registered: uid={uid} video={video_id}")
+
+        # Check if this tape is currently inserted (unknown_tape_uid matches)
+        # If so, auto-transition to playback mode
+        state = vcr_manager.load_vcr_state()
+        if state.get("unknown_tape_uid") == uid:
+            # Get video duration and title for playback
+            duration = vcr_manager.get_video_duration(video_id)
+            video_title = tape.get("title", video_id)
+            position = vcr_manager.get_tape_position(uid)
+
+            # Transition to tape inserted state - this will trigger playback
+            vcr_manager.set_tape_inserted(uid, video_id, video_title, duration, position)
+            logger.info(f"[API][VCR] auto-started playback for newly registered tape: {uid}")
+
         return jsonify({"ok": True, "tape": tape})
     except Exception as e:
         logger.error(f"[API][VCR] tape register error: {e}")
@@ -2342,10 +2357,352 @@ def api_vcr_videos():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.get("/api/vcr/empty_tape_qr")
+def api_vcr_empty_tape_qr():
+    """
+    Generate QR code for VCR recording page when an empty tape is inserted.
+    Returns WiFi status, SSID, and QR code for the recording page.
+    Tries mDNS hostname first, falls back to IP address.
+    """
+    try:
+        # Get WiFi status
+        wifi_status = wifi_manager.get_status()
+        mode = wifi_status.get("mode", "disconnected")
+        ssid = wifi_status.get("ssid", "")
+
+        # If not connected to WiFi, return status without QR
+        if mode != "client" or not ssid:
+            return jsonify({
+                "ok": True,
+                "wifi_connected": False,
+                "mode": mode,
+                "ssid": None,
+                "qr_data": None,
+                "url": None,
+            })
+
+        # Try mDNS hostname first
+        try:
+            hostname = socket.gethostname()
+            mdns_hostname = f"{hostname}.local"
+            # Verify mDNS is resolvable (quick check)
+            socket.gethostbyname(mdns_hostname)
+            url = f"http://{mdns_hostname}:5000/vcr_record"
+        except (socket.gaierror, OSError):
+            # mDNS not available, fall back to IP
+            ip = wifi_manager._get_iface_ipv4_addr(wifi_manager.WIFI_IFACE)
+            if not ip:
+                return jsonify({
+                    "ok": True,
+                    "wifi_connected": True,
+                    "mode": mode,
+                    "ssid": ssid,
+                    "qr_data": None,
+                    "url": None,
+                    "error": "No IP address available",
+                })
+            url = f"http://{ip}:5000/vcr_record"
+
+        # Generate QR code
+        qr_data = wifi_manager._make_qr_data_url(url)
+
+        return jsonify({
+            "ok": True,
+            "wifi_connected": True,
+            "mode": mode,
+            "ssid": ssid,
+            "qr_data": qr_data,
+            "url": url,
+        })
+
+    except Exception as e:
+        logger.error(f"[API][VCR] empty_tape_qr error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 @app.get("/vcr_admin")
 def vcr_admin():
     """VCR tape management admin page."""
     return render_template("vcr_admin.html")
+
+
+# --- VCR Recording (Upload) ---------------------------------------------------
+
+# Max upload size: 3GB
+VCR_MAX_UPLOAD_SIZE = 3 * 1024 * 1024 * 1024  # 3GB in bytes
+
+
+def _vcr_recording_state_write(state: dict) -> None:
+    """Write VCR recording state atomically."""
+    tmp_path = VCR_RECORDING_STATE_FILE.with_suffix(".tmp")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(state, f)
+    tmp_path.replace(VCR_RECORDING_STATE_FILE)
+
+
+def _vcr_recording_state_read() -> dict:
+    """Read VCR recording state."""
+    if not VCR_RECORDING_STATE_FILE.exists():
+        return {"recording": False}
+    try:
+        with open(VCR_RECORDING_STATE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError):
+        return {"recording": False}
+
+
+def _vcr_recording_state_clear() -> None:
+    """Clear VCR recording state."""
+    if VCR_RECORDING_STATE_FILE.exists():
+        VCR_RECORDING_STATE_FILE.unlink()
+
+
+@app.get("/vcr_record")
+def vcr_record():
+    """VCR recording page for uploading videos to empty tapes."""
+    # Get the tape UID from the current VCR state
+    state = vcr_manager.load_vcr_state()
+    tape_uid = state.get("unknown_tape_uid", "")
+    return render_template("vcr_record.html", tape_uid=tape_uid)
+
+
+@app.get("/api/vcr/record/progress")
+def api_vcr_record_progress():
+    """Get current recording progress for polling."""
+    try:
+        state = _vcr_recording_state_read()
+        # Log occasionally to avoid spam (only when recording is active)
+        if state.get("recording"):
+            logger.debug(f"[VCR] /progress: recording={state.get('recording')}, status={state.get('status')}, progress={state.get('progress')}")
+        return jsonify({"ok": True, **state})
+    except Exception as e:
+        logger.error(f"[API][VCR] record progress error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/record/start")
+def api_vcr_record_start():
+    """
+    Initialize recording state before upload begins.
+    Called by the client before starting the actual file upload.
+    """
+    data = request.get_json(force=True) or {}
+    tape_uid = (data.get("tape_uid") or "").strip()
+    filename = data.get("filename", "video")
+    file_size = data.get("file_size", 0)
+
+    logger.info(f"[VCR] /start called: tape_uid={tape_uid}, filename={filename}, file_size={file_size}")
+
+    if not tape_uid:
+        logger.warning("[VCR] /start failed: missing_tape_uid")
+        return jsonify({"ok": False, "error": "missing_tape_uid"}), 400
+
+    # Check if tape is still inserted
+    vcr_state = vcr_manager.load_vcr_state()
+    logger.info(f"[VCR] /start: VCR state unknown_tape_uid={vcr_state.get('unknown_tape_uid')}")
+    if vcr_state.get("unknown_tape_uid") != tape_uid:
+        logger.warning(f"[VCR] /start failed: tape_not_inserted (expected {tape_uid}, got {vcr_state.get('unknown_tape_uid')})")
+        return jsonify({"ok": False, "error": "tape_not_inserted"}), 400
+
+    try:
+        # Generate video ID
+        safe_filename = secure_filename(filename)
+        video_id = os.path.splitext(safe_filename)[0]
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        video_id = f"{video_id}_{timestamp}"
+
+        # Initialize recording state
+        state_to_write = {
+            "recording": True,
+            "tape_uid": tape_uid,
+            "video_id": video_id,
+            "progress": 0,
+            "total_bytes": file_size,
+            "received_bytes": 0,
+            "status": "recording",
+            "error": None,
+        }
+        logger.info(f"[VCR] /start: Writing recording state to {VCR_RECORDING_STATE_FILE}")
+        _vcr_recording_state_write(state_to_write)
+
+        # Verify the state was written
+        verify_state = _vcr_recording_state_read()
+        logger.info(f"[VCR] /start: Verified recording state: recording={verify_state.get('recording')}, status={verify_state.get('status')}")
+
+        # Trigger VCR state update so TV shows recording screen
+        vcr_manager.trigger_vcr_update()
+
+        logger.info(f"[VCR] Recording initialized: tape={tape_uid} video={video_id}")
+
+        return jsonify({"ok": True, "video_id": video_id})
+
+    except Exception as e:
+        logger.error(f"[VCR] Recording start error: {e}", exc_info=True)
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/record/client_progress")
+def api_vcr_record_client_progress():
+    """
+    Receive progress updates from the uploading client.
+    This allows the TV to show real-time progress during network upload.
+    """
+    data = request.get_json(force=True) or {}
+    progress = data.get("progress", 0)
+    received_bytes = data.get("received_bytes", 0)
+    total_bytes = data.get("total_bytes", 0)
+    status = data.get("status", "recording")  # 'recording' or 'processing'
+
+    try:
+        state = _vcr_recording_state_read()
+        if not state.get("recording"):
+            logger.warning(f"[VCR] /client_progress: not recording (state={state})")
+            return jsonify({"ok": False, "error": "not_recording"}), 400
+
+        # Update progress from client
+        state["progress"] = progress
+        state["received_bytes"] = received_bytes
+        state["status"] = status
+        if total_bytes:
+            state["total_bytes"] = total_bytes
+
+        _vcr_recording_state_write(state)
+        logger.debug(f"[VCR] /client_progress: updated to {progress}% status={status}")
+
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        logger.error(f"[VCR] Client progress error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.post("/api/vcr/record/upload")
+def api_vcr_record_upload():
+    """
+    Upload a video file for VCR recording.
+    Stores the file as-is (no transcoding) and auto-registers the tape.
+    Note: Progress is tracked by the client via /api/vcr/record/client_progress.
+    """
+    tape_uid = request.form.get("tape_uid", "").strip()
+    logger.info(f"[VCR] /upload: Flask finished receiving file, tape_uid={tape_uid}")
+
+    if not tape_uid:
+        return jsonify({"ok": False, "error": "missing_tape_uid"}), 400
+
+    # Get recording state if available (set by /start for progress tracking)
+    # But don't require it - upload should work even if /start wasn't called
+    recording_state = _vcr_recording_state_read()
+    logger.info(f"[VCR] /upload: recording_state={recording_state}")
+    video_id_from_state = None
+    if recording_state.get("recording") and recording_state.get("tape_uid") == tape_uid:
+        video_id_from_state = recording_state.get("video_id")
+        logger.info(f"[VCR] /upload: Using video_id from state: {video_id_from_state}")
+
+    # Check if tape is still inserted
+    vcr_state = vcr_manager.load_vcr_state()
+    if vcr_state.get("unknown_tape_uid") != tape_uid:
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "failed",
+            "error": "tape_removed",
+        })
+        return jsonify({"ok": False, "error": "tape_not_inserted"}), 400
+
+    if "video" not in request.files:
+        return jsonify({"ok": False, "error": "no_file"}), 400
+
+    file = request.files["video"]
+    if not file.filename:
+        return jsonify({"ok": False, "error": "empty_filename"}), 400
+
+    if not file.filename.lower().endswith(".mp4"):
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "failed",
+            "error": "invalid_format",
+        })
+        return jsonify({"ok": False, "error": "invalid_format", "message": "Only .mp4 files allowed"}), 400
+
+    try:
+        # Get video_id from recording state if available, otherwise generate
+        video_id = video_id_from_state
+        if not video_id:
+            filename = secure_filename(file.filename)
+            video_id = os.path.splitext(filename)[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            video_id = f"{video_id}_{timestamp}"
+
+        final_path = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
+
+        # Ensure video directory exists
+        os.makedirs(VIDEO_DIR, exist_ok=True)
+
+        logger.info(f"[VCR] Receiving upload: tape={tape_uid} video={video_id}")
+
+        # Save the file (Flask has already buffered it)
+        file.save(final_path)
+
+        # Verify file size
+        file_size = os.path.getsize(final_path)
+        if file_size > VCR_MAX_UPLOAD_SIZE:
+            os.unlink(final_path)
+            _vcr_recording_state_write({
+                "recording": False,
+                "status": "failed",
+                "error": "file_too_large",
+            })
+            vcr_manager.trigger_vcr_update()
+            return jsonify({"ok": False, "error": "file_too_large", "message": "Max file size is 3GB"}), 400
+
+        # Get video duration using ffprobe
+        try:
+            duration = get_video_duration(final_path)
+        except Exception:
+            duration = 0
+
+        # Update metadata
+        metadata = vcr_manager._read_json(METADATA_FILE, {})
+        metadata[video_id] = {
+            "title": video_id,
+            "duracion": duration,
+        }
+        vcr_manager._write_json_atomic(METADATA_FILE, metadata)
+
+        # Register the tape with the video
+        tape = vcr_manager.register_tape(tape_uid, video_id, video_id)
+        logger.info(f"[VCR] Recording complete: tape={tape_uid} video={video_id}")
+
+        # Update recording state to complete
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "complete",
+            "tape_uid": tape_uid,
+            "video_id": video_id,
+            "progress": 100,
+            "error": None,
+        })
+
+        # Auto-start playback (same as tape registration)
+        position = vcr_manager.get_tape_position(tape_uid)
+        vcr_manager.set_tape_inserted(tape_uid, video_id, video_id, duration, position)
+        logger.info(f"[VCR] Auto-started playback for recorded tape: {tape_uid}")
+
+        return jsonify({
+            "ok": True,
+            "video_id": video_id,
+            "tape_uid": tape_uid,
+            "duration": duration,
+        })
+
+    except Exception as e:
+        logger.error(f"[VCR] Recording failed: {e}")
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "failed",
+            "error": str(e),
+        })
+        vcr_manager.trigger_vcr_update()
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # --- VCR Background Position Tracker -----------------------------------------
