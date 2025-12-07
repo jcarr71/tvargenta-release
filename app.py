@@ -1522,7 +1522,14 @@ def api_next_video():
             video_series = data.get("series")
             if not video_series or video_series not in series_filter_set:
                 continue
+            # Series videos don't require tag matching - include them directly
+            video_tags = set(data.get("tags", []))
+            tag_score = sum((len(prioridad) - prioridad.index(tag)) for tag in video_tags if tag in prioridad)
+            overlap = len(video_tags & last_tags)
+            candidatos.append((video_id, data, tag_score, video_tags, overlap))
+            continue
 
+        # Non-series: require tag matching
         video_tags = set(data.get("tags", []))
         if not (video_tags & incluidos):
             continue
@@ -1593,8 +1600,13 @@ def api_next_video():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Reproduciendo video: {elegido_id} del canal {canal_id}")
     last_choice_per_canal[canal_id] = {"video_id": elegido_id, "ts": time.time()}
 
+    # Determine video path - series videos use series_path, regular videos use video_id
+    series_path = elegido_data.get("series_path")
+    video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
+
     return jsonify({
         "video_id": elegido_id,
+        "video_url": video_url,
         "title": elegido_data.get("title", elegido_id.replace("_", " ")),
         "tags": elegido_data.get("tags", []),
         "score_tags": tag_score,
