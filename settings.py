@@ -44,7 +44,11 @@ CONFIG_FILE         = CONTENT_DIR / "configuracion.json"
 CANALES_FILE        = CONTENT_DIR / "canales.json"
 CANAL_ACTIVO_FILE   = CONTENT_DIR / "canal_activo.json"
 CONFIG_PATH         = CONTENT_DIR / "menu_configuracion.json"
+SERIES_FILE         = CONTENT_DIR / "series.json"
 PLAYS_FILE          = SYSTEM_DATA_DIR / "content" / "plays.json"  # persiste fuera del repo si corres en /srv
+
+# Series video directory
+SERIES_VIDEO_DIR    = VIDEO_DIR / "series"
 
 SPLASH_STATE_FILE   = SYSTEM_DATA_DIR / "Splash" / "splash_state.json"
 INTRO_PATH          = SPLASH_DIR / "splash_1.mp4"

@@ -1,0 +1,230 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Series Episodes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .dropzone {
+      border: 2px dashed #9333ea;
+      transition: all 0.3s ease;
+    }
+    .dropzone.dragover {
+      border-color: #a855f7;
+      background-color: rgba(147, 51, 234, 0.1);
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: #1f2937;
+      border-radius: 0.375rem;
+      margin-bottom: 0.5rem;
+    }
+    .file-item .parsed {
+      color: #a855f7;
+      font-size: 0.75rem;
+    }
+    .file-item .warning {
+      color: #f59e0b;
+    }
+  </style>
+</head>
+<body class="bg-black text-white font-mono min-h-screen p-4">
+  <div class="max-w-2xl mx-auto">
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <h1 class="text-2xl sm:text-3xl text-purple-400 font-bold">
+        Upload Series Episodes
+      </h1>
+
+      <div class="flex items-center gap-4">
+        <a href="{{ url_for('series_page') }}"
+           class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          Back to Series
+        </a>
+      </div>
+    </header>
+
+    <form action="{{ url_for('upload_series') }}" method="post" enctype="multipart/form-data" id="upload-form">
+      <!-- Series Selection -->
+      <div class="bg-gray-800 border border-purple-600 rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-bold text-purple-300 mb-4">Select Series</h2>
+
+        {% if series_list %}
+        <div class="mb-4">
+          <label class="block text-sm mb-2 text-gray-300">Choose existing series:</label>
+          <select name="series" id="series-select"
+                  class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
+            <option value="">-- Select a series --</option>
+            {% for series in series_list %}
+            <option value="{{ series.folder_name }}" {% if series.folder_name == preselected %}selected{% endif %}>
+              {{ series.display_name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="text-center text-gray-500 mb-4">— OR —</div>
+        {% endif %}
+
+        <div>
+          <label class="block text-sm mb-2 text-gray-300">Create new series:</label>
+          <input type="text" name="new_series" id="new-series-input"
+                 placeholder="e.g. Los Simuladores"
+                 class="w-full bg-gray-900 text-white px-3 py-2 rounded border border-gray-600 focus:border-purple-500 focus:outline-none">
+          <p class="text-xs text-gray-500 mt-1">Leave empty to use selected series above.</p>
+        </div>
+      </div>
+
+      <!-- File Upload -->
+      <div class="bg-gray-800 border border-purple-600 rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-bold text-purple-300 mb-4">Upload Episodes</h2>
+
+        <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer mb-4">
+          <input type="file" name="videos[]" id="file-input" multiple accept=".mp4" class="hidden">
+          <div class="text-4xl mb-2">📺</div>
+          <p class="text-gray-300 mb-2">Drag & drop episode files here</p>
+          <p class="text-sm text-gray-500">or click to browse</p>
+          <p class="text-xs text-gray-600 mt-2">Supported formats: S01E05.mp4, 1x05.mp4, Season1Episode5.mp4</p>
+        </div>
+
+        <div id="file-list" class="hidden">
+          <h3 class="text-sm font-bold text-gray-300 mb-2">Files to upload:</h3>
+          <div id="file-items"></div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex justify-between items-center">
+        <a href="{{ url_for('series_page') }}" class="text-blue-400 hover:underline text-sm">Cancel</a>
+        <button type="submit" id="submit-btn" disabled
+                class="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-6 py-2 rounded shadow">
+          Upload Episodes
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const fileList = document.getElementById('file-list');
+    const fileItems = document.getElementById('file-items');
+    const submitBtn = document.getElementById('submit-btn');
+    const seriesSelect = document.getElementById('series-select');
+    const newSeriesInput = document.getElementById('new-series-input');
+
+    // Episode parsing patterns
+    const patterns = [
+      /[Ss](\d+)[Ee](\d+)/,           // S01E05
+      /(\d+)[xX](\d+)/,                // 1x05
+      /[Ss]eason\s*(\d+)\s*[Ee]pisode\s*(\d+)/i  // Season 1 Episode 5
+    ];
+
+    function parseEpisode(filename) {
+      for (const pattern of patterns) {
+        const match = filename.match(pattern);
+        if (match) {
+          return { season: parseInt(match[1]), episode: parseInt(match[2]) };
+        }
+      }
+      return null;
+    }
+
+    function updateFileList() {
+      const files = fileInput.files;
+      fileItems.innerHTML = '';
+
+      if (files.length === 0) {
+        fileList.classList.add('hidden');
+        submitBtn.disabled = true;
+        return;
+      }
+
+      fileList.classList.remove('hidden');
+
+      for (const file of files) {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+
+        const parsed = parseEpisode(file.name);
+        let parsedText = '';
+        if (parsed) {
+          parsedText = `<span class="parsed">→ Season ${parsed.season}, Episode ${parsed.episode}</span>`;
+        } else {
+          parsedText = `<span class="parsed warning">⚠️ Could not parse season/episode</span>`;
+        }
+
+        item.innerHTML = `
+          <span class="flex-1">${file.name}</span>
+          ${parsedText}
+        `;
+        fileItems.appendChild(item);
+      }
+
+      updateSubmitButton();
+    }
+
+    function updateSubmitButton() {
+      const hasFiles = fileInput.files.length > 0;
+      const hasSeries = (seriesSelect && seriesSelect.value) || newSeriesInput.value.trim();
+      submitBtn.disabled = !(hasFiles && hasSeries);
+    }
+
+    // Dropzone events
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+
+      const dt = new DataTransfer();
+      for (const file of e.dataTransfer.files) {
+        if (file.name.toLowerCase().endsWith('.mp4')) {
+          dt.items.add(file);
+        }
+      }
+      fileInput.files = dt.files;
+      updateFileList();
+    });
+
+    fileInput.addEventListener('change', updateFileList);
+
+    if (seriesSelect) {
+      seriesSelect.addEventListener('change', () => {
+        if (seriesSelect.value) {
+          newSeriesInput.value = '';
+        }
+        updateSubmitButton();
+      });
+    }
+
+    newSeriesInput.addEventListener('input', () => {
+      if (newSeriesInput.value.trim() && seriesSelect) {
+        seriesSelect.value = '';
+      }
+      updateSubmitButton();
+    });
+
+    // Initial state
+    updateSubmitButton();
+  </script>
+</body>
+</html>

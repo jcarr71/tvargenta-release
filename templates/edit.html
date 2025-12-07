@@ -81,25 +81,23 @@
       <section class="section rounded-lg p-3 sm:p-4">
         <h2 class="text-lg sm:text-xl font-bold text-purple-300 mb-3">📁 Categoría</h2>
 
+        {% if is_series_video %}
+        <!-- Series video: locked category and series -->
         <div class="mb-3">
-          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido <span class="text-red-400">*</span></label>
-          <select name="category" id="category-select" class="input w-full" required>
-            <option value="vhs_tape" {% if video.get('category', 'vhs_tape') == 'vhs_tape' %}selected{% endif %}>📼 VHS Tape</option>
-            <option value="tv_episode" {% if video.get('category') == 'tv_episode' %}selected{% endif %}>📺 TV Episode</option>
-            <option value="movie" {% if video.get('category') == 'movie' %}selected{% endif %}>🎬 Movie</option>
-            <option value="commercial" {% if video.get('category') == 'commercial' %}selected{% endif %}>📢 Commercial</option>
-          </select>
+          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido</label>
+          <div class="input w-full bg-gray-700 cursor-not-allowed flex items-center gap-2">
+            <span>📺 TV Episode</span>
+            <span class="text-xs text-purple-400">(locked - series video)</span>
+          </div>
+          <input type="hidden" name="category" value="tv_episode">
         </div>
 
-        <!-- TV Episode specific fields -->
-        <div id="tv-episode-fields" class="space-y-3 mt-4 p-3 bg-gray-800 border border-purple-500 rounded {% if video.get('category') != 'tv_episode' %}hide{% endif %}">
+        <div class="space-y-3 mt-4 p-3 bg-gray-800 border border-purple-500 rounded">
           <h3 class="text-sm font-bold text-purple-200">Detalles de Episodio TV</h3>
 
           <div>
             <label class="block text-xs sm:text-sm mb-1">Serie</label>
-            <input type="text" name="series" id="series-input" value="{{ video.get('series', '') or '' }}"
-                   class="input w-full" list="series-list" placeholder="Nombre de la serie...">
-            <datalist id="series-list"></datalist>
+            <div class="input w-full bg-gray-700 cursor-not-allowed">{{ series_display }}</div>
           </div>
 
           <div class="grid grid-cols-2 gap-3">
@@ -115,6 +113,18 @@
             </div>
           </div>
         </div>
+        {% else %}
+        <!-- Non-series video: editable category (no TV Episode option) -->
+        <div class="mb-3">
+          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido <span class="text-red-400">*</span></label>
+          <select name="category" id="category-select" class="input w-full" required>
+            <option value="vhs_tape" {% if video.get('category', 'vhs_tape') == 'vhs_tape' %}selected{% endif %}>📼 VHS Tape</option>
+            <option value="movie" {% if video.get('category') == 'movie' %}selected{% endif %}>🎬 Movie</option>
+            <option value="commercial" {% if video.get('category') == 'commercial' %}selected{% endif %}>📢 Commercial</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">To add TV Episodes, use the <a href="{{ url_for('upload_series') }}" class="text-purple-400 hover:underline">Series Upload</a> feature.</p>
+        </div>
+        {% endif %}
       </section>
 
       <!-- Tags -->
@@ -382,31 +392,9 @@
       });
     })();
 
-    // ---------- Category selection: show/hide TV Episode fields ----------
-    (function initCategoryFields(){
-      const categorySelect = document.getElementById('category-select');
-      const tvEpisodeFields = document.getElementById('tv-episode-fields');
-
-      function toggleTvFields() {
-        const isTvEpisode = categorySelect.value === 'tv_episode';
-        tvEpisodeFields.classList.toggle('hide', !isTvEpisode);
-      }
-
-      categorySelect.addEventListener('change', toggleTvFields);
-
-      // Load series list for autocomplete
-      fetch('/api/series')
-        .then(r => r.json())
-        .then(data => {
-          const datalist = document.getElementById('series-list');
-          (data.series || []).forEach(s => {
-            const opt = document.createElement('option');
-            opt.value = s;
-            datalist.appendChild(opt);
-          });
-        })
-        .catch(() => {});
-    })();
+    // Note: Category fields are now handled server-side
+    // - Series videos have locked category (TV Episode) and series
+    // - Non-series videos don't have TV Episode option
 
     // ---------- Inicialización a partir del contexto del servidor ----------
     (function hydrateSelectedFromServer(){
