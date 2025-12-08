@@ -45,6 +45,9 @@ BLOCK_DURATION_SEC = 30 * 60  # 30 minutes
 MAX_COMMERCIAL_BREAK_SEC = 4 * 60  # 4 minutes max per break
 MIN_COMMERCIAL_BREAKS = 3  # Minimum number of breaks per block
 
+# Schedule version - increment when schedule logic changes to trigger regeneration
+SCHEDULE_VERSION = 2
+
 # Contiguous block randomization for series scheduling
 # Probability distribution for max consecutive 30-min blocks per series per time slot
 CONTIGUOUS_BLOCK_WEIGHTS = [
@@ -181,7 +184,13 @@ class BroadcastScheduler:
                 with open(schedule_path, 'r', encoding='utf-8') as f:
                     self._schedule = json.load(f)
 
-                # Check if we need to regenerate (Sunday has passed)
+                # Check if we need to regenerate (version mismatch or Sunday has passed)
+                schedule_version = self._schedule.get("version", 1)
+                if schedule_version < SCHEDULE_VERSION:
+                    logger.info(f"[SCHEDULER] Schedule version {schedule_version} < {SCHEDULE_VERSION}, regenerating")
+                    self._generate_weekly_schedule()
+                    return
+
                 week_start = self._schedule.get("week_start", "")
                 if week_start:
                     ws_dt = datetime.fromisoformat(week_start)
@@ -190,7 +199,7 @@ class BroadcastScheduler:
                         logger.info("[SCHEDULER] New week detected, regenerating schedule")
                         self._generate_weekly_schedule()
                     else:
-                        logger.info(f"[SCHEDULER] Loaded existing schedule from {week_start}")
+                        logger.info(f"[SCHEDULER] Loaded existing schedule v{schedule_version} from {week_start}")
                 else:
                     self._generate_weekly_schedule()
             except Exception as e:
@@ -230,6 +239,7 @@ class BroadcastScheduler:
         metadata = self._load_metadata()
 
         schedule = {
+            "version": SCHEDULE_VERSION,
             "week_start": self._get_last_sunday_midnight().isoformat(),
             "channels": {}
         }
@@ -248,7 +258,7 @@ class BroadcastScheduler:
 
         self._schedule = schedule
         self._save_schedule()
-        logger.info(f"[SCHEDULER] Generated schedule for {len(schedule['channels'])} broadcast channels")
+        logger.info(f"[SCHEDULER] Generated v{SCHEDULE_VERSION} schedule for {len(schedule['channels'])} broadcast channels")
 
     def _generate_channel_schedule(
         self,
