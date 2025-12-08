@@ -20,6 +20,7 @@ import json
 import logging
 import math
 import os
+import random
 import threading
 import time
 from datetime import datetime, timedelta
@@ -43,6 +44,27 @@ SCHEDULER_INTERVAL_SEC = 1  # Run scheduler every second
 BLOCK_DURATION_SEC = 30 * 60  # 30 minutes
 MAX_COMMERCIAL_BREAK_SEC = 4 * 60  # 4 minutes max per break
 MIN_COMMERCIAL_BREAKS = 3  # Minimum number of breaks per block
+
+# Contiguous block randomization for series scheduling
+# Probability distribution for max consecutive 30-min blocks per series per time slot
+CONTIGUOUS_BLOCK_WEIGHTS = [
+    (2, 80),   # 2 blocks (60 min): 80% chance
+    (3, 10),   # 3 blocks (90 min): 10% chance
+    (4, 6),    # 4 blocks (120 min): 6% chance
+    (5, 4),    # 5 blocks (150 min): 4% chance
+]
+
+
+def _roll_max_contiguous_blocks() -> int:
+    """
+    Roll a random max contiguous blocks value based on weighted probability.
+
+    Returns:
+        Number of max consecutive 30-min blocks (2, 3, 4, or 5)
+    """
+    choices = [blocks for blocks, _ in CONTIGUOUS_BLOCK_WEIGHTS]
+    weights = [weight for _, weight in CONTIGUOUS_BLOCK_WEIGHTS]
+    return random.choices(choices, weights=weights, k=1)[0]
 
 
 class BroadcastScheduler:
@@ -300,26 +322,60 @@ class BroadcastScheduler:
                 # Crosses midnight (e.g., night: 21-28 means 21:00-04:00)
                 slot_duration_min = (end_hour - start_hour) * 60
 
-            # Balance time among eligible series
-            time_per_series = slot_duration_min // len(eligible)
+            # Roll random max contiguous blocks for each series in this slot
+            # This determines how many consecutive 30-min blocks each series plays before switching
+            series_max_blocks = {}
+            for series_info in eligible:
+                series_max_blocks[series_info["name"]] = _roll_max_contiguous_blocks()
 
+            # Build series blocks by cycling through series with their block limits
             series_blocks = []
             current_minute = 0
+            series_index = 0
+            block_duration = 30  # Each block is 30 minutes
 
-            for series_info in eligible:
-                series_blocks.append({
-                    "series": series_info["name"],
-                    "start_minute": current_minute,
-                    "duration_minutes": time_per_series,
-                    "use_commercial_blocks": series_info["use_commercial_blocks"]
-                })
-                current_minute += time_per_series
+            # Track how many blocks each series has played in current turn
+            current_turn_blocks = {s["name"]: 0 for s in eligible}
+
+            while current_minute < slot_duration_min:
+                series_info = eligible[series_index]
+                series_name = series_info["name"]
+                max_blocks = series_max_blocks[series_name]
+
+                # Calculate how many blocks this series can play in this turn
+                blocks_remaining_in_turn = max_blocks - current_turn_blocks[series_name]
+                time_remaining_in_slot = slot_duration_min - current_minute
+                blocks_that_fit = time_remaining_in_slot // block_duration
+
+                # Play the minimum of: remaining turn blocks, or what fits in slot
+                blocks_to_play = min(blocks_remaining_in_turn, blocks_that_fit)
+
+                if blocks_to_play > 0:
+                    duration_minutes = blocks_to_play * block_duration
+                    series_blocks.append({
+                        "series": series_name,
+                        "start_minute": current_minute,
+                        "duration_minutes": duration_minutes,
+                        "use_commercial_blocks": series_info["use_commercial_blocks"]
+                    })
+                    current_minute += duration_minutes
+                    current_turn_blocks[series_name] += blocks_to_play
+
+                # Check if this series hit its max for this turn
+                if current_turn_blocks[series_name] >= max_blocks:
+                    # Reset turn counter and move to next series
+                    current_turn_blocks[series_name] = 0
+                    series_index = (series_index + 1) % len(eligible)
+                elif blocks_to_play == 0:
+                    # No more full blocks fit, we're done with this slot
+                    break
 
             daily_slots.append({
                 "slot_name": slot_name,
                 "start_hour": start_hour,
                 "end_hour": end_hour,
-                "series_blocks": series_blocks
+                "series_blocks": series_blocks,
+                "series_max_blocks": series_max_blocks  # Store rolls for debugging/reference
             })
 
         # Initialize episode cursors (start at first episode)
