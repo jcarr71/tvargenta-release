@@ -217,10 +217,11 @@
     <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-3 mb-6 sm:mb-8">
       <a href="{{ url_for('vertele') }}" class="text-xs sm:text-sm bg-green-600 hover:bg-green-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.watch_tv") }}</a>
       <a href="{{ url_for('canales') }}" class="text-xs sm:text-sm bg-green-700 hover:bg-green-800 text-white font-bold px-3 py-2 sm:px-6 rounded shadow text-center"> {{ tr("index.actions.channels") }}</a>
+      <a href="{{ url_for('series_page') }}" class="text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center">TV Series</a>
       <a href="{{ url_for('upload') }}" class="text-xs sm:text-sm bg-yellow-600 hover:bg-yellow-700 text-black font-bold px-3 py-2 sm:px-5 rounded shadow text-center">{{ tr("index.actions.upload") }}</a>
       <a href="{{ url_for('configuracion') }}" class="text-xs sm:text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.config") }}</a>
       <a href="{{ url_for('tags') }}" class="text-xs sm:text-sm bg-pink-600 hover:bg-pink-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.tags") }}</a>
-      <a href="{{ url_for('vcr_admin') }}" class="text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.vcr") }}</a>
+      <a href="{{ url_for('vcr_admin') }}" class="text-xs sm:text-sm bg-purple-800 hover:bg-purple-900 text-white font-bold px-3 py-2 sm:px-5 rounded shadow text-center"> {{ tr("index.actions.vcr") }}</a>
     </div>
 
     <!-- Barra título + contador -->
@@ -313,7 +314,9 @@
            data-title="{{ (video.title or '')|lower }}"
            data-fecha="{{ video.fecha or '' }}"
            data-tags="{{ (video.tags or [])|join(',') }}"
-           data-duration="{{ video.duracion or 0 }}">
+           data-duration="{{ video.duracion or 0 }}"
+           data-category="{{ video.category or 'vhs_tape' }}"
+           data-series="{{ video.series or '' }}">
         <!-- Botón eliminar video completo -->
         <button onclick="confirmFullDelete('{{ video_id }}')" class="delete-btn text-red-500 hover:text-white text-lg font-bold" title="Eliminar video completo">🗑</button>
 
@@ -327,7 +330,22 @@
 
         <!-- Info -->
         <div class="flex-1 w-full">
-          <h4 class="text-lg sm:text-xl font-semibold mb-1 break-words">{{ video.title }}</h4>
+          <div class="flex items-center gap-2 mb-1">
+            <h4 class="text-lg sm:text-xl font-semibold break-words">{{ video.title }}</h4>
+            {% set cat = video.category or 'vhs_tape' %}
+            {% if cat == 'tv_episode' %}
+              <span class="bg-purple-600 text-white text-[10px] px-1.5 py-0.5 rounded">📺 TV</span>
+            {% elif cat == 'movie' %}
+              <span class="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded">🎬 Movie</span>
+            {% elif cat == 'commercial' %}
+              <span class="bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded">📢 Ad</span>
+            {% else %}
+              <span class="bg-gray-600 text-white text-[10px] px-1.5 py-0.5 rounded">📼 VHS</span>
+            {% endif %}
+          </div>
+          {% if video.category == 'tv_episode' and video.series %}
+          <p class="text-xs sm:text-sm text-purple-300"><strong>Serie:</strong> {{ video.series }}{% if video.season %} S{{ video.season }}{% endif %}{% if video.episode %}E{{ video.episode }}{% endif %}</p>
+          {% endif %}
           <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.date") }}:</strong> {{ video.fecha }}</p>
           <p class="text-xs sm:text-sm text-gray-300"><strong>{{ tr("index.video_card.character") }}</strong> {{ video.personaje }}</p>
           <div class="flex flex-wrap gap-1.5 sm:gap-2 mt-2">
@@ -419,6 +437,16 @@
     function pasaFiltroCanal(card){
       const canalId=canalSelect.value; if(!canalId) return true;
       const regla=CANALES[canalId]; if(!regla) return true;
+
+      // Series filter: when channel has series_filter, only show TV Episodes from those series
+      const seriesFilter = regla.series_filter || [];
+      if(seriesFilter.length > 0) {
+        const cardCategory = card.dataset.category || 'vhs_tape';
+        const cardSeries = card.dataset.series || '';
+        if(cardCategory !== 'tv_episode') return false;
+        if(!seriesFilter.includes(cardSeries)) return false;
+      }
+
       const cardTags=new Set((card.dataset.tags||'').split(',').filter(Boolean).map(normalizarTag));
       const excl=(regla.tags_excluidos||[]).map(normalizarTag);
       const pri =(regla.tags_prioridad||[]).map(normalizarTag);

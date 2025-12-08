@@ -31,7 +31,9 @@ from settings import (
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
+    SERIES_FILE, SERIES_VIDEO_DIR,
 )
+import re
 import bluetooth_manager
 import wifi_manager
 import vcr_manager
@@ -306,9 +308,142 @@ _ensure_json(CONFIG_FILE,     DEFAULT_CONFIG)
 _ensure_json(CANALES_FILE,    DEFAULT_CANALES)
 _ensure_json(METADATA_FILE,   {})
 _ensure_json(CANAL_ACTIVO_FILE, DEFAULT_CANAL_ACTIVO)
+_ensure_json(SERIES_FILE,     {})
+
+# Ensure series video directory exists
+SERIES_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 # Note: Channel 03 is a system channel (AV input) - it's injected at runtime
-# by the encoder and handled specially by /api/next_video. It's not stored in canales.json.  
+# by the encoder and handled specially by /api/next_video. It's not stored in canales.json.
+
+# ============================================================================
+# SERIES HELPER FUNCTIONS
+# ============================================================================
+
+def series_display_name(folder_name):
+    """Convert folder name to display name: Los_Simuladores → Los Simuladores"""
+    return (folder_name or "").replace('_', ' ')
+
+def series_folder_name(display_name):
+    """Convert display name to folder name: Los Simuladores → Los_Simuladores"""
+    # Also sanitize: remove any characters that aren't alphanumeric, underscore, or hyphen
+    name = (display_name or "").replace(' ', '_')
+    return re.sub(r'[^\w\-]', '', name)
+
+def parse_episode_info(filename):
+    """
+    Parse season/episode from filename. Returns (season, episode) or (None, None).
+    Supports: S01E05, s1e5, 1x05, Season 1 Episode 5, Season1Episode5
+    """
+    patterns = [
+        r'[Ss](\d+)[Ee](\d+)',                      # S01E05, s1e5
+        r'(\d+)[xX](\d+)',                           # 1x05
+        r'[Ss]eason\s*(\d+)\s*[Ee]pisode\s*(\d+)',  # Season 1 Episode 5, Season1Episode5
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, filename)
+        if match:
+            return int(match.group(1)), int(match.group(2))
+    return None, None
+
+def load_series():
+    """Load series data from series.json"""
+    try:
+        if SERIES_FILE.exists():
+            with open(SERIES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"[SERIES] Error loading series.json: {e}")
+    return {}
+
+def save_series(data):
+    """Save series data to series.json"""
+    _write_json_atomic(SERIES_FILE, data)
+
+def scan_series_directories():
+    """
+    Scan series directories on startup:
+    1. Find all series folders in content/videos/series/
+    2. Add new series to series.json
+    3. Scan for video files and create/update metadata
+    """
+    if not SERIES_VIDEO_DIR.exists():
+        SERIES_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+        return
+
+    series_data = load_series()
+    metadata = load_metadata()
+    changes_made = False
+
+    # Scan for series directories
+    for series_dir in SERIES_VIDEO_DIR.iterdir():
+        if not series_dir.is_dir():
+            continue
+
+        series_name = series_dir.name
+
+        # Add to series.json if not present
+        if series_name not in series_data:
+            series_data[series_name] = {
+                "created": datetime.now().strftime("%Y-%m-%d")
+            }
+            logger.info(f"[SERIES] Discovered new series: {series_display_name(series_name)}")
+            changes_made = True
+
+        # Scan for video files in this series
+        for video_file in series_dir.glob("*.mp4"):
+            video_id = video_file.stem  # filename without extension
+            series_path = f"series/{series_name}/{video_id}"
+
+            # Check if we already have metadata for this video
+            existing = metadata.get(video_id, {})
+
+            # Parse season/episode from filename
+            season, episode = parse_episode_info(video_id)
+
+            # Create or update metadata
+            if video_id not in metadata or existing.get("series_path") != series_path:
+                metadata[video_id] = {
+                    "title": existing.get("title") or video_id,
+                    "category": "tv_episode",
+                    "series": series_name,
+                    "series_path": series_path,
+                    "season": existing.get("season") or season,
+                    "episode": existing.get("episode") or episode,
+                    "tags": existing.get("tags", []),
+                    "personaje": existing.get("personaje", ""),
+                    "fecha": existing.get("fecha", ""),
+                    "modo": existing.get("modo", []),
+                    "duracion": existing.get("duracion")
+                }
+                logger.info(f"[SERIES] Added/updated metadata for {series_path}")
+                changes_made = True
+
+            # Generate thumbnail if missing
+            thumb_path = THUMB_DIR / f"{video_id}.jpg"
+            if not thumb_path.exists():
+                try:
+                    generate_thumbnail(str(video_file), str(thumb_path))
+                    logger.info(f"[SERIES] Generated thumbnail for {video_id}")
+                except Exception as e:
+                    logger.warning(f"[SERIES] Failed to generate thumbnail for {video_id}: {e}")
+
+    # Save changes
+    if changes_made:
+        save_series(series_data)
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        logger.info("[SERIES] Saved series and metadata updates")
+
+def generate_thumbnail(video_path, thumb_path):
+    """Generate a thumbnail from a video file using ffmpeg"""
+    subprocess.run([
+        "ffmpeg", "-y", "-i", video_path,
+        "-ss", "00:00:02",
+        "-vframes", "1",
+        "-vf", "scale=320:-1",
+        thumb_path
+    ], check=True, capture_output=True, timeout=30)  
 
 
 def load_config_i18n():
@@ -518,6 +653,12 @@ def save_tags(tags_data):
 
 _bootstrap_config_from_tags_if_empty()
 
+# Scan series directories on startup
+try:
+    scan_series_directories()
+except Exception as e:
+    logger.error(f"[SERIES] Error during startup scan: {e}")
+
 def get_canal_activo():
     if os.path.exists(CANAL_ACTIVO_FILE):
         with open(CANAL_ACTIVO_FILE, "r", encoding="utf-8") as f:
@@ -560,7 +701,14 @@ def sanity_check_thumbnails(video_id=None):
     targets = [video_id] if video_id else metadata.keys()
 
     for vid in targets:
-        video_path = os.path.join(VIDEO_DIR, vid + ".mp4")
+        # Check series_path first for series videos
+        vid_info = metadata.get(vid, {})
+        series_path = vid_info.get("series_path")
+        if series_path:
+            video_path = str(VIDEO_DIR / f"{series_path}.mp4")
+        else:
+            video_path = os.path.join(VIDEO_DIR, vid + ".mp4")
+
         thumbnail_path = os.path.join(CONTENT_DIR, "thumbnails", vid + ".jpg")
 
         if os.path.exists(video_path) and not os.path.exists(thumbnail_path):
@@ -602,14 +750,35 @@ def eliminar_estado():
     if UPLOAD_STATUS.exists(): UPLOAD_STATUS.unlink()
 
 def sincronizar_videos():
+    # Scan regular videos in VIDEO_DIR
     archivos_video = {
         os.path.splitext(f)[0] for f in os.listdir(VIDEO_DIR)
-        if f.lower().endswith(('.mp4', '.webm', '.mov'))
+        if f.lower().endswith(('.mp4', '.webm', '.mov')) and os.path.isfile(os.path.join(VIDEO_DIR, f))
     }
+
+    # Scan series videos in SERIES_VIDEO_DIR/<series_name>/
+    if SERIES_VIDEO_DIR.exists():
+        for series_dir in SERIES_VIDEO_DIR.iterdir():
+            if series_dir.is_dir():
+                for f in series_dir.iterdir():
+                    if f.is_file() and f.suffix.lower() in ('.mp4', '.webm', '.mov'):
+                        archivos_video.add(f.stem)
+
     entradas_metadata = set(metadata.keys())
 
-    videos_validos = {k: v for k, v in metadata.items() if k in archivos_video}
-    videos_fantasmas = {k: v for k, v in metadata.items() if k not in archivos_video}
+    # For series videos, check they exist at their series_path location
+    def video_exists(video_id, data):
+        series_path = data.get("series_path")
+        if series_path:
+            # Series video - check in series directory
+            full_path = VIDEO_DIR / f"{series_path}.mp4"
+            return full_path.exists()
+        else:
+            # Regular video - check in VIDEO_DIR
+            return video_id in archivos_video
+
+    videos_validos = {k: v for k, v in metadata.items() if video_exists(k, v)}
+    videos_fantasmas = {k: v for k, v in metadata.items() if not video_exists(k, v)}
     videos_nuevos = sorted(archivos_video - entradas_metadata)
 
     return videos_validos, videos_fantasmas, videos_nuevos
@@ -651,15 +820,20 @@ def ensure_durations():
     updated = False
     for video_id, info in metadata.items():
         if "duracion" not in info:
-            filepath = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
+            # Check series_path first, then fall back to VIDEO_DIR
+            series_path = info.get("series_path")
+            if series_path:
+                filepath = VIDEO_DIR / f"{series_path}.mp4"
+            else:
+                filepath = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
             if os.path.exists(filepath):
-                dur = get_video_duration(filepath)
+                dur = get_video_duration(str(filepath))
                 metadata[video_id]["duracion"] = dur
                 updated = True
     if updated:
         with open(METADATA_FILE, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
-        print("ðŸ•’ Duraciones actualizadas en metadata")
+        print("ðŸ•' Duraciones actualizadas en metadata")
 
 def get_total_recuerdos():
     total_sec = sum(v.get("duracion", 0) for v in metadata.values())
@@ -833,20 +1007,66 @@ def video_detail(video_id):
     video = metadata.get(video_id)
     if not video:
         return "Video no encontrado", 404
-    return render_template("video.html", video_id=video_id, video=video)
+
+    # Determine video URL based on whether it's a series video
+    series_path = video.get("series_path")
+    if series_path:
+        video_url = f"/videos/{series_path}.mp4"
+    else:
+        video_url = f"/videos/{video_id}.mp4"
+
+    return render_template("video.html", video_id=video_id, video=video, video_url=video_url)
 
 @app.route("/edit/<video_id>", methods=["GET", "POST"])
 def edit_video(video_id):
+    # Check if this is a series video
+    existing_video = metadata.get(video_id, {})
+    is_series_video = bool(existing_video.get("series_path"))
+
     if request.method == "POST":
         form = request.form
         tags = form.get("tags", "")
-        metadata[video_id] = {
-            "title": form.get("title"),
-            "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
-            "personaje": form.get("personaje"),
-            "fecha": form.get("fecha"),
-            "modo": form.getlist("modo")
-        }
+
+        # For series videos, category and series are locked
+        if is_series_video:
+            category = "tv_episode"
+            video_data = {
+                "title": form.get("title"),
+                "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
+                "personaje": form.get("personaje"),
+                "fecha": form.get("fecha"),
+                "modo": form.getlist("modo"),
+                "category": "tv_episode",
+                "series": existing_video.get("series"),
+                "series_path": existing_video.get("series_path"),
+            }
+            # Season and episode can still be edited
+            season_str = form.get("season", "").strip()
+            episode_str = form.get("episode", "").strip()
+            video_data["season"] = int(season_str) if season_str.isdigit() else None
+            video_data["episode"] = int(episode_str) if episode_str.isdigit() else None
+        else:
+            category = form.get("category", "vhs_tape")
+            video_data = {
+                "title": form.get("title"),
+                "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
+                "personaje": form.get("personaje"),
+                "fecha": form.get("fecha"),
+                "modo": form.getlist("modo"),
+                "category": category
+            }
+            # Non-series videos don't have TV Episode fields
+            video_data["series"] = None
+            video_data["season"] = None
+            video_data["episode"] = None
+
+        # Preserve existing fields like duracion
+        if video_id in metadata:
+            for key in ["duracion"]:
+                if key in metadata[video_id]:
+                    video_data[key] = metadata[video_id][key]
+
+        metadata[video_id] = video_data
         with open(METADATA_FILE, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
         return redirect(url_for("index"))
@@ -860,19 +1080,29 @@ def edit_video(video_id):
             "tags": [],
             "personaje": "",
             "fecha": "",
-            "modo": []
+            "modo": [],
+            "category": "vhs_tape",
+            "series": None,
+            "season": None,
+            "episode": None
         }
 
     selected_tags = video.get("tags", [])
     tags_data = load_tags()
     tag_categoria = {tag: grupo for grupo, info in tags_data.items() for tag in info["tags"]}
 
+    # For series videos, get display name
+    series_name = video.get("series", "")
+    series_display = series_display_name(series_name) if series_name else ""
+
     return render_template("edit.html",
                        video_id=video_id,
                        video=video,
                        selected_tags=selected_tags,
                        tag_categoria=tag_categoria,
-                       tags=tags_data)
+                       tags=tags_data,
+                       is_series_video=is_series_video,
+                       series_display=series_display)
 
 @app.route("/api/videos")
 def api_videos():
@@ -886,9 +1116,21 @@ def serve_thumbnail(filename):
 def serve_video(filename):
     return send_from_directory(os.path.join(CONTENT_DIR, "videos"), filename)
 
+@app.route("/videos/series/<series_name>/<filename>")
+def serve_series_video(series_name, filename):
+    """Serve video files from series directories."""
+    series_dir = SERIES_VIDEO_DIR / series_name
+    return send_from_directory(str(series_dir), filename)
+
 @app.route("/delete_full/<video_id>")
 def delete_full_video(video_id):
-    video_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
+    # Check if it's a series video
+    vid_info = metadata.get(video_id, {})
+    series_path = vid_info.get("series_path")
+    if series_path:
+        video_path = str(VIDEO_DIR / f"{series_path}.mp4")
+    else:
+        video_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
     if os.path.exists(video_path):
         os.remove(video_path)
         print(f"ðŸ§¨ Video eliminado: {video_path}")
@@ -1250,15 +1492,18 @@ def api_next_video():
                 canal_id = activo["canal_id"]
                 config = canales[canal_id]
     
-    # --- De-dupe: si hay pick pendiente “fresco”, reusalo ---
+    # --- De-dupe: si hay pick pendiente "fresco", reusalo ---
     now = time.time()
     pp = pending_pick.get(canal_id)
     if (not force_next) and pp and (now - pp.get("ts", 0.0)) < PENDING_TTL:
         vid = pp["video_id"]
         info = metadata.get(vid, {})
+        series_path = info.get("series_path")
+        video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{vid}.mp4"
         logger.info(f"[NEXT-DUPE] Reuso pick pendiente canal={canal_id} video={vid}")
         return jsonify({
             "video_id": vid,
+            "video_url": video_url,
             "title": info.get("title", vid.replace("_", " ")),
             "tags": info.get("tags", []),
             "modo": canal_id,
@@ -1275,8 +1520,11 @@ def api_next_video():
         elegido_id = sticky["video_id"]
         elegido_data = metadata.get(elegido_id, {})
         if elegido_data:
+            series_path = elegido_data.get("series_path")
+            video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
             return jsonify({
                 "video_id": elegido_id,
+                "video_url": video_url,
                 "title": elegido_data.get("title", elegido_id.replace("_", " ")),
                 "tags": elegido_data.get("tags", []),
                 "score_tags": 0,
@@ -1296,9 +1544,15 @@ def api_next_video():
         logger.info(f"[NEXT] cooldown canal={canal_id} dt={now-ultimo:.2f}s -> bloqueo")
         return jsonify({"cooldown": True, "canal_id": canal_id}), 200
 
+    # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
+    series_filter = config.get("series_filter", [])
+    series_filter_set = set(series_filter) if series_filter else None
+
     prioridad = config.get("tags_prioridad", [])
     incluidos = set(config.get("tags_incluidos", prioridad))  # fallback
-    if not incluidos:
+
+    # Only require tags_incluidos for non-series channels
+    if not incluidos and not series_filter_set:
         return jsonify({"error": "No hay tags incluidos definidos en la configuración."}), 400
 
     canal_shown = shown_videos_por_canal.get(canal_id, [])
@@ -1310,11 +1564,34 @@ def api_next_video():
         prev_md = metadata.get(prev["video_id"], {})
         last_tags = set(prev_md.get("tags", []))
 
+    # Debug logging for series filter
+    if series_filter_set:
+        tv_episodes = [(vid, d.get("series")) for vid, d in metadata.items() if d.get("category") == "tv_episode"]
+        logger.info(f"[NEXT] Series filter active: {series_filter}, found {len(tv_episodes)} TV episodes in metadata")
+        for vid, ser in tv_episodes[:5]:  # Log first 5
+            logger.info(f"[NEXT]   - {vid}: series={ser}, match={ser in series_filter_set if ser else False}")
+
     # --- Candidatos por tags e inéditos en el canal ---
     candidatos = []
     for video_id, data in metadata.items():
         if video_id in canal_shown:
             continue
+
+        # Series filter: when active, only include TV Episodes with matching series
+        if series_filter_set:
+            if data.get("category") != "tv_episode":
+                continue
+            video_series = data.get("series")
+            if not video_series or video_series not in series_filter_set:
+                continue
+            # Series videos don't require tag matching - include them directly
+            video_tags = set(data.get("tags", []))
+            tag_score = sum((len(prioridad) - prioridad.index(tag)) for tag in video_tags if tag in prioridad)
+            overlap = len(video_tags & last_tags)
+            candidatos.append((video_id, data, tag_score, video_tags, overlap))
+            continue
+
+        # Non-series: require tag matching
         video_tags = set(data.get("tags", []))
         if not (video_tags & incluidos):
             continue
@@ -1353,12 +1630,13 @@ def api_next_video():
     candidatos = candidatos_ok
     # ============================================================
 
-    # Si no quedan, limpiá “ya vistos” y reintentá
+    # Si no quedan, limpiá "ya vistos" y reintentá
     if not candidatos:
         if canal_shown:
             shown_videos_por_canal[canal_id] = []
             return api_next_video()
         else:
+            logger.warning(f"[NEXT] No videos found for canal={canal_id}, series_filter={series_filter}")
             return jsonify({"no_videos": True, "canal_id": canal_id})
 
     # --- Fairness + diversidad + prioridad + jitter ---
@@ -1385,8 +1663,13 @@ def api_next_video():
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Reproduciendo video: {elegido_id} del canal {canal_id}")
     last_choice_per_canal[canal_id] = {"video_id": elegido_id, "ts": time.time()}
 
+    # Determine video path - series videos use series_path, regular videos use video_id
+    series_path = elegido_data.get("series_path")
+    video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
+
     return jsonify({
         "video_id": elegido_id,
+        "video_url": video_url,
         "title": elegido_data.get("title", elegido_id.replace("_", " ")),
         "tags": elegido_data.get("tags", []),
         "score_tags": tag_score,
@@ -1402,13 +1685,297 @@ def api_next_video():
 
 
 
+def _get_all_series():
+    """Get list of series names from series.json."""
+    return sorted(load_series().keys())
+
+def _get_series_episode_count(series_name):
+    """Count episodes for a given series."""
+    count = 0
+    meta = load_metadata()
+    for video_id, data in meta.items():
+        if data.get("series") == series_name:
+            count += 1
+    return count
+
+# ============================================================================
+# SERIES MANAGEMENT ROUTES
+# ============================================================================
+
+@app.route("/series")
+def series_page():
+    """Series management page."""
+    series_data = load_series()
+
+    # Build list with episode counts and display names
+    series_list = []
+    for folder_name, info in series_data.items():
+        series_list.append({
+            "folder_name": folder_name,
+            "display_name": series_display_name(folder_name),
+            "episode_count": _get_series_episode_count(folder_name),
+            "created": info.get("created", "")
+        })
+
+    # Sort by display name
+    series_list.sort(key=lambda s: s["display_name"].lower())
+
+    cfg = load_config_i18n()
+    lang = cfg.get("language", "es")
+    base_trans = load_translations(lang)
+
+    def tr(key, default=None):
+        keys = key.split(".")
+        val = base_trans
+        for k in keys:
+            if isinstance(val, dict):
+                val = val.get(k)
+            else:
+                return default if default else key
+        return val if val else (default if default else key)
+
+    return render_template("series.html",
+                           series_list=series_list,
+                           lang=lang,
+                           tr=tr)
+
+@app.route("/series/add", methods=["POST"])
+def series_add():
+    """Add a new series."""
+    display_name = request.form.get("name", "").strip()
+    if not display_name:
+        return redirect(url_for("series_page"))
+
+    folder_name = series_folder_name(display_name)
+    if not folder_name:
+        return redirect(url_for("series_page"))
+
+    series_data = load_series()
+
+    # Check if already exists
+    if folder_name in series_data:
+        return redirect(url_for("series_page"))
+
+    # Create folder
+    series_dir = SERIES_VIDEO_DIR / folder_name
+    series_dir.mkdir(parents=True, exist_ok=True)
+
+    # Add to series.json
+    series_data[folder_name] = {
+        "created": datetime.now().strftime("%Y-%m-%d")
+    }
+    save_series(series_data)
+
+    logger.info(f"[SERIES] Created new series: {display_name} ({folder_name})")
+    return redirect(url_for("series_page"))
+
+@app.route("/series/delete/<series_name>", methods=["POST"])
+def series_delete(series_name):
+    """Delete a series and all its episodes."""
+    series_data = load_series()
+
+    if series_name not in series_data:
+        return redirect(url_for("series_page"))
+
+    # Delete folder and contents
+    series_dir = SERIES_VIDEO_DIR / series_name
+    if series_dir.exists():
+        shutil.rmtree(series_dir)
+
+    # Remove from series.json
+    del series_data[series_name]
+    save_series(series_data)
+
+    # Remove related metadata entries
+    global metadata
+    metadata = load_metadata()
+    to_delete = [vid for vid, data in metadata.items() if data.get("series") == series_name]
+    for vid in to_delete:
+        del metadata[vid]
+        # Also delete thumbnail
+        thumb_path = THUMB_DIR / f"{vid}.jpg"
+        if thumb_path.exists():
+            thumb_path.unlink()
+
+    with open(METADATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    logger.info(f"[SERIES] Deleted series: {series_name} ({len(to_delete)} episodes removed)")
+    return redirect(url_for("series_page"))
+
+@app.route("/api/series")
+def api_series():
+    """Return list of series names for API use."""
+    series_data = load_series()
+    return jsonify({
+        "series": [
+            {
+                "folder_name": name,
+                "display_name": series_display_name(name)
+            }
+            for name in sorted(series_data.keys())
+        ]
+    })
+
+# ============================================================================
+# SERIES UPLOAD ROUTES
+# ============================================================================
+
+@app.route("/upload/series", methods=["GET"])
+def upload_series():
+    """Series upload page."""
+    series_data = load_series()
+
+    # Build list with display names
+    series_list = [
+        {
+            "folder_name": name,
+            "display_name": series_display_name(name)
+        }
+        for name in sorted(series_data.keys())
+    ]
+
+    # Check if a specific series was requested
+    preselected = request.args.get("series", "")
+
+    cfg = load_config_i18n()
+    lang = cfg.get("language", "es")
+    base_trans = load_translations(lang)
+
+    def tr(key, default=None):
+        keys = key.split(".")
+        val = base_trans
+        for k in keys:
+            if isinstance(val, dict):
+                val = val.get(k)
+            else:
+                return default if default else key
+        return val if val else (default if default else key)
+
+    return render_template("upload_series.html",
+                           series_list=series_list,
+                           preselected=preselected,
+                           lang=lang,
+                           tr=tr)
+
+@app.route("/upload/series", methods=["POST"])
+def upload_series_post():
+    """Handle series episode uploads."""
+    global metadata
+
+    # Get series - either existing or new
+    series_name = request.form.get("series", "").strip()
+    new_series_name = request.form.get("new_series", "").strip()
+
+    if new_series_name:
+        # Create new series
+        folder_name = series_folder_name(new_series_name)
+        if folder_name:
+            series_data = load_series()
+            if folder_name not in series_data:
+                series_dir = SERIES_VIDEO_DIR / folder_name
+                series_dir.mkdir(parents=True, exist_ok=True)
+                series_data[folder_name] = {
+                    "created": datetime.now().strftime("%Y-%m-%d")
+                }
+                save_series(series_data)
+                logger.info(f"[SERIES] Created new series during upload: {new_series_name}")
+            series_name = folder_name
+    elif not series_name:
+        return redirect(url_for("upload_series"))
+
+    # Verify series exists
+    series_data = load_series()
+    if series_name not in series_data:
+        return redirect(url_for("upload_series"))
+
+    series_dir = SERIES_VIDEO_DIR / series_name
+    series_dir.mkdir(parents=True, exist_ok=True)
+
+    files = request.files.getlist("videos[]")
+    if not files:
+        return redirect(url_for("upload_series"))
+
+    metadata = load_metadata()
+
+    for file in files:
+        if not file.filename:
+            continue
+        if not file.filename.lower().endswith(".mp4"):
+            continue
+
+        # Sanitize filename
+        original_name = secure_filename(file.filename)
+        video_id = os.path.splitext(original_name)[0]
+        # Ensure no spaces
+        video_id = video_id.replace(' ', '_')
+        final_path = series_dir / f"{video_id}.mp4"
+
+        # Save directly to final location
+        temp_path = str(final_path) + ".uploading"
+        file.save(temp_path)
+
+        try:
+            # Get duration for metadata
+            duracion = get_video_duration(temp_path)
+
+            # For series uploads, skip transcoding - just rename the file
+            # Series episodes are pre-made content that doesn't need resizing
+            shutil.move(temp_path, final_path)
+
+            # Parse season/episode from filename
+            season, episode = parse_episode_info(video_id)
+
+            # Create metadata
+            series_path = f"series/{series_name}/{video_id}"
+            metadata[video_id] = {
+                "title": video_id,
+                "category": "tv_episode",
+                "series": series_name,
+                "series_path": series_path,
+                "season": season,
+                "episode": episode,
+                "tags": [],
+                "personaje": "",
+                "fecha": "",
+                "modo": [],
+                "duracion": duracion
+            }
+
+            # Generate thumbnail
+            thumb_path = THUMB_DIR / f"{video_id}.jpg"
+            try:
+                generate_thumbnail(str(final_path), str(thumb_path))
+            except Exception as e:
+                logger.warning(f"[SERIES] Failed to generate thumbnail for {video_id}: {e}")
+
+            logger.info(f"[SERIES] Uploaded episode: {series_path}")
+
+        except Exception as e:
+            logger.error(f"[SERIES] Error processing {file.filename}: {e}")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    # Save metadata
+    with open(METADATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    return redirect(url_for("series_page"))
+
 @app.route("/canales")
 def canales():
     canales_data = load_canales()  # ya lo tenÃ©s definido
     tags_data = load_tags()
     config_data = load_config()
 
-    return render_template("canales.html", canales=canales_data, tags=tags_data, config=config_data)
+    # Get series with display names
+    all_series = [
+        {"folder_name": name, "display_name": series_display_name(name)}
+        for name in _get_all_series()
+    ]
+
+    return render_template("canales.html", canales=canales_data, tags=tags_data, config=config_data, all_series=all_series, series_display_name=series_display_name)
 
 @app.route("/guardar_canal", methods=["POST"])
 def guardar_canal():
@@ -1417,6 +1984,7 @@ def guardar_canal():
     descripcion = request.form.get("descripcion", "").strip()
     icono = request.form.get("icono", "").strip()
     tags_prioridad = request.form.getlist("tags_prioridad")
+    series_filter = request.form.getlist("series_filter")
     intro = request.form.get("intro_video_id", "").strip()
 
     if not nombre:
@@ -1433,7 +2001,8 @@ def guardar_canal():
         "nombre": nombre,
         "descripcion": descripcion,
         "icono": icono,
-        "tags_prioridad": tags_prioridad
+        "tags_prioridad": tags_prioridad,
+        "series_filter": series_filter
     }
 
     if intro:
@@ -1462,6 +2031,12 @@ def editar_canal(canal_id):
     tags_data = load_tags()
     config = load_config()
 
+    # Get series with display names
+    all_series = [
+        {"folder_name": name, "display_name": series_display_name(name)}
+        for name in _get_all_series()
+    ]
+
     # lista plana de todos los tags del tags.json
     todos_los_tags = [t for grupo in tags_data.values() for t in grupo.get("tags", [])]
 
@@ -1478,7 +2053,9 @@ def editar_canal(canal_id):
                            canales=canales,
                            tags=tags_data,
                            tags_disponibles=tags_disponibles,
-                           config=config)
+                           config=config,
+                           all_series=all_series,
+                           series_display_name=series_display_name)
 
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():

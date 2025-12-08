@@ -77,6 +77,56 @@
         </div>
       </section>
 
+      <!-- Category -->
+      <section class="section rounded-lg p-3 sm:p-4">
+        <h2 class="text-lg sm:text-xl font-bold text-purple-300 mb-3">📁 Categoría</h2>
+
+        {% if is_series_video %}
+        <!-- Series video: locked category and series -->
+        <div class="mb-3">
+          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido</label>
+          <div class="input w-full bg-gray-700 cursor-not-allowed flex items-center gap-2">
+            <span>📺 TV Episode</span>
+            <span class="text-xs text-purple-400">(locked - series video)</span>
+          </div>
+          <input type="hidden" name="category" value="tv_episode">
+        </div>
+
+        <div class="space-y-3 mt-4 p-3 bg-gray-800 border border-purple-500 rounded">
+          <h3 class="text-sm font-bold text-purple-200">Detalles de Episodio TV</h3>
+
+          <div>
+            <label class="block text-xs sm:text-sm mb-1">Serie</label>
+            <div class="input w-full bg-gray-700 cursor-not-allowed">{{ series_display }}</div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs sm:text-sm mb-1">Temporada</label>
+              <input type="number" name="season" min="1" value="{{ video.get('season', '') or '' }}"
+                     class="input w-full" placeholder="1">
+            </div>
+            <div>
+              <label class="block text-xs sm:text-sm mb-1">Episodio</label>
+              <input type="number" name="episode" min="1" value="{{ video.get('episode', '') or '' }}"
+                     class="input w-full" placeholder="1">
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <!-- Non-series video: editable category (no TV Episode option) -->
+        <div class="mb-3">
+          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido <span class="text-red-400">*</span></label>
+          <select name="category" id="category-select" class="input w-full" required>
+            <option value="vhs_tape" {% if video.get('category', 'vhs_tape') == 'vhs_tape' %}selected{% endif %}>📼 VHS Tape</option>
+            <option value="movie" {% if video.get('category') == 'movie' %}selected{% endif %}>🎬 Movie</option>
+            <option value="commercial" {% if video.get('category') == 'commercial' %}selected{% endif %}>📢 Commercial</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">To add TV Episodes, use the <a href="{{ url_for('upload_series') }}" class="text-purple-400 hover:underline">Series Upload</a> feature.</p>
+        </div>
+        {% endif %}
+      </section>
+
       <!-- Tags -->
       <section class="section rounded-lg p-3 sm:p-4">
         <div class="flex items-center justify-between">
@@ -341,6 +391,10 @@
         try { localStorage.setItem(KEY, vis ? '0' : '1'); } catch {}
       });
     })();
+
+    // Note: Category fields are now handled server-side
+    // - Series videos have locked category (TV Episode) and series
+    // - Non-series videos don't have TV Episode option
 
     // ---------- Inicialización a partir del contexto del servidor ----------
     (function hydrateSelectedFromServer(){
