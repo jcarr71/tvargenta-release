@@ -21,6 +21,7 @@ import logging
 import math
 import os
 import random
+import subprocess
 import threading
 import time
 from datetime import datetime, timedelta
@@ -90,6 +91,8 @@ class BroadcastScheduler:
         self._ready = threading.Event()
         self._ads_cache: List[Dict] = []  # Cached list of available ads
         self._ads_cache_time: float = 0
+        self._metadata_cache: Dict = {}  # In-memory metadata cache
+        self._metadata_loaded = False
 
     def start(self):
         """Start the background scheduler thread."""
@@ -299,8 +302,11 @@ class BroadcastScheduler:
                 s_info = series_data[s_name]
                 episodes = self._get_series_episodes(s_name, metadata)
                 if episodes:
-                    # Use 1800 (30 min) as default for unknown durations to match playback logic
-                    max_duration = max(e.get("duracion", 0) or 1800 for e in episodes)
+                    # Get max duration, running ffprobe on-demand for missing durations
+                    max_duration = max(
+                        self._get_episode_duration(e.get("video_id", ""), e)
+                        for e in episodes
+                    )
                     channel_series.append({
                         "name": s_name,
                         "time_of_day": s_info.get("time_of_day", "any"),
@@ -555,7 +561,7 @@ class BroadcastScheduler:
         target_index = (episode_index + block_index) % len(episodes)
         episode = episodes[target_index]
 
-        episode_duration = episode.get("duracion", 0) or 1800  # Default 30 min
+        episode_duration = self._get_episode_duration(episode.get("video_id", ""), episode)
         if episode_duration >= BLOCK_DURATION_SEC:
             # Episode is >= 30 min, no commercials
             seek_time = min(seconds_into_30min_block, episode_duration - 1)
@@ -626,7 +632,10 @@ class BroadcastScheduler:
         episode_index = self._cursor_to_index(cursor, episodes)
 
         # Calculate total time through all episodes
-        total_time = sum(e.get("duracion", 0) or 1800 for e in episodes)
+        total_time = sum(
+            self._get_episode_duration(e.get("video_id", ""), e)
+            for e in episodes
+        )
 
         # Where are we in the cycle?
         position = seconds_into_block % total_time
@@ -634,7 +643,7 @@ class BroadcastScheduler:
         # Find which episode and timestamp
         accumulated = 0
         for i, ep in enumerate(episodes):
-            ep_duration = ep.get("duracion", 0) or 1800
+            ep_duration = self._get_episode_duration(ep.get("video_id", ""), ep)
             if accumulated + ep_duration > position:
                 seek_time = position - accumulated
                 return self._episode_entry(ep, seek_time)
@@ -662,6 +671,7 @@ class BroadcastScheduler:
 
     def _episode_entry(self, episode: Dict, seek_time: float) -> Dict:
         """Create a buffer entry for an episode."""
+        video_id = episode.get("video_id", "")
         return {
             "content_type": "episode",
             "series": episode.get("series", ""),
@@ -669,8 +679,8 @@ class BroadcastScheduler:
             "episode": episode.get("episode", 1),
             "timestamp": max(0, seek_time),
             "video_path": f"{episode.get('series_path', '')}.mp4",
-            "duration": episode.get("duracion", 0) or 1800,
-            "video_id": episode.get("video_id", "")
+            "duration": self._get_episode_duration(video_id, episode),
+            "video_id": video_id
         }
 
     def _test_pattern_entry(self) -> Dict:
@@ -818,17 +828,93 @@ class BroadcastScheduler:
             return {}
 
     def _load_metadata(self) -> Dict:
-        """Load video metadata from metadata.json."""
+        """Get video metadata from in-memory cache, loading from disk if needed."""
+        if not self._metadata_loaded:
+            self._reload_metadata()
+        return self._metadata_cache
+
+    def _reload_metadata(self):
+        """Reload metadata from disk into cache."""
         try:
             with open(METADATA_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            return {}
+                self._metadata_cache = json.load(f)
+            self._metadata_loaded = True
+            logger.info(f"[SCHEDULER] Loaded metadata cache ({len(self._metadata_cache)} entries)")
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error loading metadata: {e}")
+            self._metadata_cache = {}
+            self._metadata_loaded = True
+
+    def _save_metadata(self):
+        """Persist metadata cache to disk."""
+        try:
+            tmp_path = Path(METADATA_FILE).with_suffix(".tmp")
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(self._metadata_cache, f, indent=2, ensure_ascii=False)
+            os.replace(tmp_path, METADATA_FILE)
+            logger.debug("[SCHEDULER] Saved metadata to disk")
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error saving metadata: {e}")
+
+    def _get_video_duration_ffprobe(self, filepath: str) -> float:
+        """Get video duration using ffprobe."""
+        try:
+            result = subprocess.run([
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1",
+                filepath
+            ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
+            return float(result.stdout.strip())
+        except Exception as e:
+            logger.warning(f"[SCHEDULER] Could not get duration for {filepath}: {e}")
+            return 0
+
+    def _get_episode_duration(self, video_id: str, episode_data: Dict) -> float:
+        """
+        Get episode duration, running ffprobe on-demand if missing.
+
+        Args:
+            video_id: The video identifier
+            episode_data: Episode metadata dict (will be updated if duration found)
+
+        Returns:
+            Duration in seconds, or 1800 (30 min) as fallback
+        """
+        duration = episode_data.get("duracion", 0)
+        if duration and duration > 0:
+            return duration
+
+        # Duration missing - try to get it via ffprobe
+        series_path = episode_data.get("series_path", "")
+        if series_path:
+            filepath = VIDEO_DIR / f"{series_path}.mp4"
+        else:
+            filepath = VIDEO_DIR / f"{video_id}.mp4"
+
+        if filepath.exists():
+            duration = self._get_video_duration_ffprobe(str(filepath))
+            if duration > 0:
+                # Update cache and persist
+                episode_data["duracion"] = duration
+                if video_id in self._metadata_cache:
+                    self._metadata_cache[video_id]["duracion"] = duration
+                    self._save_metadata()
+                logger.info(f"[SCHEDULER] Computed duration for {video_id}: {duration:.1f}s")
+                return duration
+
+        # Fallback to 30 minutes
+        logger.warning(f"[SCHEDULER] No duration for {video_id}, using 30 min default")
+        return 1800
 
     def force_regenerate_schedule(self):
         """Force regeneration of the weekly schedule."""
         logger.info("[SCHEDULER] Forcing schedule regeneration")
         self._generate_weekly_schedule()
+
+    def reload_metadata(self):
+        """Reload metadata cache from disk. Call after external metadata updates."""
+        self._reload_metadata()
 
     def get_current_schedule_info(self, channel_name: str) -> Dict:
         """
