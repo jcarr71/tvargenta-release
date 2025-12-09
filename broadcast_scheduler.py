@@ -371,6 +371,10 @@ class BroadcastScheduler:
         segments = []
         current_ts = day_start_ts
 
+        # Track episode consumption per series throughout the day
+        # This ensures episodes advance sequentially across all blocks
+        episode_offsets = {}  # series_name -> number of episodes consumed today
+
         # Process each second of the day by iterating through time slots
         while current_ts < day_end_ts:
             dt = datetime.fromtimestamp(current_ts)
@@ -425,7 +429,7 @@ class BroadcastScheduler:
 
             # Generate segments for this slot
             slot_segments = self._generate_slot_segments(
-                channel_name, active_slot, slot_start_ts, slot_end_ts, metadata
+                channel_name, active_slot, slot_start_ts, slot_end_ts, metadata, episode_offsets
             )
             segments.extend(slot_segments)
 
@@ -440,7 +444,8 @@ class BroadcastScheduler:
         slot: Dict,
         slot_start_ts: int,
         slot_end_ts: int,
-        metadata: Dict
+        metadata: Dict,
+        episode_offsets: Dict[str, int]
     ) -> List[Dict]:
         """Generate segments for a single time slot."""
         segments = []
@@ -471,7 +476,7 @@ class BroadcastScheduler:
             # Generate segments for this series block
             block_segments = self._generate_series_block_segments(
                 channel_name, series_name, block_start_ts, block_end_ts,
-                use_commercial_blocks, metadata
+                use_commercial_blocks, metadata, episode_offsets
             )
             segments.extend(block_segments)
 
@@ -484,7 +489,8 @@ class BroadcastScheduler:
         block_start_ts: int,
         block_end_ts: int,
         use_commercial_blocks: bool,
-        metadata: Dict
+        metadata: Dict,
+        episode_offsets: Dict[str, int]
     ) -> List[Dict]:
         """Generate segments for a series within a time block."""
         segments = []
@@ -493,8 +499,14 @@ class BroadcastScheduler:
         if not episodes:
             return segments
 
+        # Get base index from weekly cursor
         cursor = self._get_episode_cursor(channel_name, series_name)
-        episode_index = self._cursor_to_index(cursor, episodes)
+        base_index = self._cursor_to_index(cursor, episodes)
+
+        # Add offset for episodes already consumed today
+        if series_name not in episode_offsets:
+            episode_offsets[series_name] = 0
+        episode_index = base_index + episode_offsets[series_name]
 
         current_ts = block_start_ts
 
@@ -531,6 +543,7 @@ class BroadcastScheduler:
                 current_ts += int(segment_duration)
 
             episode_index += 1
+            episode_offsets[series_name] += 1
 
         return segments
 
