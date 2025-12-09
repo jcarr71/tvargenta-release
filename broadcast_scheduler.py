@@ -715,6 +715,8 @@ class BroadcastScheduler:
         series_data = self._load_series()
         metadata = self._load_metadata()
 
+        logger.info(f"[SCHEDULER] Found {len(channels)} channels, {len(series_data)} series, {len(metadata)} metadata entries")
+
         schedule = {
             "version": SCHEDULE_VERSION,
             "week_start": self._get_last_sunday_midnight().isoformat(),
@@ -728,9 +730,15 @@ class BroadcastScheduler:
             if not series_filter:
                 continue  # Not a broadcast channel
 
+            logger.info(f"[SCHEDULER] Processing broadcast channel '{channel_name}' with series_filter={series_filter}")
+
             channel_schedule = self._generate_channel_schedule(
                 channel_name, series_filter, series_data, metadata
             )
+
+            # Log if daily_slots is empty
+            if not channel_schedule.get("daily_slots"):
+                logger.warning(f"[SCHEDULER] Channel '{channel_name}' has no daily slots - check series configuration")
 
             # Restore preserved cursors if they exist
             if channel_name in existing_cursors:
@@ -794,8 +802,14 @@ class BroadcastScheduler:
                         "max_duration": max_duration,
                         "use_commercial_blocks": max_duration < BLOCK_DURATION_SEC
                     })
+                    logger.info(f"[SCHEDULER]   Series '{s_name}': {len(episodes)} episodes, time_of_day={s_info.get('time_of_day', 'any')}")
+                else:
+                    logger.warning(f"[SCHEDULER]   Series '{s_name}' has no episodes in metadata (check category='tv_episode' and series field)")
+            else:
+                logger.warning(f"[SCHEDULER]   Series '{s_name}' not found in series.json")
 
         if not channel_series:
+            logger.warning(f"[SCHEDULER]   No valid series found for channel - returning empty schedule")
             return {"daily_slots": [], "episode_cursor": {}}
 
         # Build daily slots
