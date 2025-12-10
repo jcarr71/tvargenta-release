@@ -407,6 +407,9 @@ def get_next_episode_for_channel(channel_id: str, series_name: str,
     Advances cursor position and handles wrap-around.
     Returns episode dict or None if no episodes available.
     """
+    # Track if we need to save cursors (when loaded internally)
+    should_save_cursors = cursors is None
+
     if cursors is None:
         cursors = load_episode_cursors()
     if metadata is None:
@@ -439,6 +442,10 @@ def get_next_episode_for_channel(channel_id: str, series_name: str,
         "last_index": next_index,
         "updated_at": datetime.now().isoformat()
     }
+
+    # Save cursors if we loaded them internally
+    if should_save_cursors:
+        save_episode_cursors(cursors)
 
     return next_episode
 
