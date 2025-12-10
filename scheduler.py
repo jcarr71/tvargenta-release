@@ -206,9 +206,37 @@ def save_daily_schedule(data: dict) -> None:
 
     _write_json_atomic(DAILY_SCHEDULE_FILE, data)
 
-    # Update the in-memory cache
+    # Update the in-memory cache (replaces previous day's cache)
     with _daily_schedule_cache_lock:
         _daily_schedule_cache = data
+
+    logger.info("[SCHEDULER] Daily schedule cache updated")
+
+
+def warm_daily_schedule_cache() -> bool:
+    """
+    Pre-warm the daily schedule cache on startup.
+    Call this during initialization to avoid disk I/O on first channel switch.
+    Returns True if cache was warmed, False if no schedule exists.
+    """
+    global _daily_schedule_cache
+
+    with _daily_schedule_cache_lock:
+        # Already cached
+        if _daily_schedule_cache is not None:
+            return True
+
+        # Load from disk
+        try:
+            if DAILY_SCHEDULE_FILE.exists():
+                with open(DAILY_SCHEDULE_FILE, "r", encoding="utf-8") as f:
+                    _daily_schedule_cache = json.load(f)
+                logger.info("[SCHEDULER] Daily schedule cache warmed from disk")
+                return True
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error warming cache: {e}")
+
+    return False
 
 
 def load_episode_cursors() -> dict:
@@ -1278,6 +1306,10 @@ def initialize_scheduler():
 
     # Check if we need to generate schedules immediately
     check_and_generate_schedules()
+
+    # Warm the cache for fast channel switching
+    # (if schedule was just generated, cache is already warm via save_daily_schedule)
+    warm_daily_schedule_cache()
 
     # Start background loop
     start_scheduler()
