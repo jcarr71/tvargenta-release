@@ -104,6 +104,14 @@ TEST_PATTERN_END_HOUR = 4
 SCHEDULER_CHECK_INTERVAL = 5  # seconds
 
 # ============================================================================
+# IN-MEMORY SCHEDULE CACHE
+# ============================================================================
+
+# Cache for daily schedule to eliminate disk I/O on hot path (channel switching)
+_daily_schedule_cache: Optional[dict] = None
+_daily_schedule_cache_lock = threading.Lock()
+
+# ============================================================================
 # DATA LOADING UTILITIES
 # ============================================================================
 
@@ -172,19 +180,35 @@ def save_weekly_schedule(data: dict) -> None:
 
 
 def load_daily_schedule() -> dict:
-    """Load daily schedule from file."""
-    try:
-        if DAILY_SCHEDULE_FILE.exists():
-            with open(DAILY_SCHEDULE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    except Exception as e:
-        logger.error(f"[SCHEDULER] Error loading daily_schedule.json: {e}")
-    return {}
+    """Load daily schedule from cache, falling back to file on cold start."""
+    global _daily_schedule_cache
+
+    with _daily_schedule_cache_lock:
+        # Return cached version if available
+        if _daily_schedule_cache is not None:
+            return _daily_schedule_cache
+
+        # Cold start: load from disk and populate cache
+        try:
+            if DAILY_SCHEDULE_FILE.exists():
+                with open(DAILY_SCHEDULE_FILE, "r", encoding="utf-8") as f:
+                    _daily_schedule_cache = json.load(f)
+                    return _daily_schedule_cache
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error loading daily_schedule.json: {e}")
+
+        return {}
 
 
 def save_daily_schedule(data: dict) -> None:
-    """Save daily schedule to file."""
+    """Save daily schedule to file and update cache."""
+    global _daily_schedule_cache
+
     _write_json_atomic(DAILY_SCHEDULE_FILE, data)
+
+    # Update the in-memory cache
+    with _daily_schedule_cache_lock:
+        _daily_schedule_cache = data
 
 
 def load_episode_cursors() -> dict:
