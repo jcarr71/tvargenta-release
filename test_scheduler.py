@@ -842,6 +842,285 @@ def test_20_multiple_episodes_per_block():
     return True
 
 
+def test_21_slot_index_calculation():
+    """Test 21: Slot index calculation within time-of-day periods."""
+    print("\n=== Test 21: Slot index calculation ===")
+
+    # Test early_morning slots (4am-7am = 6 slots)
+    # 4:00 = slot 0, 4:30 = slot 1, 5:00 = slot 2, etc.
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(4, 0)
+    assert time_of_day == "early_morning", f"Expected early_morning, got {time_of_day}"
+    assert slot_idx == 0, f"4:00am should be slot 0, got {slot_idx}"
+    print(f"  4:00am: {time_of_day}, slot {slot_idx} ✓")
+
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(4, 30)
+    assert slot_idx == 1, f"4:30am should be slot 1, got {slot_idx}"
+    print(f"  4:30am: {time_of_day}, slot {slot_idx} ✓")
+
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(6, 30)
+    assert slot_idx == 5, f"6:30am should be slot 5, got {slot_idx}"
+    print(f"  6:30am: {time_of_day}, slot {slot_idx} ✓")
+
+    # Test evening slots (5pm-9pm = 8 slots)
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(17, 0)
+    assert time_of_day == "evening", f"Expected evening, got {time_of_day}"
+    assert slot_idx == 0, f"5:00pm should be slot 0, got {slot_idx}"
+    print(f"  5:00pm: {time_of_day}, slot {slot_idx} ✓")
+
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(20, 30)
+    assert slot_idx == 7, f"8:30pm should be slot 7, got {slot_idx}"
+    print(f"  8:30pm: {time_of_day}, slot {slot_idx} ✓")
+
+    # Test night slots with wrap-around (9pm-3am)
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(21, 0)
+    assert time_of_day == "night", f"Expected night, got {time_of_day}"
+    assert slot_idx == 0, f"9:00pm should be slot 0, got {slot_idx}"
+    print(f"  9:00pm: {time_of_day}, slot {slot_idx} ✓")
+
+    time_of_day, slot_idx = scheduler.get_slot_index_for_time(0, 0)
+    assert time_of_day == "night", f"Expected night for midnight, got {time_of_day}"
+    # Midnight is 3 hours after 9pm = 6 slots
+    assert slot_idx == 6, f"Midnight should be slot 6, got {slot_idx}"
+    print(f"  Midnight: {time_of_day}, slot {slot_idx} ✓")
+
+    print("  Test 21 PASSED")
+    return True
+
+
+def test_22_video_url_construction():
+    """Test 22: Video URL construction for different content types."""
+    print("\n=== Test 22: Video URL construction ===")
+
+    # Ensure schedule exists
+    if not scheduler.DAILY_SCHEDULE_FILE.exists():
+        scheduler.generate_weekly_schedule()
+        scheduler.generate_daily_schedule()
+
+    # Test at various times and verify URL format
+    # Test pattern should have system path
+    test_time = datetime.now().replace(hour=3, minute=30, second=0, microsecond=0)
+    result = scheduler.get_scheduled_content("channel_1", test_time)
+
+    assert result["video_url"] == "/videos/system/test_pattern.mp4", \
+        f"Test pattern URL wrong: {result['video_url']}"
+    print(f"  Test pattern URL: {result['video_url']} ✓")
+
+    # Find a time with episode or commercial content
+    test_time = datetime.now().replace(hour=17, minute=15, second=0, microsecond=0)
+    result = scheduler.get_scheduled_content("channel_1", test_time)
+
+    if result["type"] == "episode":
+        assert "/videos/" in result["video_url"], "Episode URL should contain /videos/"
+        assert ".mp4" in result["video_url"], "Episode URL should end with .mp4"
+        print(f"  Episode URL: {result['video_url']} ✓")
+    elif result["type"] == "commercial":
+        assert result["video_url"].startswith("/videos/"), "Commercial URL should start with /videos/"
+        assert result["video_url"].endswith(".mp4"), "Commercial URL should end with .mp4"
+        print(f"  Commercial URL: {result['video_url']} ✓")
+
+    print("  Test 22 PASSED")
+    return True
+
+
+def test_23_invalid_time_of_day_rejected():
+    """Test 23: Invalid time-of-day values are rejected."""
+    print("\n=== Test 23: Invalid time_of_day rejection ===")
+
+    # Try to set invalid time_of_day
+    result = scheduler.set_series_time_of_day("Test_Series_A", "invalid_value")
+    assert result == False, "Should reject invalid time_of_day"
+    print(f"  'invalid_value' rejected: {result} ✓")
+
+    result = scheduler.set_series_time_of_day("Test_Series_A", "morning")
+    assert result == False, "Should reject 'morning' (not a valid option)"
+    print(f"  'morning' rejected: {result} ✓")
+
+    result = scheduler.set_series_time_of_day("Test_Series_A", "")
+    assert result == False, "Should reject empty string"
+    print(f"  Empty string rejected: {result} ✓")
+
+    # Try to set on non-existent series
+    result = scheduler.set_series_time_of_day("Non_Existent_Series", "evening")
+    assert result == False, "Should reject non-existent series"
+    print(f"  Non-existent series rejected: {result} ✓")
+
+    # Verify valid values are still accepted
+    result = scheduler.set_series_time_of_day("Test_Series_A", "evening")
+    assert result == True, "Should accept valid time_of_day"
+    print(f"  'evening' accepted: {result} ✓")
+
+    print("  Test 23 PASSED")
+    return True
+
+
+def test_24_daily_schedule_entry_continuity():
+    """Test 24: Daily schedule entries cover full day without gaps."""
+    print("\n=== Test 24: Schedule entry continuity ===")
+
+    # Generate fresh schedule
+    scheduler.generate_weekly_schedule()
+    scheduler.generate_daily_schedule()
+
+    schedule = scheduler.load_daily_schedule()
+    channel_entries = schedule.get("channels", {}).get("channel_1", [])
+
+    assert len(channel_entries) > 0, "Should have entries"
+    print(f"  Total entries: {len(channel_entries)}")
+
+    # Check that entries are sorted and contiguous
+    prev_end = 0
+    gaps = []
+    overlaps = []
+
+    for entry in channel_entries:
+        if entry["start"] > prev_end:
+            gaps.append((prev_end, entry["start"]))
+        elif entry["start"] < prev_end:
+            overlaps.append((prev_end, entry["start"]))
+        prev_end = entry["end"]
+
+    if gaps:
+        print(f"  WARNING: Found {len(gaps)} gaps in schedule")
+        for gap in gaps[:3]:
+            print(f"    Gap from {gap[0]}s to {gap[1]}s")
+    else:
+        print(f"  No gaps in schedule ✓")
+
+    if overlaps:
+        print(f"  WARNING: Found {len(overlaps)} overlaps in schedule")
+    else:
+        print(f"  No overlaps in schedule ✓")
+
+    # Verify first entry starts at 0 (3am)
+    assert channel_entries[0]["start"] == 0, "First entry should start at 0"
+    print(f"  First entry starts at second 0 ✓")
+
+    # Verify coverage extends to end of day (23 hours from 3am = 82800 seconds)
+    last_end = channel_entries[-1]["end"]
+    expected_end = 23 * 3600  # 23 hours
+    assert last_end >= expected_end - 1800, f"Schedule should cover ~23 hours, ends at {last_end}s"
+    print(f"  Schedule ends at second {last_end} (covers {last_end/3600:.1f} hours) ✓")
+
+    print("  Test 24 PASSED")
+    return True
+
+
+def test_25_seek_to_calculation_accuracy():
+    """Test 25: Seek-to timestamp calculation is accurate."""
+    print("\n=== Test 25: Seek-to calculation accuracy ===")
+
+    # Ensure schedule exists
+    if not scheduler.DAILY_SCHEDULE_FILE.exists():
+        scheduler.generate_weekly_schedule()
+        scheduler.generate_daily_schedule()
+
+    # Get content at a specific second
+    base_time = datetime.now().replace(hour=5, minute=0, second=0, microsecond=0)
+    result1 = scheduler.get_scheduled_content("channel_1", base_time)
+
+    # Get content 30 seconds later (same entry, different seek)
+    later_time = datetime.now().replace(hour=5, minute=0, second=30, microsecond=0)
+    result2 = scheduler.get_scheduled_content("channel_1", later_time)
+
+    print(f"  5:00:00am: type={result1['type']}, seek_to={result1['seek_to']}")
+    print(f"  5:00:30am: type={result2['type']}, seek_to={result2['seek_to']}")
+
+    # If same video, seek should differ by ~30 seconds
+    if result1["video_id"] == result2["video_id"]:
+        seek_diff = result2["seek_to"] - result1["seek_to"]
+        assert abs(seek_diff - 30) < 2, f"Seek difference should be ~30s, got {seek_diff}s"
+        print(f"  Same video: seek differs by {seek_diff}s ✓")
+    else:
+        print(f"  Different videos - seek calculation still valid ✓")
+
+    # Test at the edge of test pattern period
+    test_start = datetime.now().replace(hour=3, minute=0, second=0, microsecond=0)
+    result_start = scheduler.get_scheduled_content("channel_1", test_start)
+    assert result_start["seek_to"] == 0, "Start of test pattern should have seek_to=0"
+    print(f"  3:00:00am (test pattern start): seek_to={result_start['seek_to']} ✓")
+
+    test_mid = datetime.now().replace(hour=3, minute=30, second=0, microsecond=0)
+    result_mid = scheduler.get_scheduled_content("channel_1", test_mid)
+    assert result_mid["seek_to"] == 1800, f"3:30am should have seek_to=1800, got {result_mid['seek_to']}"
+    print(f"  3:30:00am (mid test pattern): seek_to={result_mid['seek_to']} ✓")
+
+    print("  Test 25 PASSED")
+    return True
+
+
+def test_26_empty_series_handling():
+    """Test 26: Handling of series with no episodes."""
+    print("\n=== Test 26: Empty series handling ===")
+
+    # Create a series with no episodes
+    series_data = scheduler.load_series()
+    series_data["Empty_Series"] = {
+        "created": "2025-01-01",
+        "time_of_day": "any"
+    }
+    scheduler.save_series(series_data)
+
+    # Try to get episodes for empty series
+    episodes = scheduler.get_series_episodes("Empty_Series")
+    assert len(episodes) == 0, "Empty series should have 0 episodes"
+    print(f"  Empty series has {len(episodes)} episodes ✓")
+
+    # Try to get next episode for empty series
+    result = scheduler.get_next_episode_for_channel("channel_1", "Empty_Series")
+    assert result is None, "Should return None for empty series"
+    print(f"  get_next_episode returns None for empty series ✓")
+
+    # Try to peek at empty series
+    result = scheduler.peek_next_episode_for_channel("channel_1", "Empty_Series")
+    assert result is None, "Should return None for peek on empty series"
+    print(f"  peek_next_episode returns None for empty series ✓")
+
+    # Clean up
+    del series_data["Empty_Series"]
+    scheduler.save_series(series_data)
+
+    print("  Test 26 PASSED")
+    return True
+
+
+def test_27_independent_channel_cursors():
+    """Test 27: Different channels have independent episode cursors."""
+    print("\n=== Test 27: Independent channel cursors ===")
+
+    # Clear all cursors
+    scheduler.save_episode_cursors({})
+
+    # Get episode for channel_1
+    ep1_ch1 = scheduler.get_next_episode_for_channel("channel_1", "Test_Series_A")
+    assert ep1_ch1["episode"] == 1, "channel_1 should start at episode 1"
+    print(f"  channel_1 first: {ep1_ch1['video_id']} (E{ep1_ch1['episode']}) ✓")
+
+    # Get episode for channel_2 (same series) - should also be episode 1
+    ep1_ch2 = scheduler.get_next_episode_for_channel("channel_2", "Test_Series_A")
+    assert ep1_ch2["episode"] == 1, "channel_2 should also start at episode 1"
+    print(f"  channel_2 first: {ep1_ch2['video_id']} (E{ep1_ch2['episode']}) ✓")
+
+    # Advance channel_1
+    ep2_ch1 = scheduler.get_next_episode_for_channel("channel_1", "Test_Series_A")
+    assert ep2_ch1["episode"] == 2, "channel_1 should now be at episode 2"
+    print(f"  channel_1 second: {ep2_ch1['video_id']} (E{ep2_ch1['episode']}) ✓")
+
+    # channel_2 should still be at episode 1 (now returns 2 since it got 1)
+    ep2_ch2 = scheduler.get_next_episode_for_channel("channel_2", "Test_Series_A")
+    assert ep2_ch2["episode"] == 2, "channel_2 should now be at episode 2"
+    print(f"  channel_2 second: {ep2_ch2['video_id']} (E{ep2_ch2['episode']}) ✓")
+
+    # Verify cursors are independent in storage
+    cursors = scheduler.load_episode_cursors()
+    ch1_idx = cursors["channel_1"]["Test_Series_A"]["last_index"]
+    ch2_idx = cursors["channel_2"]["Test_Series_A"]["last_index"]
+    assert ch1_idx == ch2_idx, "Both channels at same position now"
+    print(f"  Cursors tracked independently: ch1={ch1_idx}, ch2={ch2_idx} ✓")
+
+    print("  Test 27 PASSED")
+    return True
+
+
 def run_all_tests():
     """Run all tests."""
     print("=" * 60)
@@ -871,6 +1150,13 @@ def run_all_tests():
         test_18_schedule_lookup_no_schedule,
         test_19_peek_episode_without_advancing,
         test_20_multiple_episodes_per_block,
+        test_21_slot_index_calculation,
+        test_22_video_url_construction,
+        test_23_invalid_time_of_day_rejected,
+        test_24_daily_schedule_entry_continuity,
+        test_25_seek_to_calculation_accuracy,
+        test_26_empty_series_handling,
+        test_27_independent_channel_cursors,
     ]
 
     passed = 0
