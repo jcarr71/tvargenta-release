@@ -1954,7 +1954,7 @@ def upload_series():
 
 @app.route("/upload/series", methods=["POST"])
 def upload_series_post():
-    """Handle series episode uploads."""
+    """Handle series episode uploads with H.264 verification."""
     global metadata
 
     # Get series - either existing or new
@@ -1976,26 +1976,32 @@ def upload_series_post():
                 logger.info(f"[SERIES] Created new series during upload: {new_series_name}")
             series_name = folder_name
     elif not series_name:
-        return redirect(url_for("upload_series"))
+        return jsonify({"ok": False, "error": "No series selected"}), 400
 
     # Verify series exists
     series_data = load_series()
     if series_name not in series_data:
-        return redirect(url_for("upload_series"))
+        return jsonify({"ok": False, "error": "Series not found"}), 404
 
     series_dir = SERIES_VIDEO_DIR / series_name
     series_dir.mkdir(parents=True, exist_ok=True)
 
     files = request.files.getlist("videos[]")
     if not files:
-        return redirect(url_for("upload_series"))
+        return jsonify({"ok": False, "error": "No files provided"}), 400
 
     metadata = load_metadata()
+    results = []
 
     for file in files:
         if not file.filename:
             continue
         if not file.filename.lower().endswith(".mp4"):
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "Only .mp4 files are allowed"
+            })
             continue
 
         # Sanitize filename
@@ -2005,16 +2011,36 @@ def upload_series_post():
         video_id = video_id.replace(' ', '_')
         final_path = series_dir / f"{video_id}.mp4"
 
-        # Save directly to final location
+        # Check for duplicate
+        if video_id in metadata:
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "already_exists",
+                "video_id": video_id
+            })
+            continue
+
+        # Save to temp file first for verification
         temp_path = str(final_path) + ".uploading"
         file.save(temp_path)
 
         try:
+            # Verify H.264 codec
+            is_valid, error_msg = verify_h264_codec(temp_path)
+            if not is_valid:
+                os.remove(temp_path)
+                results.append({
+                    "filename": file.filename,
+                    "ok": False,
+                    "error": error_msg
+                })
+                continue
+
             # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
-            # For series uploads, skip transcoding - just rename the file
-            # Series episodes are pre-made content that doesn't need resizing
+            # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
             # Parse season/episode from filename
@@ -2044,9 +2070,20 @@ def upload_series_post():
                 logger.warning(f"[SERIES] Failed to generate thumbnail for {video_id}: {e}")
 
             logger.info(f"[SERIES] Uploaded episode: {series_path}")
+            results.append({
+                "filename": file.filename,
+                "ok": True,
+                "video_id": video_id,
+                "duration": duracion
+            })
 
         except Exception as e:
             logger.error(f"[SERIES] Error processing {file.filename}: {e}")
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": str(e)
+            })
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -2055,7 +2092,7 @@ def upload_series_post():
     with open(METADATA_FILE, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
-    return redirect(url_for("series_page"))
+    return jsonify({"ok": True, "results": results})
 
 
 # =============================================================================
@@ -2136,6 +2173,16 @@ def upload_commercials_post():
         video_id = os.path.splitext(original_name)[0]
         video_id = video_id.replace(' ', '_')
         final_path = COMMERCIALS_DIR / f"{video_id}.mp4"
+
+        # Check for duplicate
+        if video_id in metadata:
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "already_exists",
+                "video_id": video_id
+            })
+            continue
 
         # Save to temp file first for verification
         temp_path = str(final_path) + ".uploading"

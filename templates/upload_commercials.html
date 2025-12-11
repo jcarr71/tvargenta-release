@@ -49,11 +49,17 @@
     .file-item .progress-fill.error {
       background: linear-gradient(90deg, #ef4444, #f87171);
     }
+    .file-item .progress-fill.exists {
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
     .file-item.uploading {
       opacity: 0.8;
     }
     .file-item.complete {
       opacity: 0.6;
+    }
+    .file-item.exists {
+      opacity: 0.7;
     }
     .file-item .status-icon {
       width: 16px;
@@ -62,6 +68,10 @@
     }
     .file-item .error-msg {
       color: #f87171;
+      font-size: 0.75rem;
+    }
+    .file-item .exists-msg {
+      color: #fbbf24;
       font-size: 0.75rem;
     }
     .commercial-card {
@@ -218,6 +228,7 @@
           <span class="status-icon"></span>
           <div class="progress-bar"><div class="progress-fill"></div></div>
           <span class="flex-1 truncate text-sm">${file.name}</span>
+          <span class="exists-msg hidden">Already exists</span>
           <span class="error-msg hidden"></span>
         `;
         fileItems.appendChild(item);
@@ -234,20 +245,27 @@
       const fill = item.querySelector('.progress-fill');
       const icon = item.querySelector('.status-icon');
       const errorEl = item.querySelector('.error-msg');
+      const existsEl = item.querySelector('.exists-msg');
 
       fill.style.width = `${percent}%`;
-      item.classList.remove('uploading', 'complete');
+      item.classList.remove('uploading', 'complete', 'exists');
+      fill.classList.remove('complete', 'error', 'exists');
+      errorEl.classList.add('hidden');
+      existsEl.classList.add('hidden');
 
       if (status === 'complete') {
         fill.classList.add('complete');
-        fill.classList.remove('error');
         item.classList.add('complete');
         icon.textContent = '✓';
         icon.style.color = '#22c55e';
-        errorEl.classList.add('hidden');
+      } else if (status === 'exists') {
+        fill.classList.add('exists');
+        item.classList.add('exists');
+        icon.textContent = '⊘';
+        icon.style.color = '#fbbf24';
+        existsEl.classList.remove('hidden');
       } else if (status === 'error') {
         fill.classList.add('error');
-        fill.classList.remove('complete');
         icon.textContent = '✗';
         icon.style.color = '#ef4444';
         if (errorMsg) {
@@ -255,10 +273,8 @@
           errorEl.classList.remove('hidden');
         }
       } else {
-        fill.classList.remove('complete', 'error');
         item.classList.add('uploading');
         icon.textContent = '';
-        errorEl.classList.add('hidden');
       }
     }
 
@@ -289,6 +305,7 @@
       showStatus(`Uploading 0 of ${files.length} files...`, 'info');
 
       let completed = 0;
+      let skipped = 0;
       let errors = 0;
 
       for (let i = 0; i < files.length; i++) {
@@ -300,6 +317,9 @@
           if (result.ok) {
             completed++;
             updateFileProgress(file.name, 100, 'complete');
+          } else if (result.error === 'already_exists') {
+            skipped++;
+            updateFileProgress(file.name, 100, 'exists');
           } else {
             errors++;
             updateFileProgress(file.name, 100, 'error', result.error);
@@ -313,13 +333,20 @@
 
       setUploadingState(false);
 
-      if (errors === 0) {
+      if (errors === 0 && skipped === 0) {
         showStatus(`All ${completed} file(s) uploaded successfully! Refreshing...`, 'success');
         setTimeout(() => {
           window.location.reload();
         }, 1500);
+      } else if (errors === 0 && completed > 0) {
+        showStatus(`${completed} uploaded, ${skipped} already existed. Refreshing...`, 'success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else if (errors === 0 && completed === 0) {
+        showStatus(`All ${skipped} file(s) already exist. Nothing to upload.`, 'warning');
       } else {
-        showStatus(`Completed: ${completed} succeeded, ${errors} failed.`, errors > 0 ? 'warning' : 'success');
+        showStatus(`${completed} uploaded, ${skipped} skipped, ${errors} failed.`, 'warning');
       }
     }
 
