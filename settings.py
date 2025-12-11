@@ -50,6 +50,9 @@ PLAYS_FILE          = SYSTEM_DATA_DIR / "content" / "plays.json"  # persiste fue
 # Series video directory
 SERIES_VIDEO_DIR    = VIDEO_DIR / "series"
 
+# Commercials video directory
+COMMERCIALS_DIR     = VIDEO_DIR / "commercials"
+
 SPLASH_STATE_FILE   = SYSTEM_DATA_DIR / "Splash" / "splash_state.json"
 INTRO_PATH          = SPLASH_DIR / "splash_1.mp4"
 

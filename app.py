@@ -31,7 +31,7 @@ from settings import (
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
-    SERIES_FILE, SERIES_VIDEO_DIR,
+    SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR,
 )
 import re
 import bluetooth_manager
@@ -809,6 +809,33 @@ def get_video_duration(filepath):
     except Exception as e:
         print(f"âš ï¸ No se pudo obtener duraciÃ³n de {filepath}: {e}")
         return 0
+
+
+def verify_h264_codec(filepath):
+    """
+    Verify that a video file uses H.264 codec.
+    Returns (is_valid, error_message).
+    """
+    try:
+        result = subprocess.run([
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=codec_name",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            filepath
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
+
+        codec = result.stdout.strip().lower()
+        if codec in ("h264", "avc"):
+            return True, None
+        elif codec:
+            return False, f"Unsupported codec: {codec}. Only H.264 is allowed."
+        else:
+            return False, "Could not detect video codec."
+    except subprocess.TimeoutExpired:
+        return False, "Codec verification timed out."
+    except Exception as e:
+        return False, f"Codec verification failed: {str(e)}"
 
 
 def ensure_durations():
@@ -2029,6 +2056,191 @@ def upload_series_post():
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
     return redirect(url_for("series_page"))
+
+
+# =============================================================================
+# COMMERCIAL UPLOAD
+# =============================================================================
+
+def get_commercials_list():
+    """Get list of all commercials from metadata."""
+    metadata = load_metadata()
+    commercials = []
+    for video_id, data in metadata.items():
+        if data.get("category") == "commercial":
+            commercials.append({
+                "video_id": video_id,
+                "title": data.get("title", video_id),
+                "duration": data.get("duracion", 0),
+                "tags": data.get("tags", []),
+                "fecha": data.get("fecha", ""),
+            })
+    # Sort by title
+    commercials.sort(key=lambda x: x["title"].lower())
+    return commercials
+
+
+@app.route("/upload/commercials", methods=["GET"])
+def upload_commercials():
+    """Commercial upload page."""
+    cfg = load_config_i18n()
+    lang = cfg.get("language", "es")
+    base_trans = load_translations(lang)
+
+    def tr(key, default=None):
+        keys = key.split(".")
+        val = base_trans
+        for k in keys:
+            if isinstance(val, dict):
+                val = val.get(k)
+            else:
+                return default if default else key
+        return val if val else (default if default else key)
+
+    commercials = get_commercials_list()
+
+    return render_template("upload_commercials.html",
+                           commercials=commercials,
+                           lang=lang,
+                           tr=tr)
+
+
+@app.route("/upload/commercials", methods=["POST"])
+def upload_commercials_post():
+    """Handle commercial uploads with H.264 verification."""
+    global metadata
+
+    # Ensure commercials directory exists
+    COMMERCIALS_DIR.mkdir(parents=True, exist_ok=True)
+
+    files = request.files.getlist("videos[]")
+    if not files:
+        return jsonify({"ok": False, "error": "No files provided"}), 400
+
+    metadata = load_metadata()
+    results = []
+
+    for file in files:
+        if not file.filename:
+            continue
+        if not file.filename.lower().endswith(".mp4"):
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "Only .mp4 files are allowed"
+            })
+            continue
+
+        # Sanitize filename
+        original_name = secure_filename(file.filename)
+        video_id = os.path.splitext(original_name)[0]
+        video_id = video_id.replace(' ', '_')
+        final_path = COMMERCIALS_DIR / f"{video_id}.mp4"
+
+        # Save to temp file first for verification
+        temp_path = str(final_path) + ".uploading"
+        file.save(temp_path)
+
+        try:
+            # Verify H.264 codec
+            is_valid, error_msg = verify_h264_codec(temp_path)
+            if not is_valid:
+                os.remove(temp_path)
+                results.append({
+                    "filename": file.filename,
+                    "ok": False,
+                    "error": error_msg
+                })
+                continue
+
+            # Get duration for metadata
+            duracion = get_video_duration(temp_path)
+
+            # Move to final location (no transcoding)
+            shutil.move(temp_path, final_path)
+
+            # Create metadata with commercials path
+            commercials_path = f"commercials/{video_id}"
+            metadata[video_id] = {
+                "title": video_id,
+                "category": "commercial",
+                "commercials_path": commercials_path,
+                "tags": [],
+                "personaje": "",
+                "fecha": "",
+                "modo": [],
+                "duracion": duracion
+            }
+
+            # Generate thumbnail
+            thumb_path = THUMB_DIR / f"{video_id}.jpg"
+            try:
+                generate_thumbnail(str(final_path), str(thumb_path))
+            except Exception as e:
+                logger.warning(f"[COMMERCIALS] Failed to generate thumbnail for {video_id}: {e}")
+
+            logger.info(f"[COMMERCIALS] Uploaded commercial: {video_id} ({duracion:.1f}s)")
+            results.append({
+                "filename": file.filename,
+                "ok": True,
+                "video_id": video_id,
+                "duration": duracion
+            })
+
+        except Exception as e:
+            logger.error(f"[COMMERCIALS] Error processing {file.filename}: {e}")
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": str(e)
+            })
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    # Save metadata
+    with open(METADATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    return jsonify({"ok": True, "results": results})
+
+
+@app.route("/api/commercials/<video_id>", methods=["DELETE"])
+def delete_commercial(video_id):
+    """Delete a commercial (file, metadata, and thumbnail)."""
+    global metadata
+    metadata = load_metadata()
+
+    if video_id not in metadata:
+        return jsonify({"ok": False, "error": "Commercial not found"}), 404
+
+    video_data = metadata[video_id]
+    if video_data.get("category") != "commercial":
+        return jsonify({"ok": False, "error": "Video is not a commercial"}), 400
+
+    try:
+        # Delete video file
+        video_path = COMMERCIALS_DIR / f"{video_id}.mp4"
+        if video_path.exists():
+            video_path.unlink()
+
+        # Delete thumbnail
+        thumb_path = THUMB_DIR / f"{video_id}.jpg"
+        if thumb_path.exists():
+            thumb_path.unlink()
+
+        # Delete metadata
+        del metadata[video_id]
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"[COMMERCIALS] Deleted commercial: {video_id}")
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        logger.error(f"[COMMERCIALS] Error deleting {video_id}: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 
 @app.route("/canales")
 def canales():

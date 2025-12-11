@@ -1,0 +1,440 @@
+<!-- SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+     Proyecto: TVArgenta — Retro TV | Autor: Ricardo Sappia (rsflightronics@gmail.com)
+     © 2025. No comercial, atribución y consulta previa. TAL CUAL, sin garantías.
+     Ver LICENSE para términos completos.
+-->
+
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Commercials</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .dropzone {
+      border: 2px dashed #22c55e;
+      transition: all 0.3s ease;
+    }
+    .dropzone.dragover {
+      border-color: #4ade80;
+      background-color: rgba(34, 197, 94, 0.1);
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      background: #1f2937;
+      border-radius: 0.375rem;
+      margin-bottom: 0.5rem;
+    }
+    .file-item .progress-bar {
+      width: 40px;
+      height: 8px;
+      background: #374151;
+      border-radius: 4px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .file-item .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+    .file-item .progress-fill.complete {
+      background: linear-gradient(90deg, #22c55e, #4ade80);
+    }
+    .file-item .progress-fill.error {
+      background: linear-gradient(90deg, #ef4444, #f87171);
+    }
+    .file-item.uploading {
+      opacity: 0.8;
+    }
+    .file-item.complete {
+      opacity: 0.6;
+    }
+    .file-item .status-icon {
+      width: 16px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .file-item .error-msg {
+      color: #f87171;
+      font-size: 0.75rem;
+    }
+    .commercial-card {
+      background: rgba(17, 24, 39, 0.8);
+      border: 1px solid #374151;
+      transition: border-color 0.2s;
+    }
+    .commercial-card:hover {
+      border-color: #22c55e;
+    }
+  </style>
+</head>
+<body class="bg-black text-white font-mono min-h-screen p-4">
+  <div class="max-w-4xl mx-auto">
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <h1 class="text-2xl sm:text-3xl text-green-400 font-bold">
+        Upload Commercials
+      </h1>
+
+      <div class="flex items-center gap-4">
+        <a href="{{ url_for('index') }}"
+           class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          Back to Home
+        </a>
+      </div>
+    </header>
+
+    <!-- Upload Section -->
+    <div class="bg-gray-800 border border-green-600 rounded-lg p-6 mb-8">
+      <h2 class="text-lg font-bold text-green-300 mb-4">Upload New Commercials</h2>
+
+      <div id="dropzone" class="dropzone rounded-lg p-8 text-center cursor-pointer mb-4">
+        <input type="file" name="videos[]" id="file-input" multiple accept=".mp4" class="hidden">
+        <div class="text-4xl mb-2">📢</div>
+        <p class="text-gray-300 mb-2">Drag & drop commercial files here</p>
+        <p class="text-sm text-gray-500">or click to browse</p>
+        <p class="text-xs text-gray-600 mt-2">Only H.264 encoded .mp4 files are accepted</p>
+      </div>
+
+      <div id="file-list" class="hidden">
+        <h3 class="text-sm font-bold text-gray-300 mb-2">Files to upload:</h3>
+        <div id="file-items"></div>
+      </div>
+
+      <!-- Submit -->
+      <div class="flex justify-between items-center mt-4">
+        <a href="{{ url_for('index') }}" id="cancel-link" class="text-blue-400 hover:underline text-sm">Cancel</a>
+        <button type="button" id="submit-btn" disabled
+                class="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold px-6 py-2 rounded shadow">
+          Upload Commercials
+        </button>
+      </div>
+
+      <!-- Upload status message -->
+      <div id="upload-status" class="hidden mt-4 text-center text-sm"></div>
+    </div>
+
+    <!-- Existing Commercials Section -->
+    <div class="mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-bold text-green-400">Existing Commercials</h2>
+        <span class="text-sm text-gray-400">{{ commercials|length }} commercial(s)</span>
+      </div>
+
+      {% if commercials %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" id="commercials-grid">
+        {% for comm in commercials %}
+        <div class="commercial-card rounded-lg p-4" data-video-id="{{ comm.video_id }}">
+          <div class="flex gap-3">
+            <!-- Thumbnail -->
+            <div class="flex-shrink-0">
+              <img src="{{ url_for('serve_thumbnail', filename=comm.video_id + '.jpg') }}"
+                   onerror="this.onerror=null;this.src='{{ url_for('serve_thumbnail', filename='default_thumbnail.png') }}';"
+                   class="w-20 h-20 object-cover rounded border border-gray-600"
+                   alt="{{ comm.title }}">
+            </div>
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+              <h3 class="font-semibold text-sm truncate" title="{{ comm.title }}">{{ comm.title }}</h3>
+              <p class="text-xs text-gray-400 mt-1">
+                Duration: <span class="text-green-400">{{ "%.1f"|format(comm.duration) }}s</span>
+              </p>
+              {% if comm.tags %}
+              <div class="flex flex-wrap gap-1 mt-2">
+                {% for tag in comm.tags[:3] %}
+                <span class="bg-green-900 text-green-300 text-[10px] px-1.5 py-0.5 rounded">{{ tag }}</span>
+                {% endfor %}
+                {% if comm.tags|length > 3 %}
+                <span class="text-gray-500 text-[10px]">+{{ comm.tags|length - 3 }}</span>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          <!-- Actions -->
+          <div class="flex gap-2 mt-3 pt-3 border-t border-gray-700">
+            <a href="{{ url_for('video_detail', video_id=comm.video_id) }}"
+               class="flex-1 text-center text-xs bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded">
+              Preview
+            </a>
+            <a href="{{ url_for('edit_video', video_id=comm.video_id) }}"
+               class="flex-1 text-center text-xs bg-gray-600 hover:bg-gray-700 text-white py-1.5 rounded">
+              Edit
+            </a>
+            <button onclick="deleteCommercial('{{ comm.video_id }}', '{{ comm.title }}')"
+                    class="flex-1 text-center text-xs bg-red-600 hover:bg-red-700 text-white py-1.5 rounded">
+              Delete
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-12 bg-gray-900/50 rounded-lg border border-gray-700">
+        <div class="text-4xl mb-3">📢</div>
+        <p class="text-gray-400">No commercials uploaded yet.</p>
+        <p class="text-sm text-gray-500 mt-1">Upload your first commercial above!</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <script>
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-input');
+    const fileList = document.getElementById('file-list');
+    const fileItems = document.getElementById('file-items');
+    const submitBtn = document.getElementById('submit-btn');
+    const uploadStatus = document.getElementById('upload-status');
+    const cancelLink = document.getElementById('cancel-link');
+
+    let isUploading = false;
+    let fileElements = new Map();
+
+    function updateFileList() {
+      const files = fileInput.files;
+      fileItems.innerHTML = '';
+      fileElements.clear();
+
+      if (files.length === 0) {
+        fileList.classList.add('hidden');
+        submitBtn.disabled = true;
+        return;
+      }
+
+      fileList.classList.remove('hidden');
+
+      for (const file of files) {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.dataset.filename = file.name;
+
+        item.innerHTML = `
+          <span class="status-icon"></span>
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <span class="flex-1 truncate text-sm">${file.name}</span>
+          <span class="error-msg hidden"></span>
+        `;
+        fileItems.appendChild(item);
+        fileElements.set(file.name, item);
+      }
+
+      submitBtn.disabled = false;
+    }
+
+    function updateFileProgress(filename, percent, status = 'uploading', errorMsg = '') {
+      const item = fileElements.get(filename);
+      if (!item) return;
+
+      const fill = item.querySelector('.progress-fill');
+      const icon = item.querySelector('.status-icon');
+      const errorEl = item.querySelector('.error-msg');
+
+      fill.style.width = `${percent}%`;
+      item.classList.remove('uploading', 'complete');
+
+      if (status === 'complete') {
+        fill.classList.add('complete');
+        fill.classList.remove('error');
+        item.classList.add('complete');
+        icon.textContent = '✓';
+        icon.style.color = '#22c55e';
+        errorEl.classList.add('hidden');
+      } else if (status === 'error') {
+        fill.classList.add('error');
+        fill.classList.remove('complete');
+        icon.textContent = '✗';
+        icon.style.color = '#ef4444';
+        if (errorMsg) {
+          errorEl.textContent = errorMsg;
+          errorEl.classList.remove('hidden');
+        }
+      } else {
+        fill.classList.remove('complete', 'error');
+        item.classList.add('uploading');
+        icon.textContent = '';
+        errorEl.classList.add('hidden');
+      }
+    }
+
+    function setUploadingState(uploading) {
+      isUploading = uploading;
+      submitBtn.disabled = uploading;
+      submitBtn.textContent = uploading ? 'Uploading...' : 'Upload Commercials';
+      dropzone.style.pointerEvents = uploading ? 'none' : 'auto';
+      dropzone.style.opacity = uploading ? '0.5' : '1';
+      cancelLink.style.pointerEvents = uploading ? 'none' : 'auto';
+      cancelLink.style.opacity = uploading ? '0.5' : '1';
+    }
+
+    function showStatus(message, type = 'info') {
+      uploadStatus.classList.remove('hidden', 'text-green-400', 'text-red-400', 'text-yellow-400', 'text-gray-400');
+      if (type === 'success') uploadStatus.classList.add('text-green-400');
+      else if (type === 'error') uploadStatus.classList.add('text-red-400');
+      else if (type === 'warning') uploadStatus.classList.add('text-yellow-400');
+      else uploadStatus.classList.add('text-gray-400');
+      uploadStatus.textContent = message;
+    }
+
+    async function uploadFiles() {
+      const files = Array.from(fileInput.files);
+      if (files.length === 0) return;
+
+      setUploadingState(true);
+      showStatus(`Uploading 0 of ${files.length} files...`, 'info');
+
+      let completed = 0;
+      let errors = 0;
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        showStatus(`Uploading ${i + 1} of ${files.length}: ${file.name}`, 'info');
+
+        try {
+          const result = await uploadSingleFile(file);
+          if (result.ok) {
+            completed++;
+            updateFileProgress(file.name, 100, 'complete');
+          } else {
+            errors++;
+            updateFileProgress(file.name, 100, 'error', result.error);
+          }
+        } catch (err) {
+          errors++;
+          updateFileProgress(file.name, 100, 'error', err.message);
+          console.error(`Failed to upload ${file.name}:`, err);
+        }
+      }
+
+      setUploadingState(false);
+
+      if (errors === 0) {
+        showStatus(`All ${completed} file(s) uploaded successfully! Refreshing...`, 'success');
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        showStatus(`Completed: ${completed} succeeded, ${errors} failed.`, errors > 0 ? 'warning' : 'success');
+      }
+    }
+
+    function uploadSingleFile(file) {
+      return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('videos[]', file);
+
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            updateFileProgress(file.name, percent, 'uploading');
+          }
+        });
+
+        xhr.addEventListener('load', () => {
+          if (xhr.status === 200) {
+            try {
+              const response = JSON.parse(xhr.responseText);
+              if (response.ok && response.results) {
+                const fileResult = response.results.find(r => r.filename === file.name);
+                if (fileResult) {
+                  resolve(fileResult);
+                } else {
+                  resolve({ ok: true });
+                }
+              } else {
+                resolve({ ok: false, error: response.error || 'Unknown error' });
+              }
+            } catch (e) {
+              resolve({ ok: false, error: 'Invalid server response' });
+            }
+          } else {
+            resolve({ ok: false, error: `HTTP ${xhr.status}` });
+          }
+        });
+
+        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.addEventListener('abort', () => reject(new Error('Aborted')));
+
+        xhr.open('POST', "{{ url_for('upload_commercials_post') }}");
+        xhr.send(formData);
+      });
+    }
+
+    async function deleteCommercial(videoId, title) {
+      if (!confirm(`Delete commercial "${title}"?\n\nThis will remove the video file, metadata, and thumbnail.`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/commercials/${videoId}`, {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+
+        if (data.ok) {
+          // Remove card from DOM
+          const card = document.querySelector(`[data-video-id="${videoId}"]`);
+          if (card) {
+            card.remove();
+          }
+          // Update count
+          const countSpan = document.querySelector('.text-gray-400');
+          if (countSpan) {
+            const remaining = document.querySelectorAll('.commercial-card').length;
+            countSpan.textContent = `${remaining} commercial(s)`;
+          }
+          // If no more commercials, reload to show empty state
+          if (document.querySelectorAll('.commercial-card').length === 0) {
+            window.location.reload();
+          }
+        } else {
+          alert(`Failed to delete: ${data.error}`);
+        }
+      } catch (err) {
+        alert(`Error deleting commercial: ${err.message}`);
+      }
+    }
+
+    // Submit button click
+    submitBtn.addEventListener('click', uploadFiles);
+
+    // Dropzone events
+    dropzone.addEventListener('click', () => {
+      if (!isUploading) fileInput.click();
+    });
+
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      if (!isUploading) dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (isUploading) return;
+
+      const dt = new DataTransfer();
+      for (const file of e.dataTransfer.files) {
+        if (file.name.toLowerCase().endsWith('.mp4')) {
+          dt.items.add(file);
+        }
+      }
+      fileInput.files = dt.files;
+      updateFileList();
+    });
+
+    fileInput.addEventListener('change', updateFileList);
+  </script>
+</body>
+</html>
