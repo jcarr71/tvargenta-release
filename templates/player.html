@@ -788,6 +788,60 @@
 	let broadcastSyncInterval = null;      // interval for syncing broadcast content
 	const BROADCAST_SYNC_INTERVAL_MS = 2000; // check for content changes every 2 seconds
 
+	// Loudness-based volume adjustment for commercials
+	// Tracks episode loudness to adjust commercial volume relative to it
+	let episodeLoudnessLufs = null;        // LUFS of the last/current episode
+	let baseVolume = 0.5;                   // Base volume (0-1) from user settings
+	let isVolumeAdjustedForCommercial = false;  // Flag to track if we applied commercial adjustment
+
+	/**
+	 * Apply volume adjustment based on loudness difference.
+	 * When a commercial is louder than the episode, reduce its volume.
+	 * @param {number|null} contentLufs - LUFS of current content
+	 * @param {string} contentType - 'episode' or 'commercial'
+	 */
+	function applyLoudnessVolumeAdjustment(contentLufs, contentType) {
+	  if (contentType === 'episode') {
+		// Store episode loudness for commercial adjustment
+		if (contentLufs !== null) {
+		  episodeLoudnessLufs = contentLufs;
+		  console.log(`[LOUDNESS] Episode loudness: ${contentLufs} LUFS`);
+		}
+		// Restore base volume for episodes
+		if (isVolumeAdjustedForCommercial) {
+		  video.volume = baseVolume;
+		  isVolumeAdjustedForCommercial = false;
+		  console.log(`[LOUDNESS] Restored base volume: ${(baseVolume * 100).toFixed(0)}%`);
+		}
+	  } else if (contentType === 'commercial') {
+		// Adjust volume for commercial relative to episode
+		if (episodeLoudnessLufs !== null && contentLufs !== null) {
+		  // Calculate dB difference: positive means commercial is louder
+		  const dbDifference = contentLufs - episodeLoudnessLufs;
+
+		  // Only reduce volume if commercial is louder (positive difference)
+		  if (dbDifference > 0) {
+			// Convert dB to linear scale: 10^(dB/20)
+			// Negative because we want to reduce when commercial is louder
+			const volumeScale = Math.pow(10, -dbDifference / 20);
+			const adjustedVolume = Math.max(0.05, Math.min(1, baseVolume * volumeScale));
+
+			video.volume = adjustedVolume;
+			isVolumeAdjustedForCommercial = true;
+			console.log(`[LOUDNESS] Commercial ${contentLufs} LUFS vs Episode ${episodeLoudnessLufs} LUFS`);
+			console.log(`[LOUDNESS] Adjusted volume: ${(adjustedVolume * 100).toFixed(0)}% (${dbDifference.toFixed(1)} dB louder)`);
+		  } else {
+			// Commercial is quieter or same - keep base volume
+			video.volume = baseVolume;
+			isVolumeAdjustedForCommercial = false;
+		  }
+		} else {
+		  // No loudness data - keep base volume
+		  video.volume = baseVolume;
+		}
+	  }
+	}
+
 	// Idiomas disponibles (orden = visual en el menú)
 	const AVAILABLE_LANGS = [
 	  { code: "es", key: "lang.es", label: "Español" },
@@ -979,7 +1033,8 @@
 		  try {
 			const res = await fetch("/api/volumen");
 			const data = await res.json();
-			video.volume = data.valor / 100;
+			baseVolume = data.valor / 100;  // Track base volume for loudness adjustment
+			video.volume = baseVolume;
 			updateMuteIndicatorFromVol(data.valor);
 		  } catch (e) {
 			console.warn("[PLAYER] no pude leer volumen:", e);
@@ -1088,6 +1143,11 @@
 
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 			// Channel badge removed for immersion
+
+			// Apply loudness-based volume adjustment for broadcast content
+			if (isBroadcast && data.broadcast_type) {
+			  applyLoudnessVolumeAdjustment(data.loudness_lufs, data.broadcast_type);
+			}
 
 			// --- armado del umbral de "play real" ---
 			// Skip play reporting for broadcast system videos (test pattern, commercials)
@@ -1310,6 +1370,11 @@
 			}
 
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+
+			// Apply loudness-based volume adjustment
+			if (data.broadcast_type) {
+			  applyLoudnessVolumeAdjustment(data.loudness_lufs, data.broadcast_type);
+			}
 		  } else if (seekDrift > 5) {
 			// Same video but we've drifted more than 5 seconds - resync
 			console.log(`[TV] Broadcast resync: drift=${seekDrift.toFixed(1)}s`);
@@ -1353,8 +1418,20 @@
 		contenedor.appendChild(b);
 	  }
 
-	  video.volume = valor / 100;
-	  updateMuteIndicatorFromVol(valor); 	
+	  // Update base volume for loudness adjustment system
+	  baseVolume = valor / 100;
+
+	  // If we're currently playing a commercial with adjusted volume, recalculate
+	  if (isVolumeAdjustedForCommercial && episodeLoudnessLufs !== null) {
+		// The commercial adjustment will be reapplied based on the new baseVolume
+		// For now, just set the base - next content change will apply proper adjustment
+		video.volume = baseVolume;
+		isVolumeAdjustedForCommercial = false;
+	  } else {
+		video.volume = baseVolume;
+	  }
+
+	  updateMuteIndicatorFromVol(valor);
 	  clearTimeout(volumenTimer);
 	  volumenTimer = setTimeout(() => {
 		barra.classList.add("oculto");

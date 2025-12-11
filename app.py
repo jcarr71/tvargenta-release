@@ -849,6 +849,52 @@ def verify_h264_codec(filepath):
         return False, f"Codec verification failed: {str(e)}"
 
 
+def analyze_loudness(filepath):
+    """
+    Analyze audio loudness of a video file using FFmpeg's ebur128 filter.
+    Returns integrated loudness in LUFS (Loudness Units relative to Full Scale).
+    Typical values: -23 LUFS (broadcast standard), -14 LUFS (streaming).
+    Louder audio = higher (closer to 0) LUFS values.
+    Returns None if analysis fails.
+    """
+    try:
+        # Use ebur128 filter to analyze loudness
+        # This outputs loudness stats to stderr
+        result = subprocess.run([
+            "ffmpeg", "-i", filepath,
+            "-af", "ebur128=framelog=verbose",
+            "-f", "null", "-"
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=300)
+
+        # Parse the integrated loudness from stderr
+        # Look for line like: "I:        -18.5 LUFS"
+        stderr = result.stderr
+        for line in stderr.split('\n'):
+            line = line.strip()
+            # Look for the summary integrated loudness line
+            if line.startswith('I:') and 'LUFS' in line:
+                # Extract the LUFS value
+                parts = line.split()
+                for i, part in enumerate(parts):
+                    if part == 'LUFS' and i > 0:
+                        try:
+                            lufs = float(parts[i-1])
+                            logger.info(f"[LOUDNESS] Analyzed {filepath}: {lufs} LUFS")
+                            return lufs
+                        except ValueError:
+                            continue
+
+        logger.warning(f"[LOUDNESS] Could not parse LUFS from ffmpeg output for {filepath}")
+        return None
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"[LOUDNESS] Analysis timed out for {filepath}")
+        return None
+    except Exception as e:
+        logger.error(f"[LOUDNESS] Analysis failed for {filepath}: {e}")
+        return None
+
+
 def ensure_durations():
     updated = False
     for video_id, info in metadata.items():
@@ -1542,8 +1588,16 @@ def api_next_video():
                         scheduled = scheduler.get_scheduled_content(canal_id)
                         if scheduled:
                             logger.info(f"[NEXT] Broadcast channel {canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
+
+                            # Get loudness data for automatic volume adjustment
+                            video_id = scheduled["video_id"]
+                            broadcast_metadata = load_metadata()
+                            loudness_lufs = None
+                            if video_id in broadcast_metadata:
+                                loudness_lufs = broadcast_metadata[video_id].get("loudness_lufs")
+
                             return jsonify({
-                                "video_id": scheduled["video_id"],
+                                "video_id": video_id,
                                 "video_url": scheduled["video_url"],
                                 "seek_to": scheduled.get("seek_to", 0),
                                 "title": scheduled.get("title", ""),
@@ -1552,7 +1606,8 @@ def api_next_video():
                                 "canal_nombre": config.get("nombre", canal_id),
                                 "canal_numero": get_canal_numero(canal_id, canales),
                                 "broadcast_type": scheduled["type"],
-                                "is_broadcast": True
+                                "is_broadcast": True,
+                                "loudness_lufs": loudness_lufs
                             })
                     except Exception as e:
                         logger.error(f"[NEXT] Broadcast scheduling error for {canal_id}: {e}")
@@ -2062,6 +2117,9 @@ def upload_series_post():
             # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
+            # Analyze audio loudness for automatic volume adjustment
+            loudness_lufs = analyze_loudness(temp_path)
+
             # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
@@ -2081,7 +2139,8 @@ def upload_series_post():
                 "personaje": "",
                 "fecha": "",
                 "modo": [],
-                "duracion": duracion
+                "duracion": duracion,
+                "loudness_lufs": loudness_lufs
             }
 
             # Generate thumbnail
@@ -2230,6 +2289,9 @@ def upload_commercials_post():
             # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
+            # Analyze audio loudness for automatic volume adjustment
+            loudness_lufs = analyze_loudness(temp_path)
+
             # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
@@ -2243,7 +2305,8 @@ def upload_commercials_post():
                 "personaje": "",
                 "fecha": "",
                 "modo": [],
-                "duracion": duracion
+                "duracion": duracion,
+                "loudness_lufs": loudness_lufs
             }
 
             # Generate thumbnail
@@ -2314,6 +2377,111 @@ def delete_commercial(video_id):
     except Exception as e:
         logger.error(f"[COMMERCIALS] Error deleting {video_id}: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# =============================================================================
+# LOUDNESS ANALYSIS API
+# =============================================================================
+
+@app.route("/api/loudness/analyze", methods=["POST"])
+def analyze_loudness_batch():
+    """
+    Analyze loudness for videos that don't have loudness_lufs in metadata.
+    Can be called to batch-process existing videos.
+    Optional: pass {"video_ids": [...]} to analyze specific videos.
+    Returns progress info and can be called multiple times.
+    """
+    global metadata
+    metadata = load_metadata()
+
+    data = request.get_json() or {}
+    specific_ids = data.get("video_ids")
+    max_to_process = data.get("limit", 10)  # Process up to 10 at a time by default
+
+    # Find videos without loudness data
+    if specific_ids:
+        to_analyze = [vid for vid in specific_ids if vid in metadata]
+    else:
+        to_analyze = [
+            vid for vid, info in metadata.items()
+            if info.get("loudness_lufs") is None
+        ]
+
+    total_missing = len(to_analyze)
+    processed = []
+    errors = []
+
+    # Process up to max_to_process videos
+    for video_id in to_analyze[:max_to_process]:
+        info = metadata[video_id]
+
+        # Determine file path based on video type
+        if info.get("commercials_path"):
+            filepath = VIDEO_DIR / f"{info['commercials_path']}.mp4"
+        elif info.get("series_path"):
+            filepath = VIDEO_DIR / f"{info['series_path']}.mp4"
+        else:
+            filepath = VIDEO_DIR / f"{video_id}.mp4"
+
+        if not filepath.exists():
+            errors.append({"video_id": video_id, "error": "File not found"})
+            continue
+
+        try:
+            lufs = analyze_loudness(str(filepath))
+            if lufs is not None:
+                metadata[video_id]["loudness_lufs"] = lufs
+                processed.append({"video_id": video_id, "loudness_lufs": lufs})
+            else:
+                errors.append({"video_id": video_id, "error": "Analysis returned no data"})
+        except Exception as e:
+            errors.append({"video_id": video_id, "error": str(e)})
+
+    # Save updated metadata if we processed any
+    if processed:
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    remaining = total_missing - len(processed)
+    return jsonify({
+        "ok": True,
+        "total_missing": total_missing,
+        "processed": len(processed),
+        "remaining": remaining,
+        "results": processed,
+        "errors": errors
+    })
+
+
+@app.route("/api/loudness/status")
+def loudness_status():
+    """
+    Get status of loudness analysis across all videos.
+    Returns counts of analyzed vs unanalyzed videos.
+    """
+    metadata = load_metadata()
+
+    total = len(metadata)
+    with_loudness = sum(1 for info in metadata.values() if info.get("loudness_lufs") is not None)
+    without_loudness = total - with_loudness
+
+    # Break down by category
+    by_category = {}
+    for video_id, info in metadata.items():
+        cat = info.get("category", "unknown")
+        if cat not in by_category:
+            by_category[cat] = {"total": 0, "analyzed": 0}
+        by_category[cat]["total"] += 1
+        if info.get("loudness_lufs") is not None:
+            by_category[cat]["analyzed"] += 1
+
+    return jsonify({
+        "ok": True,
+        "total": total,
+        "analyzed": with_loudness,
+        "pending": without_loudness,
+        "by_category": by_category
+    })
 
 
 @app.route("/canales")
