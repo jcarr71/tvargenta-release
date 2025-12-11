@@ -1169,6 +1169,12 @@ def serve_system_video(filename):
     return send_from_directory(str(system_dir), filename)
 
 
+@app.route("/videos/commercials/<filename>")
+def serve_commercial_video(filename):
+    """Serve commercial video files."""
+    return send_from_directory(str(COMMERCIALS_DIR), filename)
+
+
 @app.route("/delete_full/<video_id>")
 def delete_full_video(video_id):
     # Check if it's a series video
