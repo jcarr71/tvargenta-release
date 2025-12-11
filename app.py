@@ -1946,9 +1946,14 @@ def upload_series():
                 return default if default else key
         return val if val else (default if default else key)
 
+    # Get all existing video IDs for client-side duplicate detection
+    metadata = load_metadata()
+    existing_ids = list(metadata.keys())
+
     return render_template("upload_series.html",
                            series_list=series_list,
                            preselected=preselected,
+                           existing_ids=existing_ids,
                            lang=lang,
                            tr=tr)
 
@@ -2136,8 +2141,13 @@ def upload_commercials():
 
     commercials = get_commercials_list()
 
+    # Get all existing video IDs for client-side duplicate detection
+    metadata = load_metadata()
+    existing_ids = list(metadata.keys())
+
     return render_template("upload_commercials.html",
                            commercials=commercials,
+                           existing_ids=existing_ids,
                            lang=lang,
                            tr=tr)
 

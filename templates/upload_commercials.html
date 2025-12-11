@@ -203,13 +203,28 @@
     const uploadStatus = document.getElementById('upload-status');
     const cancelLink = document.getElementById('cancel-link');
 
+    // Existing video IDs for client-side duplicate detection
+    const existingIds = new Set({{ existing_ids | tojson }});
+
     let isUploading = false;
     let fileElements = new Map();
+    let duplicateFiles = new Set();
+
+    // Sanitize filename to match backend's secure_filename behavior
+    function sanitizeFilename(filename) {
+      // Remove path, get basename
+      const basename = filename.split(/[/\\]/).pop();
+      // Remove extension
+      const noExt = basename.replace(/\.[^.]+$/, '');
+      // Replace spaces with underscores, remove unsafe chars (mimics secure_filename)
+      return noExt.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '_');
+    }
 
     function updateFileList() {
       const files = fileInput.files;
       fileItems.innerHTML = '';
       fileElements.clear();
+      duplicateFiles.clear();
 
       if (files.length === 0) {
         fileList.classList.add('hidden');
@@ -224,18 +239,32 @@
         item.className = 'file-item';
         item.dataset.filename = file.name;
 
+        // Check if this file would be a duplicate
+        const videoId = sanitizeFilename(file.name);
+        const isDuplicate = existingIds.has(videoId);
+
+        if (isDuplicate) {
+          duplicateFiles.add(file.name);
+          item.classList.add('exists');
+        }
+
         item.innerHTML = `
-          <span class="status-icon"></span>
-          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <span class="status-icon">${isDuplicate ? '⊘' : ''}</span>
+          <div class="progress-bar"><div class="progress-fill ${isDuplicate ? 'exists' : ''}" style="width: ${isDuplicate ? '100%' : '0%'}"></div></div>
           <span class="flex-1 truncate text-sm">${file.name}</span>
-          <span class="exists-msg hidden">Already exists</span>
+          <span class="exists-msg ${isDuplicate ? '' : 'hidden'}">Already exists</span>
           <span class="error-msg hidden"></span>
         `;
+        if (isDuplicate) {
+          item.querySelector('.status-icon').style.color = '#fbbf24';
+        }
         fileItems.appendChild(item);
         fileElements.set(file.name, item);
       }
 
-      submitBtn.disabled = false;
+      // Enable submit only if there are non-duplicate files
+      const hasNewFiles = files.length > duplicateFiles.size;
+      submitBtn.disabled = !hasNewFiles;
     }
 
     function updateFileProgress(filename, percent, status = 'uploading', errorMsg = '') {
@@ -301,24 +330,34 @@
       const files = Array.from(fileInput.files);
       if (files.length === 0) return;
 
+      // Filter out duplicates that were already detected
+      const filesToUpload = files.filter(f => !duplicateFiles.has(f.name));
+      const skipped = duplicateFiles.size;
+
+      if (filesToUpload.length === 0) {
+        showStatus(`All ${skipped} file(s) already exist. Nothing to upload.`, 'warning');
+        return;
+      }
+
       setUploadingState(true);
-      showStatus(`Uploading 0 of ${files.length} files...`, 'info');
+      showStatus(`Uploading 0 of ${filesToUpload.length} files...`, 'info');
 
       let completed = 0;
-      let skipped = 0;
       let errors = 0;
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        showStatus(`Uploading ${i + 1} of ${files.length}: ${file.name}`, 'info');
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        showStatus(`Uploading ${i + 1} of ${filesToUpload.length}: ${file.name}`, 'info');
 
         try {
           const result = await uploadSingleFile(file);
           if (result.ok) {
             completed++;
             updateFileProgress(file.name, 100, 'complete');
+            // Add to existingIds so re-selecting same file shows as duplicate
+            existingIds.add(sanitizeFilename(file.name));
           } else if (result.error === 'already_exists') {
-            skipped++;
+            // Shouldn't happen with client-side check, but handle anyway
             updateFileProgress(file.name, 100, 'exists');
           } else {
             errors++;
