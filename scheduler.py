@@ -1115,7 +1115,7 @@ def get_scheduled_content(channel_id: str, timestamp: datetime = None) -> Option
             elif entry["type"] == "sponsors_placeholder":
                 result["video_url"] = "/videos/system/sponsors_placeholder.mp4"
             elif entry["type"] == "commercial":
-                result["video_url"] = f"/videos/{entry['video_id']}.mp4"
+                result["video_url"] = f"/videos/commercials/{entry['video_id']}.mp4"
             elif entry["type"] == "episode":
                 series_path = entry.get("series_path")
                 if series_path:

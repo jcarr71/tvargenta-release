@@ -31,7 +31,7 @@ from settings import (
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
-    SERIES_FILE, SERIES_VIDEO_DIR,
+    SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR,
 )
 import re
 import bluetooth_manager
@@ -759,14 +759,25 @@ def sincronizar_videos():
                     if f.is_file() and f.suffix.lower() in ('.mp4', '.webm', '.mov'):
                         archivos_video.add(f.stem)
 
+    # Scan commercials in COMMERCIALS_DIR
+    if COMMERCIALS_DIR.exists():
+        for f in COMMERCIALS_DIR.iterdir():
+            if f.is_file() and f.suffix.lower() in ('.mp4', '.webm', '.mov'):
+                archivos_video.add(f.stem)
+
     entradas_metadata = set(metadata.keys())
 
-    # For series videos, check they exist at their series_path location
+    # For series/commercial videos, check they exist at their path location
     def video_exists(video_id, data):
         series_path = data.get("series_path")
+        commercials_path = data.get("commercials_path")
         if series_path:
             # Series video - check in series directory
             full_path = VIDEO_DIR / f"{series_path}.mp4"
+            return full_path.exists()
+        elif commercials_path:
+            # Commercial video - check in commercials directory
+            full_path = VIDEO_DIR / f"{commercials_path}.mp4"
             return full_path.exists()
         else:
             # Regular video - check in VIDEO_DIR
@@ -809,6 +820,33 @@ def get_video_duration(filepath):
     except Exception as e:
         print(f"âš ï¸ No se pudo obtener duraciÃ³n de {filepath}: {e}")
         return 0
+
+
+def verify_h264_codec(filepath):
+    """
+    Verify that a video file uses H.264 codec.
+    Returns (is_valid, error_message).
+    """
+    try:
+        result = subprocess.run([
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=codec_name",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            filepath
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
+
+        codec = result.stdout.strip().lower()
+        if codec in ("h264", "avc"):
+            return True, None
+        elif codec:
+            return False, f"Unsupported codec: {codec}. Only H.264 is allowed."
+        else:
+            return False, "Could not detect video codec."
+    except subprocess.TimeoutExpired:
+        return False, "Codec verification timed out."
+    except Exception as e:
+        return False, f"Codec verification failed: {str(e)}"
 
 
 def ensure_durations():
@@ -1129,6 +1167,12 @@ def serve_system_video(filename):
     """Serve system video files (test pattern, sponsors placeholder)."""
     system_dir = VIDEO_DIR / "system"
     return send_from_directory(str(system_dir), filename)
+
+
+@app.route("/videos/commercials/<filename>")
+def serve_commercial_video(filename):
+    """Serve commercial video files."""
+    return send_from_directory(str(COMMERCIALS_DIR), filename)
 
 
 @app.route("/delete_full/<video_id>")
@@ -1919,15 +1963,20 @@ def upload_series():
                 return default if default else key
         return val if val else (default if default else key)
 
+    # Get all existing video IDs for client-side duplicate detection
+    metadata = load_metadata()
+    existing_ids = list(metadata.keys())
+
     return render_template("upload_series.html",
                            series_list=series_list,
                            preselected=preselected,
+                           existing_ids=existing_ids,
                            lang=lang,
                            tr=tr)
 
 @app.route("/upload/series", methods=["POST"])
 def upload_series_post():
-    """Handle series episode uploads."""
+    """Handle series episode uploads with H.264 verification."""
     global metadata
 
     # Get series - either existing or new
@@ -1949,26 +1998,32 @@ def upload_series_post():
                 logger.info(f"[SERIES] Created new series during upload: {new_series_name}")
             series_name = folder_name
     elif not series_name:
-        return redirect(url_for("upload_series"))
+        return jsonify({"ok": False, "error": "No series selected"}), 400
 
     # Verify series exists
     series_data = load_series()
     if series_name not in series_data:
-        return redirect(url_for("upload_series"))
+        return jsonify({"ok": False, "error": "Series not found"}), 404
 
     series_dir = SERIES_VIDEO_DIR / series_name
     series_dir.mkdir(parents=True, exist_ok=True)
 
     files = request.files.getlist("videos[]")
     if not files:
-        return redirect(url_for("upload_series"))
+        return jsonify({"ok": False, "error": "No files provided"}), 400
 
     metadata = load_metadata()
+    results = []
 
     for file in files:
         if not file.filename:
             continue
         if not file.filename.lower().endswith(".mp4"):
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "Only .mp4 files are allowed"
+            })
             continue
 
         # Sanitize filename
@@ -1978,16 +2033,36 @@ def upload_series_post():
         video_id = video_id.replace(' ', '_')
         final_path = series_dir / f"{video_id}.mp4"
 
-        # Save directly to final location
+        # Check for duplicate
+        if video_id in metadata:
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "already_exists",
+                "video_id": video_id
+            })
+            continue
+
+        # Save to temp file first for verification
         temp_path = str(final_path) + ".uploading"
         file.save(temp_path)
 
         try:
+            # Verify H.264 codec
+            is_valid, error_msg = verify_h264_codec(temp_path)
+            if not is_valid:
+                os.remove(temp_path)
+                results.append({
+                    "filename": file.filename,
+                    "ok": False,
+                    "error": error_msg
+                })
+                continue
+
             # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
-            # For series uploads, skip transcoding - just rename the file
-            # Series episodes are pre-made content that doesn't need resizing
+            # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
             # Parse season/episode from filename
@@ -2017,9 +2092,20 @@ def upload_series_post():
                 logger.warning(f"[SERIES] Failed to generate thumbnail for {video_id}: {e}")
 
             logger.info(f"[SERIES] Uploaded episode: {series_path}")
+            results.append({
+                "filename": file.filename,
+                "ok": True,
+                "video_id": video_id,
+                "duration": duracion
+            })
 
         except Exception as e:
             logger.error(f"[SERIES] Error processing {file.filename}: {e}")
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": str(e)
+            })
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -2028,7 +2114,207 @@ def upload_series_post():
     with open(METADATA_FILE, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
 
-    return redirect(url_for("series_page"))
+    return jsonify({"ok": True, "results": results})
+
+
+# =============================================================================
+# COMMERCIAL UPLOAD
+# =============================================================================
+
+def get_commercials_list():
+    """Get list of all commercials from metadata."""
+    metadata = load_metadata()
+    commercials = []
+    for video_id, data in metadata.items():
+        if data.get("category") == "commercial":
+            commercials.append({
+                "video_id": video_id,
+                "title": data.get("title", video_id),
+                "duration": data.get("duracion", 0),
+                "tags": data.get("tags", []),
+                "fecha": data.get("fecha", ""),
+            })
+    # Sort by title
+    commercials.sort(key=lambda x: x["title"].lower())
+    return commercials
+
+
+@app.route("/upload/commercials", methods=["GET"])
+def upload_commercials():
+    """Commercial upload page."""
+    cfg = load_config_i18n()
+    lang = cfg.get("language", "es")
+    base_trans = load_translations(lang)
+
+    def tr(key, default=None):
+        keys = key.split(".")
+        val = base_trans
+        for k in keys:
+            if isinstance(val, dict):
+                val = val.get(k)
+            else:
+                return default if default else key
+        return val if val else (default if default else key)
+
+    commercials = get_commercials_list()
+
+    # Get all existing video IDs for client-side duplicate detection
+    metadata = load_metadata()
+    existing_ids = list(metadata.keys())
+
+    return render_template("upload_commercials.html",
+                           commercials=commercials,
+                           existing_ids=existing_ids,
+                           lang=lang,
+                           tr=tr)
+
+
+@app.route("/upload/commercials", methods=["POST"])
+def upload_commercials_post():
+    """Handle commercial uploads with H.264 verification."""
+    global metadata
+
+    # Ensure commercials directory exists
+    COMMERCIALS_DIR.mkdir(parents=True, exist_ok=True)
+
+    files = request.files.getlist("videos[]")
+    if not files:
+        return jsonify({"ok": False, "error": "No files provided"}), 400
+
+    metadata = load_metadata()
+    results = []
+
+    for file in files:
+        if not file.filename:
+            continue
+        if not file.filename.lower().endswith(".mp4"):
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "Only .mp4 files are allowed"
+            })
+            continue
+
+        # Sanitize filename
+        original_name = secure_filename(file.filename)
+        video_id = os.path.splitext(original_name)[0]
+        video_id = video_id.replace(' ', '_')
+        final_path = COMMERCIALS_DIR / f"{video_id}.mp4"
+
+        # Check for duplicate
+        if video_id in metadata:
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": "already_exists",
+                "video_id": video_id
+            })
+            continue
+
+        # Save to temp file first for verification
+        temp_path = str(final_path) + ".uploading"
+        file.save(temp_path)
+
+        try:
+            # Verify H.264 codec
+            is_valid, error_msg = verify_h264_codec(temp_path)
+            if not is_valid:
+                os.remove(temp_path)
+                results.append({
+                    "filename": file.filename,
+                    "ok": False,
+                    "error": error_msg
+                })
+                continue
+
+            # Get duration for metadata
+            duracion = get_video_duration(temp_path)
+
+            # Move to final location (no transcoding)
+            shutil.move(temp_path, final_path)
+
+            # Create metadata with commercials path
+            commercials_path = f"commercials/{video_id}"
+            metadata[video_id] = {
+                "title": video_id,
+                "category": "commercial",
+                "commercials_path": commercials_path,
+                "tags": [],
+                "personaje": "",
+                "fecha": "",
+                "modo": [],
+                "duracion": duracion
+            }
+
+            # Generate thumbnail
+            thumb_path = THUMB_DIR / f"{video_id}.jpg"
+            try:
+                generate_thumbnail(str(final_path), str(thumb_path))
+            except Exception as e:
+                logger.warning(f"[COMMERCIALS] Failed to generate thumbnail for {video_id}: {e}")
+
+            logger.info(f"[COMMERCIALS] Uploaded commercial: {video_id} ({duracion:.1f}s)")
+            results.append({
+                "filename": file.filename,
+                "ok": True,
+                "video_id": video_id,
+                "duration": duracion
+            })
+
+        except Exception as e:
+            logger.error(f"[COMMERCIALS] Error processing {file.filename}: {e}")
+            results.append({
+                "filename": file.filename,
+                "ok": False,
+                "error": str(e)
+            })
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+    # Save metadata
+    with open(METADATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    return jsonify({"ok": True, "results": results})
+
+
+@app.route("/api/commercials/<video_id>", methods=["DELETE"])
+def delete_commercial(video_id):
+    """Delete a commercial (file, metadata, and thumbnail)."""
+    global metadata
+    metadata = load_metadata()
+
+    if video_id not in metadata:
+        return jsonify({"ok": False, "error": "Commercial not found"}), 404
+
+    video_data = metadata[video_id]
+    if video_data.get("category") != "commercial":
+        return jsonify({"ok": False, "error": "Video is not a commercial"}), 400
+
+    try:
+        # Delete video file
+        video_path = COMMERCIALS_DIR / f"{video_id}.mp4"
+        if video_path.exists():
+            video_path.unlink()
+
+        # Delete thumbnail
+        thumb_path = THUMB_DIR / f"{video_id}.jpg"
+        if thumb_path.exists():
+            thumb_path.unlink()
+
+        # Delete metadata
+        del metadata[video_id]
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"[COMMERCIALS] Deleted commercial: {video_id}")
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        logger.error(f"[COMMERCIALS] Error deleting {video_id}: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 
 @app.route("/canales")
 def canales():
