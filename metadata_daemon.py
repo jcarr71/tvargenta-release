@@ -170,7 +170,13 @@ def analyze_loudness(filepath):
         "-f", "null", "-"
     ]
 
-    stdout, stderr, success = run_throttled(cmd, timeout=600)
+    # Allow up to 1 hour for loudness analysis (long movies at idle priority)
+    stdout, stderr, success = run_throttled(cmd, timeout=3600)
+
+    # Check for timeout
+    if stderr == "Timeout":
+        logger.warning(f"Loudness analysis timed out for {filepath}")
+        return None
 
     # Parse integrated loudness from stderr
     for line in stderr.split('\n'):
