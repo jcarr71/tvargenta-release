@@ -3,8 +3,9 @@
 Metadata Population Daemon for TVArgenta
 
 Background service that populates missing metadata for videos:
+- duracion: Video duration in seconds
 - loudness_lufs: Audio loudness in LUFS for volume normalization
-- duracion: Video duration (if missing)
+- thumbnails: Preview images for the UI
 
 Runs with low resource priority to avoid impacting system performance.
 
@@ -16,14 +17,17 @@ The daemon will:
 2. Process one video at a time with throttling
 3. Use nice/ionice for low CPU/IO priority
 4. Sleep between videos to avoid resource contention
+5. Log all activity to content/logs/metadata_daemon.log
 """
 
 import json
+import logging
 import os
 import signal
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 # Configuration
@@ -37,15 +41,48 @@ FFMPEG_THREADS = 1            # Single-threaded FFmpeg
 ROOT_DIR = Path(__file__).parent
 CONTENT_DIR = ROOT_DIR / "content"
 VIDEO_DIR = CONTENT_DIR / "videos"
+SERIES_VIDEO_DIR = VIDEO_DIR / "series"
+COMMERCIALS_DIR = VIDEO_DIR / "commercials"
 METADATA_FILE = CONTENT_DIR / "metadata.json"
+THUMB_DIR = CONTENT_DIR / "thumbnails"
+LOG_DIR = CONTENT_DIR / "logs"
+LOG_FILE = LOG_DIR / "metadata_daemon.log"
 
 # State
 running = True
+logger = None
 
 
-def ts():
-    """Timestamp for logging."""
-    return time.strftime("%Y-%m-%d %H:%M:%S")
+def setup_logging():
+    """Configure logging to file and stdout."""
+    global logger
+
+    # Ensure log directory exists
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    logger = logging.getLogger("metadata_daemon")
+    logger.setLevel(logging.INFO)
+
+    # File handler - append mode, with rotation-friendly naming
+    file_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+
+    # Format
+    formatter = logging.Formatter(
+        "%(asctime)s [META] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    file_handler.setFormatter(formatter)
+    console_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+
+    return logger
 
 
 def load_metadata():
@@ -72,86 +109,107 @@ def get_video_path(video_id, info):
         return VIDEO_DIR / f"{video_id}.mp4"
 
 
-def analyze_loudness_throttled(filepath):
+def run_throttled(cmd, timeout=600):
     """
-    Analyze audio loudness using FFmpeg with resource throttling.
-    Uses nice/ionice for low priority and single-threaded processing.
+    Run a command with nice/ionice for low resource usage.
+    Returns (stdout, stderr, success).
+    """
+    throttled_cmd = [
+        "nice", "-n", str(NICE_LEVEL),
+        "ionice", "-c", str(IONICE_CLASS),
+    ] + cmd
+
+    try:
+        result = subprocess.run(
+            throttled_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=timeout
+        )
+        return result.stdout, result.stderr, result.returncode == 0
+    except subprocess.TimeoutExpired:
+        return "", "Timeout", False
+    except Exception as e:
+        return "", str(e), False
+
+
+def get_duration(filepath):
+    """Get video duration using ffprobe with throttling."""
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(filepath)
+    ]
+
+    stdout, stderr, success = run_throttled(cmd, timeout=60)
+
+    if success and stdout.strip():
+        try:
+            return float(stdout.strip())
+        except ValueError:
+            pass
+
+    logger.warning(f"Failed to get duration: {stderr}")
+    return None
+
+
+def analyze_loudness(filepath):
+    """
+    Analyze audio loudness using FFmpeg's ebur128 filter.
     Returns integrated loudness in LUFS, or None if analysis fails.
     """
-    try:
-        # Build command with nice and ionice for low resource usage
-        cmd = [
-            "nice", "-n", str(NICE_LEVEL),
-            "ionice", "-c", str(IONICE_CLASS),
-            "ffmpeg",
-            "-threads", str(FFMPEG_THREADS),
-            "-i", str(filepath),
-            "-af", "ebur128=framelog=verbose",
-            "-f", "null", "-"
-        ]
+    cmd = [
+        "ffmpeg",
+        "-threads", str(FFMPEG_THREADS),
+        "-i", str(filepath),
+        "-af", "ebur128=framelog=verbose",
+        "-f", "null", "-"
+    ]
 
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=600  # 10 minute timeout for very long videos
-        )
+    stdout, stderr, success = run_throttled(cmd, timeout=600)
 
-        # Parse integrated loudness from stderr
-        for line in result.stderr.split('\n'):
-            line = line.strip()
-            if line.startswith('I:') and 'LUFS' in line:
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    if part == 'LUFS' and i > 0:
-                        try:
-                            return float(parts[i-1])
-                        except ValueError:
-                            continue
-        return None
+    # Parse integrated loudness from stderr
+    for line in stderr.split('\n'):
+        line = line.strip()
+        if line.startswith('I:') and 'LUFS' in line:
+            parts = line.split()
+            for i, part in enumerate(parts):
+                if part == 'LUFS' and i > 0:
+                    try:
+                        return float(parts[i-1])
+                    except ValueError:
+                        continue
 
-    except subprocess.TimeoutExpired:
-        print(f"[{ts()}] [META] Timeout analyzing loudness")
-        return None
-    except Exception as e:
-        print(f"[{ts()}] [META] Error analyzing loudness: {e}")
-        return None
+    logger.warning(f"Failed to parse loudness from output")
+    return None
 
 
-def get_duration_throttled(filepath):
+def generate_thumbnail(video_path, thumb_path):
+    """Generate a thumbnail image from a video with throttling."""
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-ss", "00:00:02",
+        "-i", str(video_path),
+        "-vframes", "1",
+        "-vf", "scale=320:-1",
+        str(thumb_path)
+    ]
+
+    stdout, stderr, success = run_throttled(cmd, timeout=60)
+
+    if not success:
+        logger.warning(f"Failed to generate thumbnail: {stderr}")
+
+    return success
+
+
+def find_videos_needing_work(metadata):
     """
-    Get video duration using ffprobe with resource throttling.
-    """
-    try:
-        cmd = [
-            "nice", "-n", str(NICE_LEVEL),
-            "ionice", "-c", str(IONICE_CLASS),
-            "ffprobe",
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
-            str(filepath)
-        ]
-
-        result = subprocess.run(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=60
-        )
-
-        return float(result.stdout.strip())
-
-    except (subprocess.TimeoutExpired, ValueError, Exception) as e:
-        print(f"[{ts()}] [META] Error getting duration: {e}")
-        return None
-
-
-def find_videos_needing_metadata(metadata):
-    """
-    Find videos that are missing loudness_lufs or duracion.
+    Find videos that are missing metadata or thumbnails.
     Returns list of (video_id, info, missing_fields) tuples.
     """
     needs_work = []
@@ -159,11 +217,18 @@ def find_videos_needing_metadata(metadata):
     for video_id, info in metadata.items():
         missing = []
 
+        # Check for missing duration
+        if info.get("duracion") is None:
+            missing.append("duracion")
+
+        # Check for missing loudness
         if info.get("loudness_lufs") is None:
             missing.append("loudness_lufs")
 
-        if info.get("duracion") is None:
-            missing.append("duracion")
+        # Check for missing thumbnail
+        thumb_path = THUMB_DIR / f"{video_id}.jpg"
+        if not thumb_path.exists():
+            missing.append("thumbnail")
 
         if missing:
             needs_work.append((video_id, info, missing))
@@ -179,36 +244,47 @@ def process_one_video(video_id, info, missing_fields, metadata):
     filepath = get_video_path(video_id, info)
 
     if not filepath.exists():
-        print(f"[{ts()}] [META] File not found: {filepath}")
+        logger.warning(f"File not found: {filepath}")
         return False
 
     updated = False
     category = info.get("category", "unknown")
 
-    print(f"[{ts()}] [META] Processing: {video_id} ({category})")
-    print(f"[{ts()}] [META]   Missing: {', '.join(missing_fields)}")
+    logger.info(f"Processing: {video_id} ({category})")
+    logger.info(f"  Missing: {', '.join(missing_fields)}")
 
     # Get duration if missing
     if "duracion" in missing_fields:
-        print(f"[{ts()}] [META]   Analyzing duration...", end=" ", flush=True)
-        duration = get_duration_throttled(filepath)
+        logger.info(f"  Analyzing duration...")
+        duration = get_duration(filepath)
         if duration is not None:
             metadata[video_id]["duracion"] = duration
-            print(f"{duration:.1f}s")
+            logger.info(f"  Duration: {duration:.1f}s")
             updated = True
         else:
-            print("FAILED")
+            logger.warning(f"  Duration: FAILED")
 
     # Get loudness if missing
     if "loudness_lufs" in missing_fields:
-        print(f"[{ts()}] [META]   Analyzing loudness...", end=" ", flush=True)
-        lufs = analyze_loudness_throttled(filepath)
+        logger.info(f"  Analyzing loudness (this may take a while)...")
+        lufs = analyze_loudness(filepath)
         if lufs is not None:
             metadata[video_id]["loudness_lufs"] = lufs
-            print(f"{lufs:.1f} LUFS")
+            logger.info(f"  Loudness: {lufs:.1f} LUFS")
             updated = True
         else:
-            print("FAILED")
+            logger.warning(f"  Loudness: FAILED")
+
+    # Generate thumbnail if missing
+    if "thumbnail" in missing_fields:
+        logger.info(f"  Generating thumbnail...")
+        thumb_path = THUMB_DIR / f"{video_id}.jpg"
+        THUMB_DIR.mkdir(parents=True, exist_ok=True)
+        if generate_thumbnail(filepath, thumb_path):
+            logger.info(f"  Thumbnail: OK")
+            # Thumbnail isn't stored in metadata, just the file
+        else:
+            logger.warning(f"  Thumbnail: FAILED")
 
     return updated
 
@@ -217,12 +293,13 @@ def run_daemon():
     """Main daemon loop."""
     global running
 
-    print(f"[{ts()}] [META] TVArgenta Metadata Daemon starting...")
-    print(f"[{ts()}] [META] Configuration:")
-    print(f"[{ts()}] [META]   Check interval: {CHECK_INTERVAL}s")
-    print(f"[{ts()}] [META]   Sleep between videos: {SLEEP_BETWEEN_VIDEOS}s")
-    print(f"[{ts()}] [META]   Nice level: {NICE_LEVEL}")
-    print(f"[{ts()}] [META]   I/O class: {IONICE_CLASS} (idle)")
+    logger.info("TVArgenta Metadata Daemon starting...")
+    logger.info(f"Configuration:")
+    logger.info(f"  Check interval: {CHECK_INTERVAL}s")
+    logger.info(f"  Sleep between videos: {SLEEP_BETWEEN_VIDEOS}s")
+    logger.info(f"  Nice level: {NICE_LEVEL}")
+    logger.info(f"  I/O class: {IONICE_CLASS} (idle)")
+    logger.info(f"  Log file: {LOG_FILE}")
 
     while running:
         try:
@@ -230,19 +307,19 @@ def run_daemon():
             metadata = load_metadata()
 
             if not metadata:
-                print(f"[{ts()}] [META] No videos in metadata, sleeping...")
+                logger.info("No videos in metadata, sleeping...")
                 time.sleep(CHECK_INTERVAL)
                 continue
 
             # Find videos needing work
-            needs_work = find_videos_needing_metadata(metadata)
+            needs_work = find_videos_needing_work(metadata)
 
             if not needs_work:
-                print(f"[{ts()}] [META] All videos have metadata, sleeping {CHECK_INTERVAL}s...")
+                logger.info(f"All videos have complete metadata, sleeping {CHECK_INTERVAL}s...")
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            print(f"[{ts()}] [META] Found {len(needs_work)} videos needing metadata")
+            logger.info(f"Found {len(needs_work)} videos needing metadata")
 
             # Process one video
             video_id, info, missing_fields = needs_work[0]
@@ -251,37 +328,40 @@ def run_daemon():
 
             if updated:
                 save_metadata(metadata)
-                print(f"[{ts()}] [META] Saved metadata for {video_id}")
+                logger.info(f"Saved metadata for {video_id}")
 
             # Sleep before next video (or before next check)
             remaining = len(needs_work) - 1
             if remaining > 0 and running:
-                print(f"[{ts()}] [META] {remaining} videos remaining, sleeping {SLEEP_BETWEEN_VIDEOS}s...")
+                logger.info(f"{remaining} videos remaining, sleeping {SLEEP_BETWEEN_VIDEOS}s...")
                 time.sleep(SLEEP_BETWEEN_VIDEOS)
             else:
-                print(f"[{ts()}] [META] Batch complete, sleeping {CHECK_INTERVAL}s...")
+                logger.info(f"Batch complete, sleeping {CHECK_INTERVAL}s...")
                 time.sleep(CHECK_INTERVAL)
 
         except KeyboardInterrupt:
-            print(f"\n[{ts()}] [META] Interrupted by keyboard")
+            logger.info("Interrupted by keyboard")
             break
 
         except Exception as e:
-            print(f"[{ts()}] [META] Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}", exc_info=True)
             time.sleep(CHECK_INTERVAL)
 
-    print(f"[{ts()}] [META] Daemon stopped")
+    logger.info("Daemon stopped")
 
 
 def signal_handler(signum, frame):
     """Handle shutdown signals."""
     global running
-    print(f"\n[{ts()}] [META] Received signal {signum}, shutting down...")
+    logger.info(f"Received signal {signum}, shutting down...")
     running = False
 
 
 def main():
     """Entry point."""
+    # Set up logging first
+    setup_logging()
+
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
