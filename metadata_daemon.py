@@ -31,8 +31,9 @@ from datetime import datetime
 from pathlib import Path
 
 # Configuration
-CHECK_INTERVAL = 300          # Seconds between scans for new work (5 minutes)
+CHECK_INTERVAL = 300          # Seconds between scans when idle (5 minutes)
 SLEEP_BETWEEN_VIDEOS = 60     # Seconds to sleep between processing videos
+BATCH_SIZE = 10               # Process up to N videos before re-checking queue
 NICE_LEVEL = 19               # Lowest CPU priority (19 = nicest)
 IONICE_CLASS = 3              # Idle I/O class (only when disk is free)
 FFMPEG_THREADS = 1            # Single-threaded FFmpeg
@@ -295,8 +296,9 @@ def run_daemon():
 
     logger.info("TVArgenta Metadata Daemon starting...")
     logger.info(f"Configuration:")
-    logger.info(f"  Check interval: {CHECK_INTERVAL}s")
+    logger.info(f"  Check interval (idle): {CHECK_INTERVAL}s")
     logger.info(f"  Sleep between videos: {SLEEP_BETWEEN_VIDEOS}s")
+    logger.info(f"  Batch size: {BATCH_SIZE}")
     logger.info(f"  Nice level: {NICE_LEVEL}")
     logger.info(f"  I/O class: {IONICE_CLASS} (idle)")
     logger.info(f"  Log file: {LOG_FILE}")
@@ -319,24 +321,37 @@ def run_daemon():
                 time.sleep(CHECK_INTERVAL)
                 continue
 
-            logger.info(f"Found {len(needs_work)} videos needing metadata")
+            total_pending = len(needs_work)
+            logger.info(f"Found {total_pending} videos needing metadata")
 
-            # Process one video
-            video_id, info, missing_fields = needs_work[0]
+            # Process up to BATCH_SIZE videos
+            batch = needs_work[:BATCH_SIZE]
+            processed_count = 0
 
-            updated = process_one_video(video_id, info, missing_fields, metadata)
+            for i, (video_id, info, missing_fields) in enumerate(batch):
+                if not running:
+                    break
 
-            if updated:
-                save_metadata(metadata)
-                logger.info(f"Saved metadata for {video_id}")
+                updated = process_one_video(video_id, info, missing_fields, metadata)
 
-            # Sleep before next video (or before next check)
-            remaining = len(needs_work) - 1
-            if remaining > 0 and running:
-                logger.info(f"{remaining} videos remaining, sleeping {SLEEP_BETWEEN_VIDEOS}s...")
-                time.sleep(SLEEP_BETWEEN_VIDEOS)
+                if updated:
+                    save_metadata(metadata)
+                    logger.info(f"Saved metadata for {video_id}")
+
+                processed_count += 1
+
+                # Sleep between videos (but not after the last one in batch)
+                if running and i < len(batch) - 1:
+                    logger.info(f"Processed {processed_count}/{len(batch)} in batch, sleeping {SLEEP_BETWEEN_VIDEOS}s...")
+                    time.sleep(SLEEP_BETWEEN_VIDEOS)
+
+            # After batch: check if more work remains
+            remaining = total_pending - processed_count
+            if remaining > 0:
+                logger.info(f"Batch complete ({processed_count} processed), {remaining} remaining - checking immediately...")
+                # Don't sleep - loop back to check for more work
             else:
-                logger.info(f"Batch complete, sleeping {CHECK_INTERVAL}s...")
+                logger.info(f"All caught up ({processed_count} processed), sleeping {CHECK_INTERVAL}s...")
                 time.sleep(CHECK_INTERVAL)
 
         except KeyboardInterrupt:
