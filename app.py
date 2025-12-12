@@ -2154,16 +2154,13 @@ def upload_series_post():
             # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
-            # Analyze audio loudness for automatic volume adjustment
-            loudness_lufs = analyze_loudness(temp_path)
-
             # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
             # Parse season/episode from filename
             season, episode = parse_episode_info(video_id)
 
-            # Create metadata
+            # Create metadata (loudness_lufs populated later by metadata_daemon)
             series_path = f"series/{series_name}/{video_id}"
             metadata[video_id] = {
                 "title": video_id,
@@ -2176,8 +2173,7 @@ def upload_series_post():
                 "personaje": "",
                 "fecha": "",
                 "modo": [],
-                "duracion": duracion,
-                "loudness_lufs": loudness_lufs
+                "duracion": duracion
             }
 
             # Generate thumbnail
@@ -2326,13 +2322,10 @@ def upload_commercials_post():
             # Get duration for metadata
             duracion = get_video_duration(temp_path)
 
-            # Analyze audio loudness for automatic volume adjustment
-            loudness_lufs = analyze_loudness(temp_path)
-
             # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
-            # Create metadata with commercials path
+            # Create metadata (loudness_lufs populated later by metadata_daemon)
             commercials_path = f"commercials/{video_id}"
             metadata[video_id] = {
                 "title": video_id,
@@ -2342,8 +2335,7 @@ def upload_commercials_post():
                 "personaje": "",
                 "fecha": "",
                 "modo": [],
-                "duracion": duracion,
-                "loudness_lufs": loudness_lufs
+                "duracion": duracion
             }
 
             # Generate thumbnail
