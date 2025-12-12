@@ -1067,7 +1067,8 @@ def _ctx_gestion():
         tags=load_tags(),
         config=load_config(),
         recuerdos=get_total_recuerdos(),
-        canales=load_canales()
+        canales=load_canales(),
+        active_page='library'
     )
 
 
@@ -1883,17 +1884,17 @@ def series_add():
     """Add a new series."""
     display_name = request.form.get("name", "").strip()
     if not display_name:
-        return redirect(url_for("series_page"))
+        return redirect(url_for("index"))
 
     folder_name = series_folder_name(display_name)
     if not folder_name:
-        return redirect(url_for("series_page"))
+        return redirect(url_for("index"))
 
     series_data = load_series()
 
     # Check if already exists
     if folder_name in series_data:
-        return redirect(url_for("series_page"))
+        return redirect(url_for("index"))
 
     # Create folder
     series_dir = SERIES_VIDEO_DIR / folder_name
@@ -1907,7 +1908,7 @@ def series_add():
     save_series(series_data)
 
     logger.info(f"[SERIES] Created new series: {display_name} ({folder_name})")
-    return redirect(url_for("series_page"))
+    return redirect(url_for("index"))
 
 @app.route("/series/delete/<series_name>", methods=["POST"])
 def series_delete(series_name):
@@ -1945,17 +1946,53 @@ def series_delete(series_name):
 
 @app.route("/api/series")
 def api_series():
-    """Return list of series names for API use."""
+    """Return list of series with episode counts, time_of_day, and episodes grouped by season."""
     series_data = load_series()
-    return jsonify({
-        "series": [
-            {
-                "folder_name": name,
-                "display_name": series_display_name(name)
-            }
-            for name in sorted(series_data.keys())
+    global metadata
+    metadata = load_metadata()
+
+    result = []
+    for name in sorted(series_data.keys()):
+        # Get all episodes for this series
+        episodes = []
+        for video_id, v in metadata.items():
+            if v.get("category") == "tv_episode" and v.get("series") == name:
+                episodes.append({
+                    "video_id": video_id,
+                    "title": v.get("title", video_id),
+                    "season": v.get("season") or 1,
+                    "episode": v.get("episode") or 0,
+                    "duration": v.get("duracion", 0)
+                })
+
+        # Group episodes by season
+        seasons = {}
+        for ep in episodes:
+            season_num = ep["season"]
+            if season_num not in seasons:
+                seasons[season_num] = []
+            seasons[season_num].append(ep)
+
+        # Sort episodes within each season
+        for season_num in seasons:
+            seasons[season_num].sort(key=lambda x: (x["episode"], x["title"]))
+
+        # Convert to sorted list of season objects
+        seasons_list = [
+            {"season": s, "episodes": seasons[s]}
+            for s in sorted(seasons.keys())
         ]
-    })
+
+        result.append({
+            "folder_name": name,
+            "display_name": series_display_name(name),
+            "episode_count": len(episodes),
+            "time_of_day": series_data[name].get("time_of_day", "any"),
+            "created": series_data[name].get("created", ""),
+            "seasons": seasons_list
+        })
+
+    return jsonify({"ok": True, "series": result})
 
 
 @app.route("/api/series/time_of_day", methods=["POST"])
@@ -2484,11 +2521,156 @@ def loudness_status():
     })
 
 
+@app.route("/api/commercials")
+def api_commercials():
+    """Return list of commercials for Content Manager."""
+    global metadata
+    metadata = load_metadata()
+
+    commercials = []
+    for video_id, data in metadata.items():
+        if data.get("category") == "commercial":
+            commercials.append({
+                "video_id": video_id,
+                "title": data.get("title", video_id),
+                "duration": data.get("duracion", 0),
+                "tags": data.get("tags", [])
+            })
+
+    # Sort by title
+    commercials.sort(key=lambda x: x["title"].lower())
+
+    return jsonify({"ok": True, "commercials": commercials})
+
+
+# --- Movies API ---
+@app.route("/api/movies")
+def api_movies():
+    """Return list of movies."""
+    global metadata
+    metadata = load_metadata()
+
+    movies = []
+    for video_id, data in metadata.items():
+        if data.get("category") == "movie":
+            movies.append({
+                "video_id": video_id,
+                "title": data.get("title", video_id),
+                "duration": data.get("duracion", 0)
+            })
+
+    movies.sort(key=lambda x: x["title"].lower())
+    return jsonify({"ok": True, "movies": movies})
+
+
+@app.route("/api/movies/<video_id>", methods=["DELETE"])
+def delete_movie(video_id):
+    """Delete a movie (file, metadata, and thumbnail)."""
+    global metadata
+    metadata = load_metadata()
+
+    if video_id not in metadata:
+        return jsonify({"ok": False, "error": "Movie not found"}), 404
+
+    video_data = metadata[video_id]
+    if video_data.get("category") != "movie":
+        return jsonify({"ok": False, "error": "Video is not a movie"}), 400
+
+    try:
+        # Delete video file
+        video_path = VIDEO_DIR / f"{video_id}.mp4"
+        if video_path.exists():
+            video_path.unlink()
+
+        # Delete thumbnail
+        thumb_path = THUMB_DIR / f"{video_id}.jpg"
+        if thumb_path.exists():
+            thumb_path.unlink()
+
+        # Delete metadata
+        del metadata[video_id]
+        with open(METADATA_FILE, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"[MOVIES] Deleted movie: {video_id}")
+        return jsonify({"ok": True})
+
+    except Exception as e:
+        logger.error(f"[MOVIES] Error deleting {video_id}: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/upload/movies", methods=["POST"])
+def upload_movies_post():
+    """Handle movie file uploads."""
+    global metadata
+    metadata = load_metadata()
+
+    files = request.files.getlist("videos[]")
+    if not files:
+        return jsonify({"ok": False, "error": "No files provided"}), 400
+
+    results = []
+
+    for file in files:
+        if not file.filename:
+            continue
+
+        try:
+            # Get video_id from filename
+            video_id = secure_filename(file.filename).rsplit(".", 1)[0]
+
+            # Check if already exists
+            if video_id in metadata:
+                results.append({"filename": file.filename, "ok": False, "error": "already_exists"})
+                continue
+
+            # Save to temp, then move
+            temp_path = VIDEO_DIR / f"_temp_{video_id}.mp4"
+            final_path = VIDEO_DIR / f"{video_id}.mp4"
+
+            file.save(temp_path)
+
+            # Get duration
+            duration = get_video_duration(temp_path)
+            if duration is None:
+                duration = 0
+
+            # Move to final location
+            temp_path.rename(final_path)
+
+            # Generate thumbnail
+            generate_thumbnail(final_path, THUMB_DIR / f"{video_id}.jpg")
+
+            # Create metadata
+            title = video_id.replace("_", " ").replace("-", " ").title()
+            metadata[video_id] = {
+                "title": title,
+                "category": "movie",
+                "duracion": duration,
+                "fecha": datetime.now().strftime("%Y-%m-%d"),
+                "tags": [],
+                "personaje": "",
+                "modo": []
+            }
+
+            results.append({"filename": file.filename, "ok": True, "video_id": video_id})
+            logger.info(f"[MOVIES] Uploaded: {video_id} ({duration}s)")
+
+        except Exception as e:
+            logger.error(f"[MOVIES] Error processing {file.filename}: {e}")
+            results.append({"filename": file.filename, "ok": False, "error": str(e)})
+
+    # Save metadata
+    with open(METADATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+
+    return jsonify({"ok": True, "results": results})
+
+
 @app.route("/canales")
 def canales():
-    canales_data = load_canales()  # ya lo tenÃ©s definido
-    tags_data = load_tags()
-    config_data = load_config()
+    canales_data = load_canales()
 
     # Get series with display names
     all_series = [
@@ -2496,7 +2678,7 @@ def canales():
         for name in _get_all_series()
     ]
 
-    return render_template("canales.html", canales=canales_data, tags=tags_data, config=config_data, all_series=all_series, series_display_name=series_display_name)
+    return render_template("canales.html", canales=canales_data, all_series=all_series, active_page='channels')
 
 @app.route("/guardar_canal", methods=["POST"])
 def guardar_canal():
@@ -2544,39 +2726,8 @@ def eliminar_canal(canal_id):
 
 @app.route("/editar_canal/<canal_id>")
 def editar_canal(canal_id):
-    canales = load_canales()
-    canal = canales.get(canal_id)
-    if not canal:
-        return redirect(url_for("canales"))
-
-    tags_data = load_tags()
-    config = load_config()
-
-    # Get series with display names
-    all_series = [
-        {"folder_name": name, "display_name": series_display_name(name)}
-        for name in _get_all_series()
-    ]
-
-    # lista plana de todos los tags del tags.json
-    todos_los_tags = [t for grupo in tags_data.values() for t in grupo.get("tags", [])]
-
-    incluidos = set(config.get("tags_incluidos") or [])
-    if incluidos:
-        tags_disponibles = [t for t in todos_los_tags if t in incluidos]
-    else:
-        # Fallback: si no hay incluidos en config, mostrar TODOS
-        tags_disponibles = todos_los_tags
-
-    return render_template("canales.html",
-                           canal_actual=canal,
-                           canal_id=canal_id,
-                           canales=canales,
-                           tags=tags_data,
-                           tags_disponibles=tags_disponibles,
-                           config=config,
-                           all_series=all_series,
-                           series_display_name=series_display_name)
+    # Editing is now inline, redirect to main channels page
+    return redirect(url_for("canales"))
 
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():
