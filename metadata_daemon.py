@@ -158,21 +158,56 @@ def get_duration(filepath):
     return None
 
 
-def analyze_loudness(filepath):
+def analyze_loudness(filepath, duration=None):
     """
     Analyze audio loudness using FFmpeg's ebur128 filter.
+    Samples 30 seconds every 5 minutes for efficiency on long files.
     Returns integrated loudness in LUFS, or None if analysis fails.
     """
+    SAMPLE_DURATION = 30   # seconds per sample
+    SAMPLE_INTERVAL = 300  # seconds between sample starts (5 minutes)
+
+    # Get duration if not provided
+    if duration is None:
+        duration = get_duration(filepath)
+
+    # Build audio filter
+    if duration is None or duration <= SAMPLE_INTERVAL:
+        # Short file or unknown duration - analyze entire file
+        audio_filter = "ebur128=framelog=verbose"
+        timeout = 600  # 10 min for short files
+    else:
+        # Sample 30 seconds every 5 minutes throughout the file
+        samples = []
+        t = 0
+        while t + SAMPLE_DURATION <= duration:
+            samples.append(f"between(t,{t},{t + SAMPLE_DURATION})")
+            t += SAMPLE_INTERVAL
+
+        # Add final segment if there's significant time remaining
+        if duration - t > 10:  # More than 10 seconds left
+            end_start = max(t, duration - SAMPLE_DURATION)
+            samples.append(f"between(t,{end_start},{duration})")
+
+        select_expr = "+".join(samples)
+        # aselect picks the samples, asetpts fixes timestamps for ebur128
+        audio_filter = f"aselect='{select_expr}',asetpts=N/SR/TB,ebur128=framelog=verbose"
+
+        # Timeout based on actual audio to process (samples × duration + overhead)
+        audio_seconds = len(samples) * SAMPLE_DURATION
+        timeout = max(300, audio_seconds * 3)  # 3x realtime + minimum 5 min
+
+        logger.debug(f"Sampling {len(samples)} segments ({audio_seconds}s total) from {duration:.0f}s file")
+
     cmd = [
         "ffmpeg",
         "-threads", str(FFMPEG_THREADS),
         "-i", str(filepath),
-        "-af", "ebur128=framelog=verbose",
+        "-af", audio_filter,
         "-f", "null", "-"
     ]
 
-    # Allow up to 1 hour for loudness analysis (long movies at idle priority)
-    stdout, stderr, success = run_throttled(cmd, timeout=3600)
+    stdout, stderr, success = run_throttled(cmd, timeout=timeout)
 
     # Check for timeout
     if stderr == "Timeout":
@@ -274,8 +309,10 @@ def process_one_video(video_id, info, missing_fields, metadata):
 
     # Get loudness if missing
     if "loudness_lufs" in missing_fields:
-        logger.info(f"  Analyzing loudness (this may take a while)...")
-        lufs = analyze_loudness(filepath)
+        logger.info(f"  Analyzing loudness...")
+        # Pass duration to enable efficient sampling (avoid re-fetching)
+        known_duration = metadata[video_id].get("duracion")
+        lufs = analyze_loudness(filepath, duration=known_duration)
         if lufs is not None:
             metadata[video_id]["loudness_lufs"] = lufs
             logger.info(f"  Loudness: {lufs:.1f} LUFS")
