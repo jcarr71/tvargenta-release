@@ -961,7 +961,7 @@ def ensure_durations():
         print("ðŸ•' Duraciones actualizadas en metadata")
 
 def get_total_recuerdos():
-    total_sec = sum(v.get("duracion", 0) for v in metadata.values())
+    total_sec = sum(v.get("duracion") or 0 for v in metadata.values())
     horas = int(total_sec // 3600)
     minutos = int((total_sec % 3600) // 60)
 
