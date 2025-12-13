@@ -59,8 +59,6 @@ INTRO_PATH          = SPLASH_DIR / "splash_1.mp4"
 # Usuario que corre el kiosk 
 USER = os.environ.get("TVARGENTA_USER") or getpass.getuser()
 
-UPLOAD_STATUS = TMP_DIR / "upload_status.txt"
-
 # VCR / NFC paths
 VCR_STATE_FILE = TMP_DIR / "vcr_state.json"
 VCR_TRIGGER_FILE = TMP_DIR / "trigger_vcr.json"

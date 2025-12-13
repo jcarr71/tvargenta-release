@@ -31,7 +31,7 @@ from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
     METADATA_FILE, TAGS_FILE, CONFIG_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
-    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
+    PLAYS_FILE, USER, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
     SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR,
 )
@@ -784,13 +784,6 @@ def get_video_resolution(filepath):
         print(f"âš ï¸ Error al obtener resoluciÃ³n de {filepath}: {e}")
         return None, None
 
-def escribir_estado(status):
-    with open(UPLOAD_STATUS, "w", encoding="utf-8") as f:
-        f.write(status)
-
-def eliminar_estado():
-    if UPLOAD_STATUS.exists(): UPLOAD_STATUS.unlink()
-
 def sincronizar_videos():
     # Scan regular videos in VIDEO_DIR
     archivos_video = {
@@ -1318,83 +1311,6 @@ def delete_video_metadata(video_id):
 
     return redirect(url_for("index"))
 
-@app.route("/upload", methods=["GET", "POST"])
-def upload():
-    if request.method == "GET":
-        return render_template("upload.html")
-
-    files = request.files.getlist("videos[]")
-    os.makedirs(VIDEO_DIR, exist_ok=True)
-
-    print(f"ðŸ“¥ Archivos recibidos: {[f.filename for f in files]}")
-
-    for file in files:
-        if not file.filename.lower().endswith(".mp4"):
-            escribir_estado(f"âŒ Archivo no permitido: {file.filename}")
-            continue
-
-        escribir_estado("ðŸ“¥ Recibiendo archivo...")
-
-        filename = secure_filename(file.filename)
-        video_id = os.path.splitext(filename)[0]
-        final_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-            temp_path = tmp.name
-            file.save(temp_path)
-
-        print(f"ðŸ”„ Procesando: {filename}")
-        try:
-            escribir_estado("ðŸ“ Comprobando resoluciÃ³n...")
-            width, height = get_video_resolution(temp_path)
-            duracion = get_video_duration(temp_path)
-            metadata[video_id] = metadata.get(video_id, {})
-            metadata[video_id]["duracion"] = duracion
-            if width == 800 and height == 480:
-                # Atomic cutover: move temp file to final path
-                shutil.move(temp_path, final_path)
-                temp_path = None  # Mark as already moved
-                escribir_estado("âœ… Video ya estaba en 800x480. Copiado directo")
-                print(f"âœ… Video ya estaba en 800x480. Copiado directo: {final_path}")
-            else:
-                escribir_estado("âœ‚ï¸ Redimensionando video...")
-                # Atomic cutover: transcode to temp file, then rename
-                transcode_temp_path = final_path + ".transcoding"
-                subprocess.run([
-                    "ffmpeg", "-i", temp_path,
-                    "-vf", "scale=800:480:force_original_aspect_ratio=decrease,pad=800:480:(ow-iw)/2:(oh-ih)/2",
-                    "-c:a", "copy",
-                    "-y", transcode_temp_path
-                ], check=True)
-                os.replace(transcode_temp_path, final_path)
-                print(f"ðŸŽ› Video procesado con resize y crop: {final_path}")
-        except Exception as e:
-            escribir_estado(f"âš ï¸ Error al procesar {filename}")
-            print(f"âš ï¸ Error al procesar {filename}: {e}")
-        finally:
-            # Only remove temp_path if it still exists (wasn't moved atomically)
-            if temp_path and os.path.exists(temp_path):
-                os.remove(temp_path)
-            # Clean up transcode temp file if left behind
-            transcode_temp_path = final_path + ".transcoding"
-            if os.path.exists(transcode_temp_path):
-                os.remove(transcode_temp_path)
-
-        escribir_estado("ðŸ–¼ Generando thumbnail...")
-        sanity_check_thumbnails(video_id)
-        escribir_estado("âœ… Â¡Listo che! ðŸ§‰")
-
-    eliminar_estado()
-    return redirect(url_for("index"))
-
-@app.route("/upload_status")
-def upload_status():
-    try:
-        with open(UPLOAD_STATUS, "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "Sin actividad"
-        
 @app.route("/tags")
 def tags():
     tags_data = load_tags()
