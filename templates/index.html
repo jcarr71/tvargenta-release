@@ -752,7 +752,8 @@
     fileList.classList.remove('hidden');
 
     for (const f of files) {
-      const videoId = getVideoIdFromFilename(f.name);
+      // Create video_id with series name prefix to match backend format
+      const videoId = seriesName + '_' + getVideoIdFromFilename(f.name);
       const isDuplicate = existingIds.has(videoId);
 
       if (isDuplicate) {

@@ -393,19 +393,21 @@ def scan_series_directories():
 
         # Scan for video files in this series
         for video_file in series_dir.glob("*.mp4"):
-            video_id = video_file.stem  # filename without extension
-            series_path = f"series/{series_name}/{video_id}"
+            base_video_id = video_file.stem  # filename without extension
+            # Create unique video_id by prefixing with series name to avoid collisions
+            video_id = f"{series_name}_{base_video_id}"
+            series_path = f"series/{series_name}/{base_video_id}"
 
             # Check if we already have metadata for this video
             existing = metadata.get(video_id, {})
 
             # Parse season/episode from filename
-            season, episode = parse_episode_info(video_id)
+            season, episode = parse_episode_info(base_video_id)
 
             # Create or update metadata
             if video_id not in metadata or existing.get("series_path") != series_path:
                 metadata[video_id] = {
-                    "title": existing.get("title") or video_id,
+                    "title": existing.get("title") or base_video_id,
                     "category": "tv_episode",
                     "series": series_name,
                     "series_path": series_path,
@@ -2120,10 +2122,14 @@ def upload_series_post():
 
         # Sanitize filename
         original_name = secure_filename(file.filename)
-        video_id = os.path.splitext(original_name)[0]
+        base_video_id = os.path.splitext(original_name)[0]
         # Ensure no spaces
-        video_id = video_id.replace(' ', '_')
-        final_path = series_dir / f"{video_id}.mp4"
+        base_video_id = base_video_id.replace(' ', '_')
+
+        # Create unique video_id by prefixing with series name to avoid collisions
+        # across different series with same episode filenames
+        video_id = f"{series_name}_{base_video_id}"
+        final_path = series_dir / f"{base_video_id}.mp4"
 
         # Check for duplicate
         if video_id in metadata:
@@ -2157,13 +2163,14 @@ def upload_series_post():
             # Move to final location (no transcoding)
             shutil.move(temp_path, final_path)
 
-            # Parse season/episode from filename
-            season, episode = parse_episode_info(video_id)
+            # Parse season/episode from filename (use base_video_id which has the original filename)
+            season, episode = parse_episode_info(base_video_id)
 
             # Create metadata (loudness_lufs populated later by metadata_daemon)
-            series_path = f"series/{series_name}/{video_id}"
+            # series_path uses base_video_id since that's the actual filename on disk
+            series_path = f"series/{series_name}/{base_video_id}"
             metadata[video_id] = {
-                "title": video_id,
+                "title": base_video_id,
                 "category": "tv_episode",
                 "series": series_name,
                 "series_path": series_path,

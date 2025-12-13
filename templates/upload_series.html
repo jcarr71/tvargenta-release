@@ -220,13 +220,23 @@
 
       fileList.classList.remove('hidden');
 
+      // Get selected series name for video_id prefix
+      const selectedSeries = seriesSelect?.value || '';
+      const newSeriesVal = newSeriesInput.value.trim();
+      // If creating new series, generate folder name from display name
+      const seriesName = newSeriesVal
+        ? newSeriesVal.replace(/[^\w\-]/g, '').replace(/\s+/g, '_')
+        : selectedSeries;
+
       for (const file of files) {
         const item = document.createElement('div');
         item.className = 'file-item';
         item.dataset.filename = file.name;
 
         // Check if this file would be a duplicate
-        const videoId = sanitizeFilename(file.name);
+        // Video ID now includes series name prefix to avoid collisions
+        const baseVideoId = sanitizeFilename(file.name);
+        const videoId = seriesName ? seriesName + '_' + baseVideoId : baseVideoId;
         const isDuplicate = existingIds.has(videoId);
 
         if (isDuplicate) {
@@ -369,7 +379,16 @@
             completed++;
             updateFileProgress(file.name, 100, 'complete');
             // Add to existingIds so re-selecting same file shows as duplicate
-            existingIds.add(sanitizeFilename(file.name));
+            // Use the video_id returned from the server which includes series prefix
+            if (result.video_id) {
+              existingIds.add(result.video_id);
+            } else {
+              // Fallback: construct the video_id with series prefix
+              const seriesName = newSeries
+                ? newSeries.replace(/[^\w\-]/g, '').replace(/\s+/g, '_')
+                : series;
+              existingIds.add(seriesName + '_' + sanitizeFilename(file.name));
+            }
           } else if (result.error === 'already_exists') {
             // Shouldn't happen with client-side check, but handle anyway
             updateFileProgress(file.name, 100, 'exists');
@@ -488,6 +507,10 @@
         if (seriesSelect.value) {
           newSeriesInput.value = '';
         }
+        // Re-check duplicates with new series prefix
+        if (fileInput.files.length > 0) {
+          updateFileList();
+        }
         updateSubmitButton();
       });
     }
@@ -495,6 +518,10 @@
     newSeriesInput.addEventListener('input', () => {
       if (newSeriesInput.value.trim() && seriesSelect) {
         seriesSelect.value = '';
+      }
+      // Re-check duplicates with new series prefix
+      if (fileInput.files.length > 0) {
+        updateFileList();
       }
       updateSubmitButton();
     });
