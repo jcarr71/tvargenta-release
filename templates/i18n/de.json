@@ -42,6 +42,7 @@
 
   "settings.title": "Einstellungen",
   "settings.show_channel_name": "Kanalname anzeigen",
+  "settings.target_lufs": "Lautstärkepegel",
   "settings.yes": "Ja",
   "settings.no": "Nein",
 

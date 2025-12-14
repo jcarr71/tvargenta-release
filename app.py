@@ -973,12 +973,19 @@ def get_total_recuerdos():
 # --- Preferencias UI ---
 def load_ui_prefs():
     cfg = load_config()
-    # default: mostrar el nombre del canal
-    return {"show_channel_name": bool(cfg.get("show_channel_name", True))}
+    # default: mostrar el nombre del canal, target_lufs = -16 (streaming standard)
+    return {
+        "show_channel_name": bool(cfg.get("show_channel_name", True)),
+        "target_lufs": cfg.get("target_lufs", -16)
+    }
 
 def save_ui_prefs(prefs):
     cfg = load_config()
     cfg["show_channel_name"] = bool(prefs.get("show_channel_name", True))
+    # Validate target_lufs: must be between -24 and -10
+    target_lufs = prefs.get("target_lufs", -16)
+    if isinstance(target_lufs, (int, float)) and -24 <= target_lufs <= -10:
+        cfg["target_lufs"] = int(target_lufs)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
         
@@ -1860,7 +1867,8 @@ def api_next_video():
         "canal_nombre": canales[canal_id].get("nombre", canal_id),
         "canal_numero": get_canal_numero(canal_id, canales),
         "min_gap_minutes": MIN_GAP_MIN,        # debug útil
-        "age_seconds": None if edad_s == float('inf') else int(edad_s)
+        "age_seconds": None if edad_s == float('inf') else int(edad_s),
+        "loudness_lufs": elegido_data.get("loudness_lufs")
     })
 
 
@@ -3296,6 +3304,12 @@ def api_vcr_state():
         if state.get("is_rewinding"):
             progress = vcr_manager.check_rewind_progress()
             state["rewind_progress"] = progress
+        # Include loudness data for volume normalization
+        video_id = state.get("video_id")
+        if video_id:
+            metadata = load_metadata()
+            if video_id in metadata:
+                state["loudness_lufs"] = metadata[video_id].get("loudness_lufs")
         return jsonify({"ok": True, **state})
     except Exception as e:
         logger.error(f"[API][VCR] state error: {e}")

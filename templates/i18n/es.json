@@ -42,6 +42,7 @@
 
   "settings.title": "Configuraciones",
   "settings.show_channel_name": "Mostrar nombre canal",
+  "settings.target_lufs": "Nivel de volumen",
   "settings.yes": "Sí",
   "settings.no": "No",
 

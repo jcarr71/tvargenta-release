@@ -42,6 +42,7 @@
 
   "settings.title": "Settings",
   "settings.show_channel_name": "Show channel name",
+  "settings.target_lufs": "Loudness level",
   "settings.yes": "Yes",
   "settings.no": "No",
 
