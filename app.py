@@ -1015,11 +1015,8 @@ def bump_play(video_id):
 def load_metadata():
     return _read_json(METADATA_FILE, {})
 
-# Scan series directories on startup (must be after load_metadata is defined)
-try:
-    scan_series_directories()
-except Exception as e:
-    logger.error(f"[SERIES] Error during startup scan: {e}")
+# Note: Directory scanning moved to metadata_daemon.py (Phase 0)
+# The daemon handles discovery of both series and commercials
 
 def _iso_to_ts(iso_str):
     try:

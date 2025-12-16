@@ -2,7 +2,12 @@
 """
 Metadata Population Daemon for TVArgenta
 
-Background service that populates missing metadata for videos using a two-phase approach:
+Background service that discovers videos and populates missing metadata using a three-phase approach:
+
+Phase 0 (Directory Scan):
+- Scans content/videos/series/ for TV episode files
+- Scans content/videos/commercials/ for commercial files
+- Adds newly discovered videos to metadata.json
 
 Phase 1 (Fast Metadata):
 - duracion: Video duration in seconds
@@ -18,16 +23,18 @@ Usage:
     python3 metadata_daemon.py
 
 The daemon will:
-1. Phase 1: Process ALL videos for duration and thumbnails (fast)
-2. Phase 2: Process ALL videos for loudness analysis (slow)
-3. Sleep only when all metadata is complete
-4. Use nice/ionice for low CPU/IO priority
-5. Log all activity to content/logs/metadata_daemon.log
+1. Phase 0: Scan directories for new videos (series + commercials)
+2. Phase 1: Process ALL videos for duration and thumbnails (fast)
+3. Phase 2: Process ALL videos for loudness analysis (slow)
+4. Sleep only when all metadata is complete
+5. Use nice/ionice for low CPU/IO priority
+6. Log all activity to content/logs/metadata_daemon.log
 """
 
 import json
 import logging
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -52,6 +59,7 @@ SERIES_VIDEO_DIR = VIDEO_DIR / "series"
 COMMERCIALS_DIR = VIDEO_DIR / "commercials"
 METADATA_FILE = CONTENT_DIR / "metadata.json"
 METADATA_LOCK_FILE = CONTENT_DIR / ".metadata.lock"
+SERIES_FILE = CONTENT_DIR / "series.json"
 THUMB_DIR = CONTENT_DIR / "thumbnails"
 LOG_DIR = CONTENT_DIR / "logs"
 LOG_FILE = LOG_DIR / "metadata_daemon.log"
@@ -149,6 +157,193 @@ def save_metadata_fields(video_id, fields_to_update):
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp, METADATA_FILE)
+
+
+def load_series():
+    """Load series data from series.json."""
+    if SERIES_FILE.exists():
+        with open(SERIES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+
+def save_series(data):
+    """Save series data to series.json with atomic write."""
+    tmp = SERIES_FILE.with_suffix('.json.tmp')
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, SERIES_FILE)
+
+
+def parse_episode_info(filename):
+    """
+    Parse season/episode from filename. Returns (season, episode) or (None, None).
+    Supports: S01E05, s1e5, 1x05, Season 1 Episode 5, Season1Episode5
+    """
+    patterns = [
+        r'[Ss](\d+)[Ee](\d+)',                      # S01E05, s1e5
+        r'(\d+)[xX](\d+)',                           # 1x05
+        r'[Ss]eason\s*(\d+)\s*[Ee]pisode\s*(\d+)',  # Season 1 Episode 5, Season1Episode5
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, filename)
+        if match:
+            return int(match.group(1)), int(match.group(2))
+    return None, None
+
+
+def scan_series_directories():
+    """
+    Phase 0a: Scan series directories for new videos.
+    Discovers series folders and video files, adds them to metadata.json and series.json.
+    Returns number of new videos discovered.
+    """
+    if not SERIES_VIDEO_DIR.exists():
+        SERIES_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+        return 0
+
+    series_data = load_series()
+    changes_made = False
+    new_videos = 0
+
+    with metadata_lock():
+        metadata = load_metadata()
+
+        # Scan for series directories
+        for series_dir in SERIES_VIDEO_DIR.iterdir():
+            if not series_dir.is_dir():
+                continue
+
+            series_name = series_dir.name
+
+            # Add to series.json if not present
+            if series_name not in series_data:
+                series_data[series_name] = {
+                    "created": datetime.now().strftime("%Y-%m-%d")
+                }
+                logger.info(f"Discovered new series: {series_name}")
+                changes_made = True
+
+            # Scan for video files in this series
+            for video_file in series_dir.glob("*.mp4"):
+                video_id = video_file.stem  # filename without extension
+                series_path = f"series/{series_name}/{video_id}"
+
+                # Check if we already have metadata for this video
+                existing = metadata.get(video_id, {})
+
+                # Parse season/episode from filename
+                season, episode = parse_episode_info(video_id)
+
+                # Create or update metadata if missing or path changed
+                if video_id not in metadata or existing.get("series_path") != series_path:
+                    metadata[video_id] = {
+                        "title": existing.get("title") or video_id,
+                        "category": "tv_episode",
+                        "series": series_name,
+                        "series_path": series_path,
+                        "season": existing.get("season") or season,
+                        "episode": existing.get("episode") or episode,
+                        "tags": existing.get("tags", []),
+                        "personaje": existing.get("personaje", ""),
+                        "fecha": existing.get("fecha", ""),
+                        "modo": existing.get("modo", []),
+                        "duracion": existing.get("duracion"),
+                        "loudness_lufs": existing.get("loudness_lufs")
+                    }
+                    logger.info(f"Added series video: {series_path}")
+                    changes_made = True
+                    new_videos += 1
+
+        # Save changes
+        if changes_made:
+            # Save metadata with atomic write
+            tmp = METADATA_FILE.with_suffix('.json.tmp')
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, METADATA_FILE)
+
+            save_series(series_data)
+
+    return new_videos
+
+
+def scan_commercials_directory():
+    """
+    Phase 0b: Scan commercials directory for new videos.
+    Discovers commercial video files and adds them to metadata.json.
+    Returns number of new videos discovered.
+    """
+    if not COMMERCIALS_DIR.exists():
+        COMMERCIALS_DIR.mkdir(parents=True, exist_ok=True)
+        return 0
+
+    changes_made = False
+    new_videos = 0
+
+    with metadata_lock():
+        metadata = load_metadata()
+
+        # Scan for video files in commercials directory
+        for video_file in COMMERCIALS_DIR.glob("*.mp4"):
+            video_id = video_file.stem  # filename without extension
+            commercials_path = f"commercials/{video_id}"
+
+            # Check if we already have metadata for this video
+            existing = metadata.get(video_id, {})
+
+            # Create metadata if missing
+            if video_id not in metadata:
+                metadata[video_id] = {
+                    "title": video_id,
+                    "category": "commercial",
+                    "commercials_path": commercials_path,
+                    "tags": existing.get("tags", []),
+                    "personaje": existing.get("personaje", ""),
+                    "fecha": existing.get("fecha", ""),
+                    "modo": existing.get("modo", []),
+                    "duracion": existing.get("duracion"),
+                    "loudness_lufs": existing.get("loudness_lufs")
+                }
+                logger.info(f"Added commercial: {commercials_path}")
+                changes_made = True
+                new_videos += 1
+
+        # Save changes
+        if changes_made:
+            tmp = METADATA_FILE.with_suffix('.json.tmp')
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, METADATA_FILE)
+
+    return new_videos
+
+
+def scan_all_directories():
+    """
+    Phase 0: Scan all video directories for new content.
+    Returns total number of new videos discovered.
+    """
+    logger.info("=" * 50)
+    logger.info("PHASE 0: Directory Scan")
+    logger.info("=" * 50)
+
+    series_count = scan_series_directories()
+    commercials_count = scan_commercials_directory()
+
+    total = series_count + commercials_count
+    if total > 0:
+        logger.info(f"[Phase 0] Discovered {series_count} series videos, {commercials_count} commercials")
+    else:
+        logger.info("[Phase 0] No new videos discovered")
+
+    return total
 
 
 def get_video_path(video_id, info):
@@ -439,7 +634,7 @@ def run_phase(phase_name, find_func):
 
 
 def run_daemon():
-    """Main daemon loop with two-phase processing."""
+    """Main daemon loop with three-phase processing."""
     global running
 
     logger.info("TVArgenta Metadata Daemon starting...")
@@ -448,13 +643,20 @@ def run_daemon():
     logger.info(f"  Nice level: {NICE_LEVEL}")
     logger.info(f"  I/O class: {IONICE_CLASS} (best-effort), priority: {IONICE_PRIORITY}")
     logger.info(f"  Log file: {LOG_FILE}")
-    logger.info(f"Two-phase operation:")
+    logger.info(f"Three-phase operation:")
+    logger.info(f"  Phase 0: Directory Scan (discover new videos)")
     logger.info(f"  Phase 1: Duration + Thumbnails (fast)")
     logger.info(f"  Phase 2: Loudness Analysis (slow)")
 
     while running:
         try:
-            # Load current metadata
+            # Phase 0: Scan directories for new videos
+            scan_all_directories()
+
+            if not running:
+                break
+
+            # Load current metadata (may have been updated by Phase 0)
             metadata = load_metadata()
 
             if not metadata:
@@ -488,8 +690,8 @@ def run_daemon():
                     logger.info("=" * 50)
                     run_phase("Phase 2", find_videos_needing_loudness)
 
-            # After both phases complete, loop back to check for new videos
-            logger.info("Both phases complete, checking for new videos...")
+            # After all phases complete, loop back to check for new videos
+            logger.info("All phases complete, checking for new videos...")
 
         except KeyboardInterrupt:
             logger.info("Interrupted by keyboard")
