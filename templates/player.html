@@ -1379,21 +1379,57 @@
 			lastBroadcastVideoId = data.video_id;
 			lastBroadcastSeekTo = targetPos;
 
-			currentVideo = data.video_id;
-			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
-			video.load();
-
-			if (lastBroadcastSeekTo > 0) {
-			  video.addEventListener('loadedmetadata', function seekHandler() {
-				video.currentTime = lastBroadcastSeekTo;
-				video.removeEventListener('loadedmetadata', seekHandler);
-			  }, { once: true });
+			// Calculate target volume with loudness adjustment
+			let targetVolume = 1.0;
+			if (data.loudness_lufs !== null && data.loudness_lufs !== undefined) {
+			  const TARGET_LUFS = -16;
+			  const dbOffset = TARGET_LUFS - data.loudness_lufs;
+			  const volumeScale = Math.pow(10, dbOffset / 20);
+			  targetVolume = Math.max(0.05, Math.min(1, baseVolume * volumeScale));
 			}
 
-			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			// Helper to load and play with fade-in
+			const loadNewBroadcastVideo = () => {
+			  currentVideo = data.video_id;
+			  video.src = data.video_url || `/videos/${data.video_id}.mp4`;
+			  video.load();
 
-			// Apply loudness-based volume normalization
-			applyLoudnessVolumeAdjustment(data.loudness_lufs);
+			  if (lastBroadcastSeekTo > 0) {
+				video.addEventListener('loadedmetadata', function seekHandler() {
+				  video.currentTime = lastBroadcastSeekTo;
+				  video.removeEventListener('loadedmetadata', seekHandler);
+				}, { once: true });
+			  }
+
+			  // Fade in to avoid pop
+			  video.volume = 0;
+			  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			  const fadeIn = setInterval(() => {
+				if (video.volume < targetVolume - 0.1) {
+				  video.volume = Math.min(targetVolume, video.volume + 0.15);
+				} else {
+				  video.volume = targetVolume;
+				  clearInterval(fadeIn);
+				}
+			  }, 20);
+			};
+
+			// Fade out first, then load new video
+			if (!video.paused && video.volume > 0) {
+			  const fadeOut = setInterval(() => {
+				if (video.volume > 0.1) {
+				  video.volume = Math.max(0, video.volume - 0.15);
+				} else {
+				  video.volume = 0;
+				  clearInterval(fadeOut);
+				  video.pause();
+				  loadNewBroadcastVideo();
+				}
+			  }, 20);
+			} else {
+			  video.pause();
+			  loadNewBroadcastVideo();
+			}
 		  } else if (seekDrift > 5) {
 			// Same video but we've drifted more than 5 seconds - resync
 			console.log(`[TV] Broadcast resync: drift=${seekDrift.toFixed(1)}s`);
