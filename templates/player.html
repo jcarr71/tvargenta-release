@@ -1120,8 +1120,9 @@
 
 			// Helper to load and start the new video
 			const loadAndPlayNewVideo = () => {
-			  // Set volume to 0 BEFORE loading for same-channel (prevents pop)
+			  // For same-channel: mute before loading (more reliable than volume=0)
 			  if (!cambioDeCanal) {
+				video.muted = true;
 				video.volume = 0;
 			  }
 
@@ -1139,16 +1140,24 @@
 
 			  // Fade audio in for same-channel transitions (avoid pop)
 			  if (!cambioDeCanal) {
-				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
-				const fadeIn = setInterval(() => {
-				  if (video.volume < targetVolume - 0.1) {
-					video.volume = Math.min(targetVolume, video.volume + 0.15);
-				  } else {
-					video.volume = targetVolume;
-					clearInterval(fadeIn);
-					isAudioTransitioning = false;
-				  }
-				}, 20);
+				// Wait for video to be ready before playing
+				video.addEventListener('canplay', function onCanPlay() {
+				  video.removeEventListener('canplay', onCanPlay);
+				  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+				  // Wait a moment for playback to stabilize, then unmute and fade in
+				  setTimeout(() => {
+					video.muted = false;
+					const fadeIn = setInterval(() => {
+					  if (video.volume < targetVolume - 0.1) {
+						video.volume = Math.min(targetVolume, video.volume + 0.15);
+					  } else {
+						video.volume = targetVolume;
+						clearInterval(fadeIn);
+						isAudioTransitioning = false;
+					  }
+					}, 20);
+				  }, 50);
+				}, { once: true });
 			  } else {
 				// Channel change: play immediately (keep the pop), then apply loudness
 				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
@@ -1411,7 +1420,8 @@
 
 			// Helper to load and play with fade-in
 			const loadNewBroadcastVideo = () => {
-			  // Set volume to 0 BEFORE loading (prevents pop)
+			  // Mute before loading (more reliable than volume=0)
+			  video.muted = true;
 			  video.volume = 0;
 
 			  currentVideo = data.video_id;
@@ -1425,17 +1435,24 @@
 				}, { once: true });
 			  }
 
-			  // Fade in to avoid pop
-			  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
-			  const fadeIn = setInterval(() => {
-				if (video.volume < targetVolume - 0.1) {
-				  video.volume = Math.min(targetVolume, video.volume + 0.15);
-				} else {
-				  video.volume = targetVolume;
-				  clearInterval(fadeIn);
-				  isAudioTransitioning = false;
-				}
-			  }, 20);
+			  // Wait for video to be ready before playing
+			  video.addEventListener('canplay', function onCanPlay() {
+				video.removeEventListener('canplay', onCanPlay);
+				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+				// Wait for playback to stabilize, then unmute and fade in
+				setTimeout(() => {
+				  video.muted = false;
+				  const fadeIn = setInterval(() => {
+					if (video.volume < targetVolume - 0.1) {
+					  video.volume = Math.min(targetVolume, video.volume + 0.15);
+					} else {
+					  video.volume = targetVolume;
+					  clearInterval(fadeIn);
+					  isAudioTransitioning = false;
+					}
+				  }, 20);
+				}, 50);
+			  }, { once: true });
 			};
 
 			// Fade out first, then load new video
