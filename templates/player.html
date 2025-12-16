@@ -822,6 +822,68 @@
 	  console.log(`[LOUDNESS] ${contentLufs} LUFS → target ${TARGET_LUFS} LUFS (${dbOffset > 0 ? '+' : ''}${dbOffset.toFixed(1)} dB, volume ${(adjustedVolume * 100).toFixed(0)}%)`);
 	}
 
+	// Background noise generator to keep amp awake (prevents pop on video transitions)
+	let ampKeepAliveContext = null;
+	let ampKeepAliveGain = null;
+	let ampKeepAliveSource = null;
+
+	/**
+	 * Start inaudible background noise to keep the amplifier from entering standby.
+	 * This prevents the "pop" sound when videos transition on the same channel.
+	 */
+	function startAmpKeepAlive() {
+	  if (ampKeepAliveContext) return; // Already running
+
+	  try {
+		ampKeepAliveContext = new (window.AudioContext || window.webkitAudioContext)();
+
+		// Create noise buffer (white noise)
+		const bufferSize = ampKeepAliveContext.sampleRate * 2; // 2 seconds of noise
+		const noiseBuffer = ampKeepAliveContext.createBuffer(1, bufferSize, ampKeepAliveContext.sampleRate);
+		const output = noiseBuffer.getChannelData(0);
+		for (let i = 0; i < bufferSize; i++) {
+		  output[i] = Math.random() * 2 - 1; // Random values between -1 and 1
+		}
+
+		// Create source node (loops the noise buffer)
+		ampKeepAliveSource = ampKeepAliveContext.createBufferSource();
+		ampKeepAliveSource.buffer = noiseBuffer;
+		ampKeepAliveSource.loop = true;
+
+		// Create gain node to make it inaudible (~-60dB)
+		ampKeepAliveGain = ampKeepAliveContext.createGain();
+		ampKeepAliveGain.gain.value = 0.001; // -60dB, essentially inaudible
+
+		// Connect: source -> gain -> output
+		ampKeepAliveSource.connect(ampKeepAliveGain);
+		ampKeepAliveGain.connect(ampKeepAliveContext.destination);
+
+		// Start playing
+		ampKeepAliveSource.start();
+		console.log("[AMP] Keep-alive noise started");
+	  } catch (e) {
+		console.warn("[AMP] Failed to start keep-alive noise:", e);
+	  }
+	}
+
+	/**
+	 * Stop the background noise (call before channel changes to allow pop).
+	 */
+	function stopAmpKeepAlive() {
+	  if (!ampKeepAliveContext) return;
+
+	  try {
+		ampKeepAliveSource?.stop();
+		ampKeepAliveContext?.close();
+	  } catch (e) {
+		// Ignore errors on cleanup
+	  }
+	  ampKeepAliveContext = null;
+	  ampKeepAliveGain = null;
+	  ampKeepAliveSource = null;
+	  console.log("[AMP] Keep-alive noise stopped");
+	}
+
 	// Idiomas disponibles (orden = visual en el menú)
 	const AVAILABLE_LANGS = [
 	  { code: "es", key: "lang.es", label: "Español" },
@@ -987,6 +1049,8 @@
 	  video.muted = false;
 	  updateMuteIndicatorFromVol();
 	  video.play();
+	  // Start amp keep-alive noise after user interaction
+	  startAmpKeepAlive();
 	}, { once: true });
 
 	document.addEventListener("DOMContentLoaded", async () => {
@@ -1062,6 +1126,8 @@
 		  if (data.channel_type === "av_input") {
 			const cambioDeCanal = data.modo !== ultimoCanal;
 			if (cambioDeCanal) {
+			  // Stop keep-alive before channel change to allow pop
+			  stopAmpKeepAlive();
 			  ultimoCanal = data.modo;
 			  currentVideo = null;
 			  // Show channel indicator (VCR mode may override this)
@@ -1072,6 +1138,8 @@
 			  if (typeof updateVcrChannelMode === 'function') {
 				updateVcrChannelMode("03");
 			  }
+			  // Restart keep-alive after channel change
+			  startAmpKeepAlive();
 			}
 			return;
 		  }
@@ -1163,6 +1231,8 @@
 				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 				video.volume = targetVolume;
 				isAudioTransitioning = false;
+				// Restart keep-alive after channel change completes
+				startAmpKeepAlive();
 			  }
 			};
 
@@ -1188,6 +1258,10 @@
 			} else {
 			  // Channel change, video ended, or video was paused: transition now
 			  isAudioTransitioning = true;
+			  // Stop keep-alive before channel change to allow the pop
+			  if (cambioDeCanal) {
+				stopAmpKeepAlive();
+			  }
 			  video.pause();
 			  loadAndPlayNewVideo();
 			}
