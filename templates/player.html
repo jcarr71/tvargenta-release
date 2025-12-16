@@ -787,6 +787,7 @@
 	let lastBroadcastSeekTo = 0;           // last scheduled seek position
 	let broadcastSyncInterval = null;      // interval for syncing broadcast content
 	const BROADCAST_SYNC_INTERVAL_MS = 2000; // check for content changes every 2 seconds
+	let isAudioTransitioning = false;      // lock to prevent concurrent fade transitions
 
 	// Loudness-based volume normalization
 	// Adjusts all content to a target loudness level (-16 LUFS)
@@ -1119,6 +1120,11 @@
 
 			// Helper to load and start the new video
 			const loadAndPlayNewVideo = () => {
+			  // Set volume to 0 BEFORE loading for same-channel (prevents pop)
+			  if (!cambioDeCanal) {
+				video.volume = 0;
+			  }
+
 			  video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			  video.load();
 
@@ -1133,7 +1139,6 @@
 
 			  // Fade audio in for same-channel transitions (avoid pop)
 			  if (!cambioDeCanal) {
-				video.volume = 0;
 				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 				const fadeIn = setInterval(() => {
 				  if (video.volume < targetVolume - 0.1) {
@@ -1141,17 +1146,26 @@
 				  } else {
 					video.volume = targetVolume;
 					clearInterval(fadeIn);
+					isAudioTransitioning = false;
 				  }
 				}, 20);
 			  } else {
 				// Channel change: play immediately (keep the pop), then apply loudness
 				video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 				video.volume = targetVolume;
+				isAudioTransitioning = false;
 			  }
 			};
 
-			// Same-channel video change: fade out audio first
-			if (!cambioDeCanal && !video.paused && video.volume > 0) {
+			// Prevent concurrent transitions
+			if (isAudioTransitioning) {
+			  console.log("[TV] Skipping transition - already in progress");
+			  return;
+			}
+
+			// Same-channel video change: fade out audio first (if audio is playing)
+			if (!cambioDeCanal && !video.paused && !video.ended && video.volume > 0) {
+			  isAudioTransitioning = true;
 			  const fadeOut = setInterval(() => {
 				if (video.volume > 0.1) {
 				  video.volume = Math.max(0, video.volume - 0.15);
@@ -1163,7 +1177,8 @@
 				}
 			  }, 20);
 			} else {
-			  // Channel change or video was paused: immediate transition (pop for channel changes)
+			  // Channel change, video ended, or video was paused: transition now
+			  isAudioTransitioning = true;
 			  video.pause();
 			  loadAndPlayNewVideo();
 			}
@@ -1379,6 +1394,12 @@
 			lastBroadcastVideoId = data.video_id;
 			lastBroadcastSeekTo = targetPos;
 
+			// Prevent concurrent transitions
+			if (isAudioTransitioning) {
+			  console.log("[TV] Broadcast sync skipping - transition in progress");
+			  return;
+			}
+
 			// Calculate target volume with loudness adjustment
 			let targetVolume = 1.0;
 			if (data.loudness_lufs !== null && data.loudness_lufs !== undefined) {
@@ -1390,6 +1411,9 @@
 
 			// Helper to load and play with fade-in
 			const loadNewBroadcastVideo = () => {
+			  // Set volume to 0 BEFORE loading (prevents pop)
+			  video.volume = 0;
+
 			  currentVideo = data.video_id;
 			  video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			  video.load();
@@ -1402,7 +1426,6 @@
 			  }
 
 			  // Fade in to avoid pop
-			  video.volume = 0;
 			  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 			  const fadeIn = setInterval(() => {
 				if (video.volume < targetVolume - 0.1) {
@@ -1410,12 +1433,14 @@
 				} else {
 				  video.volume = targetVolume;
 				  clearInterval(fadeIn);
+				  isAudioTransitioning = false;
 				}
 			  }, 20);
 			};
 
 			// Fade out first, then load new video
-			if (!video.paused && video.volume > 0) {
+			isAudioTransitioning = true;
+			if (!video.paused && !video.ended && video.volume > 0) {
 			  const fadeOut = setInterval(() => {
 				if (video.volume > 0.1) {
 				  video.volume = Math.max(0, video.volume - 0.15);
