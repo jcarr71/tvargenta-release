@@ -954,8 +954,8 @@
 		  const oscillator = persistentAudioCtx.createOscillator();
 		  const gainNode = persistentAudioCtx.createGain();
 
-		  oscillator.frequency.value = 60;  // Low hum (mains frequency - blends naturally)
-		  gainNode.gain.value = 0.02;       // Quiet but audible enough to keep DAC alive
+		  oscillator.frequency.value = 440;  // A4 note - very obvious
+		  gainNode.gain.value = 0.3;        // LOUD - for testing only
 
 		  oscillator.connect(gainNode);
 		  gainNode.connect(persistentAudioCtx.destination);
