@@ -776,6 +776,7 @@
 	let ultimaCarga = 0;            // timestamp de última carga efectiva
 	const MIN_INTERVAL_MS = 100;    // minimal debounce (reduced from 1200ms for responsiveness)
 	let reloadTimer = null;         // timer para reintento diferido de reload
+	let requestSequence = 0;        // sequence number to detect stale responses
 
 	let playedReportedFor = null;   // video_id para el que ya se reportó play
 	let playedTimer = null;         // timeout a 10s
@@ -1038,6 +1039,9 @@
 		return;
 	  }
 
+	  // Increment sequence to invalidate any in-flight responses
+	  const thisRequest = ++requestSequence;
+
 	  // Cancel any pending request - new channel change takes priority
 	  if (currentFetchController) {
 		currentFetchController.abort();
@@ -1058,6 +1062,12 @@
 	  fetch('/api/next_video', { signal: currentFetchController.signal })
 		.then(res => res.json())
 		.then(data => {
+		  // Stale response check - ignore if user changed channel while waiting
+		  if (thisRequest !== requestSequence) {
+			console.debug("[TV] Stale response ignored", { thisRequest, currentSequence: requestSequence });
+			return;
+		  }
+
 		  // Handle Channel 03 (AV input) specially
 		  if (data.channel_type === "av_input") {
 			const cambioDeCanal = data.modo !== ultimoCanal;
@@ -1306,9 +1316,18 @@
 	  broadcastSyncInterval = setInterval(async () => {
 		if (!isBroadcastChannel) return;
 
+		// Capture sequence before fetch to detect channel changes during request
+		const seqBeforeFetch = requestSequence;
+
 		try {
 		  const res = await fetch("/api/next_video");
 		  const data = await res.json();
+
+		  // If user changed channel while we were fetching, ignore this response
+		  if (seqBeforeFetch !== requestSequence) {
+			console.debug("[TV] Broadcast sync: stale response ignored");
+			return;
+		  }
 
 		  if (!data.is_broadcast) {
 			// Channel changed to non-broadcast
@@ -3293,9 +3312,19 @@ function ejecutarSeleccion() {
   }
 
   async function pollVcrState() {
+    // Capture sequence before fetch to detect channel changes during request
+    const seqBeforeFetch = requestSequence;
+
     try {
       const res = await fetch("/api/vcr/state");
       const data = await res.json();
+
+      // If user changed channel while we were fetching, ignore this response
+      if (seqBeforeFetch !== requestSequence) {
+        console.debug("[VCR] Stale poll response ignored");
+        return;
+      }
+
       if (data.ok) {
         vcrState = data;
         updateVcrDisplay(data);
@@ -3304,6 +3333,11 @@ function ejecutarSeleccion() {
         updateVcrDisplay({ reader_attached: false });
       }
     } catch (e) {
+      // If user changed channel while we were fetching, ignore errors too
+      if (seqBeforeFetch !== requestSequence) {
+        console.debug("[VCR] Stale poll error ignored");
+        return;
+      }
       console.error("[VCR] poll error:", e);
       // Network error - show snow
       updateVcrDisplay({ reader_attached: false });
