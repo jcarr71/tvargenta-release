@@ -24,9 +24,26 @@
       width: 100vw;
       height: 100vh;
       object-fit: cover;
+      position: fixed;
+      top: 0;
+      left: 0;
     }
-	
-	
+
+    #tvVideoA {
+      z-index: 1;
+    }
+
+    #tvVideoB {
+      z-index: 2;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #tvVideoB.crossfade-active {
+      opacity: 1;
+    }
+
+
 	#root, video {
 	  width: 100vw;
 	  height: 100vh;
@@ -611,7 +628,9 @@
   
 </head>
 <body>
-  <video id="tvVideo" autoplay playsinline disableRemotePlayback></video>
+  <!-- Dual video elements for seamless crossfade transitions -->
+  <video id="tvVideoA" autoplay playsinline disableRemotePlayback></video>
+  <video id="tvVideoB" playsinline disableRemotePlayback muted></video>
   <img id="no-signal" src="/static/no_signal.png" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:10;">
   <div id="channel-indicator" class="hidden" style="position:fixed !important; z-index:2147483647 !important;"></div>
   <div id="overlay">{{ tr("overlay.loading_channel") }}</div>
@@ -756,18 +775,48 @@
 
 
   <script>
-    const video = document.getElementById('tvVideo');
-	video.muted = false;
-	video.volume = 0.5;
-	
-	video.addEventListener('volumechange', () => {
-	  if (video.volume === 0 || video.muted) {
-		mostrarIconoMute(true);
-	  } else {
-		mostrarIconoMute(false);
-	  }
-	});
-	
+    // ========================================================================
+    // DUAL VIDEO ELEMENT SYSTEM FOR SEAMLESS CROSSFADE TRANSITIONS
+    // ========================================================================
+    const videoA = document.getElementById('tvVideoA');
+    const videoB = document.getElementById('tvVideoB');
+
+    // Active video is the one currently playing and audible
+    // Preload video is hidden, muted, and loading the next content
+    let activeVideo = videoA;
+    let preloadVideo = videoB;
+
+    // Alias for backwards compatibility with existing code
+    let video = activeVideo;
+
+    // Preload state
+    let preloadedData = null;           // Data for the preloaded video
+    let preloadInProgress = false;      // Whether preload fetch is in progress
+    let preloadReady = false;           // Whether preload video is ready to play
+    const PRELOAD_AHEAD_SEC = 2;        // Start preload this many seconds before end
+    const CROSSFADE_DURATION_MS = 200;  // Audio crossfade duration
+
+    // Initialize both video elements
+    videoA.muted = false;
+    videoA.volume = 0.5;
+    videoB.muted = true;
+    videoB.volume = 0;
+
+    // Volume change listener on active video
+    function setupVolumeChangeListener(vid) {
+      vid.addEventListener('volumechange', () => {
+        if (vid === activeVideo) {
+          if (vid.volume === 0 || vid.muted) {
+            mostrarIconoMute(true);
+          } else {
+            mostrarIconoMute(false);
+          }
+        }
+      });
+    }
+    setupVolumeChangeListener(videoA);
+    setupVolumeChangeListener(videoB);
+
     const overlay = document.getElementById('overlay');
     let currentVideo = null;
 	let ultimoCanal = null;
@@ -820,6 +869,194 @@
 	  video.volume = adjustedVolume;
 	  console.log(`[LOUDNESS] ${contentLufs} LUFS → target ${TARGET_LUFS} LUFS (${dbOffset > 0 ? '+' : ''}${dbOffset.toFixed(1)} dB, volume ${(adjustedVolume * 100).toFixed(0)}%)`);
 	}
+
+    // ========================================================================
+    // PRELOAD AND CROSSFADE SYSTEM
+    // ========================================================================
+
+    /**
+     * Start preloading the next video into the inactive video element.
+     * Called when current video is PRELOAD_AHEAD_SEC from ending.
+     */
+    async function startPreload() {
+      if (preloadInProgress || preloadReady) {
+        return; // Already preloading or preloaded
+      }
+
+      preloadInProgress = true;
+      console.log('[PRELOAD] Starting preload...');
+
+      try {
+        const response = await fetch(`/api/peek_next_video?seconds_ahead=${PRELOAD_AHEAD_SEC + 1}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.skip_preload) {
+          console.log(`[PRELOAD] Skipping: ${data.reason}`);
+          preloadInProgress = false;
+          return;
+        }
+
+        // Store the preloaded data for use during crossfade
+        preloadedData = data;
+
+        // Load into preload video element
+        preloadVideo.src = data.video_url;
+        preloadVideo.load();
+
+        // For broadcast content, seek to the correct position
+        if (data.seek_to && data.seek_to > 0) {
+          preloadVideo.addEventListener('loadedmetadata', function seekHandler() {
+            preloadVideo.currentTime = data.seek_to;
+            preloadVideo.removeEventListener('loadedmetadata', seekHandler);
+            console.log(`[PRELOAD] Seek to ${data.seek_to}s`);
+          }, { once: true });
+        }
+
+        // Mark as ready when enough data is buffered
+        preloadVideo.addEventListener('canplaythrough', function readyHandler() {
+          preloadReady = true;
+          preloadInProgress = false;
+          preloadVideo.removeEventListener('canplaythrough', readyHandler);
+          console.log(`[PRELOAD] Ready: ${data.video_id}`);
+        }, { once: true });
+
+        // Handle preload errors
+        preloadVideo.addEventListener('error', function errorHandler() {
+          console.error('[PRELOAD] Error loading video');
+          preloadInProgress = false;
+          preloadReady = false;
+          preloadedData = null;
+          preloadVideo.removeEventListener('error', errorHandler);
+        }, { once: true });
+
+      } catch (e) {
+        console.error('[PRELOAD] Fetch error:', e);
+        preloadInProgress = false;
+      }
+    }
+
+    /**
+     * Calculate the target volume for a video given its LUFS value.
+     * Does not apply the volume, just calculates it.
+     */
+    function calculateLoudnessVolume(contentLufs) {
+      if (contentLufs === null || contentLufs === undefined) {
+        return baseVolume;
+      }
+      const dbOffset = TARGET_LUFS - contentLufs;
+      const volumeScale = Math.pow(10, dbOffset / 20);
+      return Math.max(0.05, Math.min(1, baseVolume * volumeScale));
+    }
+
+    /**
+     * Perform crossfade transition from active video to preloaded video.
+     * Fades audio smoothly and swaps video elements.
+     */
+    async function performCrossfade() {
+      if (!preloadReady || !preloadedData) {
+        console.log('[CROSSFADE] Not ready, falling back to normal load');
+        return false; // Signal that crossfade didn't happen
+      }
+
+      console.log(`[CROSSFADE] Starting crossfade to ${preloadedData.video_id}`);
+
+      const oldVideo = activeVideo;
+      const newVideo = preloadVideo;
+      const data = preloadedData;
+
+      // Calculate target volume for new video (with loudness normalization)
+      const targetVolume = data.is_broadcast
+        ? calculateLoudnessVolume(data.loudness_lufs)
+        : baseVolume;
+
+      // Prepare new video (still muted, will unmute during fade)
+      newVideo.muted = false;
+      newVideo.volume = 0;
+
+      // Start playing new video
+      try {
+        await newVideo.play();
+      } catch (e) {
+        console.warn('[CROSSFADE] Play rejected:', e);
+        return false;
+      }
+
+      // Show new video (it's on top due to z-index)
+      newVideo.classList.add('crossfade-active');
+
+      // Perform audio crossfade
+      const steps = 20;
+      const stepDuration = CROSSFADE_DURATION_MS / steps;
+      const oldStartVolume = oldVideo.volume;
+
+      for (let i = 1; i <= steps; i++) {
+        await new Promise(r => setTimeout(r, stepDuration));
+        const progress = i / steps;
+        // Fade out old
+        oldVideo.volume = oldStartVolume * (1 - progress);
+        // Fade in new
+        newVideo.volume = targetVolume * progress;
+      }
+
+      // Ensure final volumes are exact
+      oldVideo.volume = 0;
+      newVideo.volume = targetVolume;
+
+      // Stop and reset old video
+      oldVideo.pause();
+      oldVideo.removeAttribute('src');
+      oldVideo.load(); // Reset
+      oldVideo.classList.remove('crossfade-active');
+      oldVideo.muted = true;
+
+      // Swap roles
+      activeVideo = newVideo;
+      preloadVideo = oldVideo;
+      video = activeVideo; // Update alias
+
+      // Update state with preloaded data
+      currentVideo = data.video_id;
+
+      // Reset preload state
+      preloadedData = null;
+      preloadReady = false;
+      preloadInProgress = false;
+
+      console.log(`[CROSSFADE] Complete. Now playing: ${currentVideo}`);
+      return true; // Signal successful crossfade
+    }
+
+    /**
+     * Reset preload state (e.g., on channel change).
+     */
+    function resetPreload() {
+      preloadedData = null;
+      preloadReady = false;
+      preloadInProgress = false;
+      preloadVideo.pause();
+      preloadVideo.removeAttribute('src');
+      preloadVideo.load();
+      preloadVideo.classList.remove('crossfade-active');
+      console.log('[PRELOAD] Reset');
+    }
+
+    /**
+     * Check if we should start preloading based on current playback position.
+     * Called from timeupdate event.
+     */
+    function checkPreloadTrigger() {
+      if (preloadInProgress || preloadReady) return;
+      if (!activeVideo.duration || activeVideo.duration === Infinity) return;
+
+      const timeRemaining = activeVideo.duration - activeVideo.currentTime;
+      if (timeRemaining <= PRELOAD_AHEAD_SEC && timeRemaining > 0) {
+        startPreload();
+      }
+    }
 
 	// Idiomas disponibles (orden = visual en el menú)
 	const AVAILABLE_LANGS = [
@@ -1029,7 +1266,7 @@
 	  });
 
 	
-	function cargarSiguienteVideo(force = false) {
+	async function cargarSiguienteVideo(force = false) {
 	  const ahora = Date.now();
 
 	  // Minimal debounce to prevent double-triggers
@@ -1044,8 +1281,21 @@
 	  }
 	  currentFetchController = new AbortController();
 
-	  // Stop current video immediately for faster perceived response
-	  video.pause();
+	  // Reset preload state since we're changing videos
+	  resetPreload();
+
+	  // Fade out audio before stopping to prevent pop
+	  const originalVolume = activeVideo.volume;
+	  const fadeSteps = 10;
+	  const fadeStepMs = CROSSFADE_DURATION_MS / fadeSteps;
+	  for (let i = fadeSteps; i >= 0; i--) {
+		activeVideo.volume = originalVolume * (i / fadeSteps);
+		await new Promise(r => setTimeout(r, fadeStepMs));
+	  }
+
+	  // Stop current video
+	  activeVideo.pause();
+	  video = activeVideo; // Ensure alias is correct
 
 	  // Stop VCR polling immediately to prevent race condition where VCR poll
 	  // restarts playback during async fetch (will be restarted if staying on ch 03)
@@ -1108,6 +1358,14 @@
 		  // Solo cambiamos el src si verdaderamente cambia el video o es forzado
 		  if (cambioDeVideo ) {
 			currentVideo = data.video_id;
+
+			// Calculate target volume before loading
+			const targetVolume = isBroadcast
+			  ? calculateLoudnessVolume(data.loudness_lufs)
+			  : baseVolume;
+
+			// Start with volume at 0 for fade-in
+			video.volume = 0;
 			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
 			video.load();
 
@@ -1120,13 +1378,21 @@
 			  }, { once: true });
 			}
 
+			// Fade in audio after playback starts
+			video.addEventListener('canplaythrough', async function fadeInHandler() {
+			  video.removeEventListener('canplaythrough', fadeInHandler);
+			  // Fade in over CROSSFADE_DURATION_MS
+			  const fadeSteps = 10;
+			  const fadeStepMs = CROSSFADE_DURATION_MS / fadeSteps;
+			  for (let i = 1; i <= fadeSteps; i++) {
+				video.volume = targetVolume * (i / fadeSteps);
+				await new Promise(r => setTimeout(r, fadeStepMs));
+			  }
+			  video.volume = targetVolume; // Ensure exact final value
+			}, { once: true });
+
 			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
 			// Channel badge removed for immersion
-
-			// Apply loudness-based volume normalization for broadcast content
-			if (isBroadcast) {
-			  applyLoudnessVolumeAdjustment(data.loudness_lufs);
-			}
 
 			// --- armado del umbral de "play real" ---
 			// Skip play reporting for broadcast system videos (test pattern, commercials)
@@ -1253,7 +1519,11 @@
 
 
 
-    video.addEventListener('ended', () => {
+    // Handle video ended event - attached to both video elements
+    async function handleVideoEnded(event) {
+      // Only handle if this is the active video
+      if (event.target !== activeVideo) return;
+
       // Check if we're on VCR channel - auto-rewind like a real VCR
       if (currentChannelId === VCR_CHANNEL_ID && vcrState?.tape_inserted && !vcrState?.is_rewinding) {
         console.log("[VCR] Tape ended - auto-rewinding");
@@ -1268,15 +1538,46 @@
         return;
       }
 
-      // Normal channel behavior - load next video
-      // Si por algún motivo no se reportó (video muy corto, etc.), reportá ahora:
-	  if (currentVideo && playedReportedFor !== currentVideo) {
-		playedReportedFor = currentVideo;
-		reportPlayed(currentVideo);
-	  }
-	  cargarSiguienteVideo(true);
-    });
-	
+      // Report play if not yet reported
+      if (currentVideo && playedReportedFor !== currentVideo) {
+        playedReportedFor = currentVideo;
+        reportPlayed(currentVideo);
+      }
+
+      // Try crossfade first if preload is ready
+      if (preloadReady && preloadedData) {
+        const crossfadeSuccess = await performCrossfade();
+        if (crossfadeSuccess) {
+          // Crossfade handled the transition, set up play reporting for new video
+          playedArmed = false;
+          clearTimeout(playedTimer);
+          playedTimer = setTimeout(() => {
+            if (currentVideo && playedReportedFor !== currentVideo) {
+              playedReportedFor = currentVideo;
+              reportPlayed(currentVideo);
+            }
+          }, 10000);
+          return;
+        }
+      }
+
+      // Fall back to normal loading if crossfade not available
+      cargarSiguienteVideo(true);
+    }
+
+    // Attach ended handler to both video elements
+    videoA.addEventListener('ended', handleVideoEnded);
+    videoB.addEventListener('ended', handleVideoEnded);
+
+    // Attach timeupdate handler for preload triggering
+    function handleTimeUpdate(event) {
+      if (event.target === activeVideo) {
+        checkPreloadTrigger();
+      }
+    }
+    videoA.addEventListener('timeupdate', handleTimeUpdate);
+    videoB.addEventListener('timeupdate', handleTimeUpdate);
+
 	setInterval(async () => {
 	  try {
 		const res = await fetch("/api/should_reload");
@@ -1337,21 +1638,46 @@
 			lastBroadcastVideoId = data.video_id;
 			lastBroadcastSeekTo = targetPos;
 
-			currentVideo = data.video_id;
-			video.src = data.video_url || `/videos/${data.video_id}.mp4`;
-			video.load();
+			// Reset preload state
+			resetPreload();
 
-			if (lastBroadcastSeekTo > 0) {
-			  video.addEventListener('loadedmetadata', function seekHandler() {
-				video.currentTime = lastBroadcastSeekTo;
-				video.removeEventListener('loadedmetadata', seekHandler);
+			// Calculate target volume with loudness normalization
+			const targetVolume = calculateLoudnessVolume(data.loudness_lufs);
+
+			// Fade out, load, fade in
+			(async () => {
+			  // Fade out
+			  const originalVolume = video.volume;
+			  const fadeSteps = 10;
+			  const fadeStepMs = CROSSFADE_DURATION_MS / fadeSteps;
+			  for (let i = fadeSteps; i >= 0; i--) {
+				video.volume = originalVolume * (i / fadeSteps);
+				await new Promise(r => setTimeout(r, fadeStepMs));
+			  }
+
+			  currentVideo = data.video_id;
+			  video.src = data.video_url || `/videos/${data.video_id}.mp4`;
+			  video.load();
+
+			  if (lastBroadcastSeekTo > 0) {
+				video.addEventListener('loadedmetadata', function seekHandler() {
+				  video.currentTime = lastBroadcastSeekTo;
+				  video.removeEventListener('loadedmetadata', seekHandler);
+				}, { once: true });
+			  }
+
+			  // Fade in after canplaythrough
+			  video.addEventListener('canplaythrough', async function fadeInHandler() {
+				video.removeEventListener('canplaythrough', fadeInHandler);
+				for (let i = 1; i <= fadeSteps; i++) {
+				  video.volume = targetVolume * (i / fadeSteps);
+				  await new Promise(r => setTimeout(r, fadeStepMs));
+				}
+				video.volume = targetVolume;
 			  }, { once: true });
-			}
 
-			video.play().catch(e => console.warn("[TV] play() rechazado:", e));
-
-			// Apply loudness-based volume normalization
-			applyLoudnessVolumeAdjustment(data.loudness_lufs);
+			  video.play().catch(e => console.warn("[TV] play() rechazado:", e));
+			})();
 		  } else if (seekDrift > 5) {
 			// Same video but we've drifted more than 5 seconds - resync
 			console.log(`[TV] Broadcast resync: drift=${seekDrift.toFixed(1)}s`);

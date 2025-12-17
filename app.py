@@ -1861,6 +1861,148 @@ def api_next_video():
     })
 
 
+@app.route("/api/peek_next_video")
+def api_peek_next_video():
+    """
+    Peek at what the next video will be without advancing state.
+    Used for preloading to enable seamless crossfade transitions.
+
+    Query params:
+        seconds_ahead: How many seconds in the future to look (default: 3)
+    """
+    from datetime import datetime, timedelta
+
+    seconds_ahead = request.args.get("seconds_ahead", 3, type=int)
+
+    canal_activo_path = str(CANAL_ACTIVO_FILE)
+    if not os.path.exists(canal_activo_path):
+        return jsonify({"error": "No active channel"}), 400
+
+    with open(canal_activo_path, "r", encoding="utf-8") as f:
+        activo = json.load(f)
+
+    canal_id = activo.get("canal_id")
+
+    # Channel 03 is VCR - no preloading
+    if canal_id == "03":
+        return jsonify({"skip_preload": True, "reason": "vcr_channel"})
+
+    canales = load_canales()
+    if canal_id not in canales:
+        return jsonify({"error": "Unknown channel"}), 400
+
+    config = canales[canal_id]
+
+    # Broadcast channels: query schedule at future timestamp
+    if config.get("series_filter"):
+        future_time = datetime.now() + timedelta(seconds=seconds_ahead)
+        scheduled = scheduler.get_scheduled_content(canal_id, timestamp=future_time)
+
+        if not scheduled:
+            return jsonify({"skip_preload": True, "reason": "no_scheduled_content"})
+
+        # Get loudness data
+        video_id = scheduled["video_id"]
+        metadata = load_metadata()
+        loudness_lufs = None
+        if video_id in metadata:
+            loudness_lufs = metadata[video_id].get("loudness_lufs")
+
+        return jsonify({
+            "video_id": video_id,
+            "video_url": scheduled["video_url"],
+            "seek_to": scheduled.get("seek_to", 0),
+            "broadcast_type": scheduled["type"],
+            "is_broadcast": True,
+            "loudness_lufs": loudness_lufs,
+            "modo": canal_id,
+            "canal_nombre": config.get("nombre", canal_id),
+            "canal_numero": get_canal_numero(canal_id, canales),
+            "preload": True
+        })
+
+    # On-demand channels: peek at what fairness algorithm would select
+    # without actually advancing the play state
+    metadata = load_metadata()
+
+    prioridad = config.get("tags_prioridad", [])
+    incluidos = set(config.get("tags_incluidos", prioridad))
+
+    if not incluidos:
+        return jsonify({"skip_preload": True, "reason": "no_tags_configured"})
+
+    canal_shown = shown_videos_por_canal.get(canal_id, [])
+
+    # Get last video's tags for variety scoring
+    prev = last_choice_per_canal.get(canal_id)
+    last_tags = set()
+    if prev:
+        prev_md = metadata.get(prev["video_id"], {})
+        last_tags = set(prev_md.get("tags", []))
+
+    # Score candidates (same logic as next_video but read-only)
+    candidatos = []
+    for vid, info in metadata.items():
+        if vid in canal_shown:
+            continue
+        tags_video = set(info.get("tags", []))
+        if not tags_video & incluidos:
+            continue
+
+        tag_score = sum(
+            len(prioridad) - prioridad.index(t)
+            for t in tags_video if t in prioridad
+        ) if prioridad else 0
+
+        plays = info.get("plays", 0)
+        last_ts = info.get("last_played_ts", 0)
+        overlap = len(tags_video & last_tags)
+
+        candidatos.append({
+            "video_id": vid,
+            "tag_score": tag_score,
+            "plays": plays,
+            "last_ts": last_ts,
+            "overlap": overlap,
+            "info": info
+        })
+
+    if not candidatos:
+        return jsonify({"skip_preload": True, "reason": "no_candidates"})
+
+    # Sort by fairness (same as next_video)
+    max_plays = max((c["plays"] for c in candidatos), default=1) or 1
+    max_ts = max((c["last_ts"] for c in candidatos), default=1) or 1
+
+    for c in candidatos:
+        c["fair_plays_norm"] = c["plays"] / max_plays
+        c["fair_last_ts"] = c["last_ts"] / max_ts
+
+    candidatos.sort(key=lambda x: (
+        -x["tag_score"],
+        x["fair_plays_norm"],
+        x["fair_last_ts"],
+        x["overlap"]
+    ))
+
+    elegido = candidatos[0]
+    elegido_id = elegido["video_id"]
+    elegido_data = elegido["info"]
+
+    series_path = elegido_data.get("series_path")
+    video_url = f"/videos/{series_path}.mp4" if series_path else f"/videos/{elegido_id}.mp4"
+
+    return jsonify({
+        "video_id": elegido_id,
+        "video_url": video_url,
+        "title": elegido_data.get("title", elegido_id.replace("_", " ")),
+        "tags": elegido_data.get("tags", []),
+        "modo": canal_id,
+        "canal_nombre": canales[canal_id].get("nombre", canal_id),
+        "canal_numero": get_canal_numero(canal_id, canales),
+        "preload": True
+    })
+
 
 def _get_all_series():
     """Get list of series names from series.json."""
