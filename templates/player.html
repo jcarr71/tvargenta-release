@@ -836,6 +836,7 @@
 	let lastBroadcastSeekTo = 0;           // last scheduled seek position
 	let broadcastSyncInterval = null;      // interval for syncing broadcast content
 	const BROADCAST_SYNC_INTERVAL_MS = 2000; // check for content changes every 2 seconds
+	let crossfadeInProgress = false;       // true during crossfade to prevent broadcast sync interference
 
 	// Loudness-based volume normalization
 	// Adjusts all content to a target loudness level (-16 LUFS)
@@ -964,9 +965,18 @@
 
       console.log(`[CROSSFADE] Starting crossfade to ${preloadedData.video_id}`);
 
+      // Set flag to prevent broadcast sync from interfering
+      crossfadeInProgress = true;
+
       const oldVideo = activeVideo;
       const newVideo = preloadVideo;
       const data = preloadedData;
+
+      // Update broadcast state EARLY to prevent race with broadcast sync
+      if (data.is_broadcast) {
+        lastBroadcastVideoId = data.video_id;
+        lastBroadcastSeekTo = data.seek_to || 0;
+      }
 
       // Calculate target volume for new video (with loudness normalization)
       const targetVolume = data.is_broadcast
@@ -982,6 +992,7 @@
         await newVideo.play();
       } catch (e) {
         console.warn('[CROSSFADE] Play rejected:', e);
+        crossfadeInProgress = false;
         return false;
       }
 
@@ -1021,10 +1032,11 @@
       // Update state with preloaded data
       currentVideo = data.video_id;
 
-      // Reset preload state
+      // Reset preload state and crossfade flag
       preloadedData = null;
       preloadReady = false;
       preloadInProgress = false;
+      crossfadeInProgress = false;
 
       console.log(`[CROSSFADE] Complete. Now playing: ${currentVideo}`);
       return true; // Signal successful crossfade
@@ -1606,6 +1618,12 @@
 
 	  broadcastSyncInterval = setInterval(async () => {
 		if (!isBroadcastChannel) return;
+
+		// Skip sync during crossfade to prevent double-loading
+		if (crossfadeInProgress) {
+		  console.log('[TV] Broadcast sync skipped - crossfade in progress');
+		  return;
+		}
 
 		try {
 		  const res = await fetch("/api/next_video");
