@@ -942,18 +942,29 @@
 
 
 	
-	 async function warmupAudio() {
+	 // Persistent audio context to keep DAC alive and prevent pops between videos
+	let persistentAudioCtx = null;
+
+	async function warmupAudio() {
 		try {
-		  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-		  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * 0.1), ctx.sampleRate); // 100 ms de silencio
-		  const src = ctx.createBufferSource();
-		  src.buffer = buf;
-		  src.connect(ctx.destination);
-		  src.start(0);
-		  // Esperamos un tick y cerramos el contexto (libera recursos y deja todo “listo”)
+		  // Create a persistent AudioContext that stays open forever
+		  persistentAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+		  // Create a silent oscillator at sub-audible frequency
+		  const oscillator = persistentAudioCtx.createOscillator();
+		  const gainNode = persistentAudioCtx.createGain();
+
+		  oscillator.frequency.value = 1; // 1 Hz - completely inaudible
+		  gainNode.gain.value = 0.001;    // Nearly silent, but keeps stream active
+
+		  oscillator.connect(gainNode);
+		  gainNode.connect(persistentAudioCtx.destination);
+		  oscillator.start();
+		  // Never stop - keeps ALSA buffer fed to prevent DAC pop
+
+		  // Small delay to let audio hardware stabilize
 		  await new Promise(r => setTimeout(r, 120));
-		  await ctx.close();
-		  console.log('[PLAYER] Audio warm-up done');
+		  console.log('[PLAYER] Audio bridge started (persistent)');
 		} catch (e) {
 		  console.warn('[PLAYER] Audio warm-up failed:', e);
 		}
