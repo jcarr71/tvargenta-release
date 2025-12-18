@@ -1,299 +1,175 @@
-<p align="right">
-  <a href="https://github.com/rsappia/TVArgenta-Release/blob/main/README.en.md" style="
-    background-color:#0078d7;
-    color:white;
-    padding:6px 14px;
-    text-decoration:none;
-    border-radius:6px;
-    font-weight:bold;
-    font-family:sans-serif;
-  ">
-    🇬🇧 Read in English
-  </a>
-</p>
-
-
-<p align="center">
-  <em>Si te trajo una sonrisa o te inspiró a crear algo propio,<br>
-  convidame un cafecito y apoyar futuros proyectos ☕🇦🇷</em>
-</p>
-
-<p align="center">
-  <a href="https://paypal.me/RicardoSappia/5" target="_blank">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200">
-  </a>
-</p>
-
-# TVArgenta---Retro-TV
-TVArgenta es una TV retro hecha con Raspberry Pi que revive la experiencia de hacer zapping entre publicidades y contenido offline. Incluye un backend local para gestionar videos, canales y metadatos, todo dentro de una carcasa 3D impresa.
-
--------------------------------------------------------------
-# TVArgenta v2.0 — Gran Actualización
-
-Esta versión marca un paso enorme para TVArgenta — ya no es solo una experiencia de TV retro con Raspberry Pi, sino un sistema más completo, autónomo y fácil de usar.
-
-## Novedades principales
-
-- Imagen del sistema lista para flashear — no requiere configuración manual.
-- Integración con RetroPie — cambio fluido entre modo TV y modo juegos.
-- Emparejamiento Bluetooth para mandos — conectá tus controladores fácilmente, con cable o inalámbricos.
-- Gestión de redes Wi-Fi — interfaz mejorada para conectar o cambiar de red directamente desde la TV.
-- Rediseño de las páginas de gestión web — administración más clara y moderna del contenido.
-- Implementacion multi idioma (ES / EN / DE)
-- Nuevos menús en pantalla (overlay) — navegación más ágil directamente desde la interfaz del televisor.
-
-## Cómo flashear la imagen
-
-Esta imagen está pensada para Raspberry Pi 4 (2 GB o más) y se basa en Raspberry Pi OS Bookworm.
-Incluye todos los scripts, dependencias y servicios de inicio ya configurados.
-
-📦 **DDescargar la imagen oficial:**  
-[TVArgenta v2.0 on Archive.org](https://archive.org/details/2025-11-11-tvargenta-public-v-2.img)
-
-### Método recomendado (Raspberry Pi Imager)
-- 1.Descargá el archivo .img.xz desde el release oficial o el mirror en Archive.org
-- 2.Abrí Raspberry Pi Imager → Elegir sistema operativo → Usar imagen personalizada → seleccioná el archivo descargado.
-- 3.Elegí tu tarjeta SD (mínimo 32 GB).
-- 4.⚠️ Cuando aparezca la pregunta “¿Editar configuración antes de flashear?”, seleccioná “No”.
-  - No cambies la configuración de Wi-Fi, nombre de host, usuario o contraseña.
-  - La imagen ya contiene su propia configuración interna.
-  - Si modificás estos valores, algunos scripts pueden dejar de funcionar o generar conflictos con la red Wi-Fi.
-- 5.Esperá a que el proceso de flasheo y verificación termine, y luego expulsá la tarjeta con seguridad.
-- 6.Insertala en la Raspberry Pi 4 y encendela — el sistema iniciará directamente en la interfaz de TVArgenta.
-
-## Verificación de integridad y autenticidad
-
-Antes de usar la imagen, se recomienda verificar su integridad y autenticidad.
-```
-# Verify integrity
-sha256sum -c TVArgenta_v2.0.sha256
-
-# Verify authenticity (optional)
-gpg --verify TVArgenta_v2.0.sha256.asc
-```
-Si ambos comandos muestran “OK”, la imagen está verificada correctamente.
-
-## ⚠️ Aviso importante
-
-Esta imagen se ofrece tal cual (“as-is”), sin ningún tipo de garantía o responsabilidad por parte del autor.
-El uso es bajo tu propia responsabilidad.
-
-Modificar los parámetros preconfigurados (red, usuario, comportamiento de arranque, etc.) no está soportado y puede causar fallos o comportamientos inesperados.
-Cualquier modificación se realiza bajo exclusiva responsabilidad del usuario.
-
-## Licencia
-
-Creative Commons Attribution – NonCommercial – NoDerivs 4.0 International
-(CC BY-NC-ND 4.0)
-
--------------------------------------------------------------
-
-## Detalles de conexiones y ensamblaje
-
-Pueden ser encontrados en Instructables: [TVArgenta v2.0 on Instructables](https://www.instructables.com/Build-Your-Own-Retro-TV-With-Raspberry-Pi-Offline-/)
-
--------------------------------------------------------------
-# Para quienes quieran hacerlo todo a mano (Aplicable para Release 1.0)
-
-# Primera parte: Configuracion basica de la Raspberry Pi
-
-Preparamos la tarjeta SD en este caso uso una de 64Gb. 
-Para eso usamos Raspberry Pi Imager 
-Asegurarse de elegir lo siguiente:
-
-<img width="683" height="320" alt="GetImage" src="https://github.com/user-attachments/assets/aa09a287-0f3b-446d-a764-79605f50f50e" />
-
-En el hostname me aseguro de q poner argentv.local (lo vamos a usar mas adelante, pero pueden ponerle el hostname que quieran) 
-
-<img width="516" height="98" alt="GetImage(1)" src="https://github.com/user-attachments/assets/0259456c-d82c-46b3-af1d-be7583b34bde" />
-
-Asegurarse de configurar las credenciales de conexion a WIFI, idioma y region. 
-Dejar activado SSH para poder acceder luego a la raspberry en forma remota: 
-
-<img width="532" height="341" alt="GetImage(2)" src="https://github.com/user-attachments/assets/949f2aac-8162-4193-9738-f84d95144d0f" />
-
-Darle a instalar, nos vemos en unos minutos 😉 
-[...]
-Una vez que termina el proceso de flasheo, insertamos la tarjeta SD en la raspberry pi y si vemos lo siguiente vamos por buen camino: 
-<img width="916" height="660" alt="GetImage(3)" src="https://github.com/user-attachments/assets/32d95c7d-202e-4d88-b238-08b752fa1662" />
-
-<img width="893" height="584" alt="GetImage(4)" src="https://github.com/user-attachments/assets/6bbc4965-9e22-46e6-9d14-69f55224ef5f" />
-
-A continuacion, vamos a intentar acceder a la raspberry en forma remota. Para eso abrimos la consola de comando y tipeamos lo siguiente: 
-
-`ssh argentv.local`
-
-Puede ser que el siguiente mensaje nos aparezca: 
-<img width="688" height="245" alt="GetImage(5)" src="https://github.com/user-attachments/assets/33ae5eb5-0f7b-4cea-a7e9-fd71d36787e5" />
-
-Si llegara a suceder, probamos lo siguiente: 
-
-`ssh-keygen -R argentv.local`
-
-<img width="551" height="113" alt="GetImage(6)" src="https://github.com/user-attachments/assets/3e24967a-1ba1-44b9-8a79-5bd007d71a1b" />
-
-Una vez hecho esto, volvemos a probar con ssh argentv.local y esta vez deberia mostrar lo siguiente: 
-
-<img width="842" height="262" alt="GetImage(7)" src="https://github.com/user-attachments/assets/e2def0f8-fb5e-4c8f-9d6c-fb658fdf6e69" />
-
-Despues de escribir `yes` como opcion, se instalan los nuevos certificados y se establece la conexion con la raspberry pi via SSH.  
-
-Mi usuario durante la instalacion lo puse como "rs", aca puede haber diferencia con el usuartio que hayan puesto ustedes, para tenrlo en cuenta el resto del setup. 
-
-Como es el primer arranque de todos despues de formatear la SD ejecutamos los siguientes comandos: 
-
-`sudo apt update && sudo apt upgrade –y ` 
-
-Ahora pasamos a clonar el repo en github. Antes es necesario configurar nuestras claves para poder hacerlo. 
-
-
-### 1) Si ya tenés claves, salteá este paso 
-
-`ls -l ~/.ssh/id_ed25519 ~/.ssh/id_ed25519.pub 2>/dev/null || true `
- 
-
-### 2) Generar una clave nueva (ED25519). Elegí un comentario útil: 
-
-`ssh-keygen -t ed25519 -C "pi@argentv" ` 
-
-Apretá Enter para aceptar la ruta por defecto (~/.ssh/id_ed25519) 
-
-Podés dejar passphrase vacía (Enter) o poner una (más seguro) 
-
-### 3) Mostrar la clave pública (esta sí se copia a GitHub -> <a href="https://github.com/settings/keys" target="_blank" style="background:#24292e;color:white;padding:8px 12px;border-radius:6px;text-decoration:none;">  🔑 GitHub Keys</a>) 
-
-`cat ~/.ssh/id_ed25519.pub`
-
-### 4) (Opcional) Cargarla en el agente para no poner passphrase cada vez 
-
-`eval "$(ssh-agent -s)"`
-`ssh-add ~/.ssh/id_ed25519` 
-
-Copiá esa clave pública. 
-
-Agregá la clave a tu GitHub 
-
-Web: GitHub → tu avatar → Settings → SSH and GPG keys → New SSH key → pegá la clave. 
- 
-
-### 5) Probar conexión con GitHub (debería saludar con tu usuario) 
-
-`ssh -T git@github.com`
-
-Si todo sale bien debrias recibir un saludo con tu usuario como el siguiente: 
-
-"Hi [user]! You've successfully authenticated, but GitHub does not provide shell access." 
-
-
-### 6) Clonar el repositorio de GitHub
-
-Ahora preparemos el directorio donde clonaremos el repositorio.
-La carpeta /srv normalmente existe por defecto, pero si no es así, podés crearla con:
-
-`sudo mkdir -p /srv`
-
-Luego, asignale la propiedad de esa carpeta a tu usuario actual (reemplazá rs con tu propio nombre de usuario).
-Esto te permitirá escribir dentro de /srv sin tener que usar sudo todo el tiempo:
-
-`sudo chown -R rs:rs /srv`
-
-#### Opción A – Clonar usando HTTPS (la más fácil)
-Este es el método recomendado si no tenés configuradas llaves SSH en tu cuenta de GitHub.
-
-```
-cd /srv
-git clone https://github.com/rsappia/TVArgenta-Release.git tvargenta
-cd /srv/tvargenta
-```
-#### Opción B – Clonar usando SSH (para usuarios avanzados)
-Usá este método solo si ya tenés una llave SSH configurada en tu cuenta de GitHub.
-
-```
-cd /srv
-git clone git@github.com:rsappia/TVArgenta-Release.git tvargenta
-cd /srv/tvargenta
-```
-Debería verse algo así:
-
-<img width="729" height="202" alt="GetImage(8)" src="https://github.com/user-attachments/assets/28d59e5f-dd75-451f-a5ad-3bd34a4ce57b" />
-
-#### Consejo:
-
-Si aparece un error como
-Permission denied (publickey)
-simplemente significa que estás intentando usar el método SSH sin tener llaves configuradas.
-En ese caso, usá la versión HTTPS de arriba — funciona exactamente igual.
-
-## Instalar dependencias del sistema y del proyecto 
-Ejecutamos:
-```
-sudo apt update 
-sudo apt install -y ffmpeg python3 python3-venv python3-pip dos2unix git 
-```
-Luego vamos al siguiente dierectorio: 
-
-`cd /srv/tvargenta/software `
-
-Y ejecutamos: 
-```
-python3 -m venv venv  
-source venv/bin/activate 
-sudo apt update && sudo apt install -y python3 python3-pip && python3 -m pip install --upgrade pip && python3 -m pip install Flask 
-```
-Preparamos tambien lo necvesario para compilar el .c del encoder: 
-
-`sudo apt install -y build-essential libgpiod-dev pkg-config` 
-
-Cambiamos de directorio para compilar el .c del encoder 
-
-`cd /srv/tvargenta/software/app/native`
-
-Una vez ahi, largamos el compilador. 
-
-`gcc encoder_reader.c -o encoder_reader $(pkg-config --cflags --libs libgpiod) `
-
-Si sale todo bien, deberia apraecer ahora el .bin compilado junto con el .c 
-
-<img width="488" height="38" alt="GetImage(9)" src="https://github.com/user-attachments/assets/15f96bbc-3f7a-4fe5-aab7-132335df9cc2" />
-
-A continuacion ajustamos los permisos necesarios:  
-```
-chmod +x encoder_reader 
-cd /srv/tvargenta/software 
-chmod +x scripts/*.sh 
-```
-Ya a esta altura podemos hacer una primer prueba de largar la aplicacion y ver si todo esta bien. Para eso no posicionamos en el siguiente directorio: 
-
-
-`cd /srv/tvargenta/software/app $ `
-Y estano ahi, ejecutamos  
-`python main.py `
-
-Si todo va bien, deberia aparecer un video de intro y luego pasar a la reproduccion de canales, q de momento esta en default y sin nada cargado en el estado inicial. Es decir, vamos a estar viendo una pantalla "negra". 
-
-Podemos probar de mover el encoder y pulsarlo para ver si sale el menu 
-
-Vamos a agregar un par de videos para ver que todo este funcionando correctamente. 
-Para eso, se pueden usar directamente los videos disponibles en : 
-`/srv/tvargenta/software/app/assets/Splash/videos `
-
-Estos viene por defecto en el repo de github.  
-
-![TVArgenta first load](https://github.com/rsappia/TVArgenta-Release/blob/main/docs/TVArgenta_first_load.gif)
-
-Whit this, you are already good to go an play around. I will be posting on the next chapter about audio configuration and on a third one all related to the hardware itself.
-
-<hr>
-
-<p align="center">
-  <em>Si te trajo una sonrisa o te inspiró a crear algo propio,<br>
-  convidame un cafecito y seguimos haciendo magia argenta ☕🇦🇷</em>
-</p>
-
-<p align="center">
-  <a href="https://paypal.me/RicardoSappia/5" target="_blank">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="200">
-  </a>
-</p>
-
-
+100% vibe-coded with Claude Code.
+
+In the words of Claude:
+
+  This fork adds 87 commits of new features, improvements, and bug fixes to the original TVArgenta v2.0. Below is a comprehensive summary of all additions:
+
+  ---
+  1. VCR/NFC Physical Tape System
+
+  A major new feature that brings physical VHS tape interaction to TVArgenta using NFC technology.
+
+  Features:
+  - NFC Tape Detection: Insert physical "tapes" (NFC tags) to play specific videos
+  - Channel 03 VCR Input: Dedicated channel showing:
+    - White noise when no NFC reader attached
+    - Blue "INSERT TAPE" screen when reader has no tape
+    - VCR position counter during playback
+  - Position Persistence: Tape playback position is saved and restored across sessions
+  - Auto-Rewind: Tapes automatically rewind when they reach the end
+  - Rewind Animation: Authentic VHS rewind effect with sound (36+ seconds with gapless audio)
+  - Encoder Controls on VCR Channel:
+    - Tap: Toggle pause
+    - Hold 3+ seconds: Trigger rewind with visual countdown
+  - Background Playback: Tape continues playing silently when not on Channel 03
+  - QR Code Recording Flow: Empty tapes show a QR code to upload new content from your phone
+  - VCR Admin Interface: Web page to register tapes and assign videos
+  - Upload Progress Sync: Real-time progress display synchronized between phone and TV
+
+  ---
+  2. Broadcast TV Scheduling System
+
+  Emulates authentic 1990s TV programming with scheduled content blocks.
+
+  Features:
+  - Weekly Schedule Generation: Runs Sunday at 2:30 AM, assigns series to time slots
+  - Daily Schedule Generation: Runs at 3:00 AM, creates second-by-second playback mapping
+  - Time-of-Day Programming Zones:
+    - Early Morning (4-7 AM)
+    - Late Morning (7 AM-12 PM)
+    - Afternoon (12-5 PM)
+    - Evening (5-9 PM)
+    - Night (9 PM-3 AM)
+  - 30-Minute Programming Blocks: Content with commercial breaks at start, middle, and end
+  - Episode Cursor Tracking: Remembers position in each series for sequential episode playback
+  - Back-to-Back Episodes: Weighted probability for consecutive episode scheduling
+  - Test Pattern: Plays between 3-4 AM daily
+  - Per-Channel Schedule Rebuild: Regenerate schedule for individual channels via UI button
+  - In-Memory Schedule Cache: Eliminates disk I/O during playback for smooth performance
+  - Comprehensive Test Suite: 27+ tests covering scheduler edge cases
+
+  ---
+  3. TV Series Management
+
+  Directory-based organization for TV shows with automatic detection.
+
+  Features:
+  - Structured Directory Organization: content/videos/series/{Show Name}/Season {N}/
+  - Automatic Series Detection: Scans and indexes series on startup
+  - Episode Count Tracking: Shows episode counts per season in the UI
+  - Series-Specific Channels: Create channels that only play content from specific series
+  - Upload Interface: Dedicated series upload page with progress tracking
+  - No Transcoding: Series files are moved directly without re-encoding
+  - SMPTE Color Bars: Displays test pattern when channel has no available content
+
+  ---
+  4. Redesigned Web Management Interface
+
+  Consolidated and modernized admin pages.
+
+  Features:
+  - Unified Library Page: Merged Library and Content Manager into single interface
+  - Inline Expanding Cards: Modern card-based UI for channels and series
+  - Redesigned Channels Page: Cleaner channel management with expand/collapse
+  - Redesigned TV Series Section: Visual series management
+  - Content Type Dropdown: Replace generic upload with Movies/Series/Commercials options
+  - Duplicate Detection: Client-side duplicate file detection with "already exists" feedback
+  - Upload Progress Indicators: Consistent progress tracking across all upload flows
+  - "Finalizing..." State: Shows processing status after upload reaches 100%
+  - Rebuild Schedule Button: Per-channel schedule regeneration from channel cards
+
+  ---
+  5. Background Metadata Daemon
+
+  Automatic background processing for video metadata.
+
+  Features:
+  - Multi-Phase Processing:
+    - Phase 0: Scan for new files in videos, series, and commercials
+    - Phase 1 (Fast): Extract duration and generate thumbnails
+    - Phase 2 (Slow): Analyze audio loudness (LUFS)
+  - Low-Priority Execution: Uses nice/ionice to avoid impacting playback
+  - Sampling Strategy: Analyzes 30-second samples every 5 minutes (not entire file)
+  - Long Movie Support: 1-hour timeout for lengthy films
+  - Auto-Start: Daemon starts automatically with the application
+  - Atomic File Operations: Safe concurrent access to metadata.json
+  - Race Condition Fix: Prevents conflicts between app and daemon
+
+  ---
+  6. Audio/Volume Improvements
+
+  Loudness normalization and audio quality fixes.
+
+  Features:
+  - Loudness Normalization: Fixed -16 LUFS target for consistent volume
+  - Dynamic Volume Adjustment: Real-time volume adjustment based on loudness analysis
+  - Commercial Volume Matching: Commercials automatically adjusted to match content volume
+  - Audio Pop Elimination: ALSA dmix configuration to prevent pops between videos
+  - Same-Channel Pop Prevention: No audio artifacts when staying on the same channel
+
+  ---
+  7. Commercial System
+
+  Dedicated commercial break handling.
+
+  Features:
+  - Commercial Upload Flow: Dedicated upload interface for commercials
+  - H.264 Codec Verification: Validates codec compatibility during upload
+  - Commercial Video Serving: Flask route to serve commercial files
+  - Ghost Video Detection: Prevents orphaned commercials in the system
+  - Volume Normalization: Automatic loudness adjustment for commercials
+
+  ---
+  8. Channel Improvements
+
+  Enhanced channel functionality.
+
+  Features:
+  - Channel Indicator: Visual display of current channel
+  - Improved Channel Changing: Faster, more responsive channel switching
+  - Rapid Channel Change Fix: Prevents video freeze during quick channel surfing
+  - Player State Sync: Prevents player state from falling behind during changes
+  - Category-Based Filtering: Channels can filter by content categories
+
+  ---
+  9. Timezone Support
+
+  Features:
+  - Configurable timezone setting
+  - Uses Python ZoneInfo for accurate time handling
+  - Affects schedule generation and time-of-day programming
+
+  ---
+  10. Performance Optimizations
+
+  Features:
+  - Faster Metadata Scanner: Optimized scanning for large libraries
+  - Schedule Cache Warm Start: Pre-loads schedule on startup
+  - Reduced Disk I/O: In-memory caching for frequently accessed data
+  - Double-Load Prevention: Avoids loading videos twice during channel changes
+  - Laggy Playback Fix: Smooth looping in broadcast mode
+
+  ---
+  11. Bug Fixes
+
+  - Fix TypeError when duracion is null in metadata
+  - Fix video URLs for series playback across all code paths
+  - Fix series channels failing due to empty tags_incluidos check
+  - Fix upload progress tracking and duplicate detection
+  - Fix TV seasons display showing all seasons correctly
+  - Disable Cast overlay on video elements
+  - Fix multiple VCR channel isolation bugs
+  - Include videos without metadata in VHS assignment dropdown
+
+  ---
+  Summary Statistics
+
+  | Metric               | Value |
+  |----------------------|-------|
+  | Total Commits        | 87    |
+  | Pull Requests Merged | 10    |
+  | Major Features Added | 6     |
+  | Test Cases Added     | 27+   |
+
+  ---
+  This overview documents all significant changes from the original rsappia/TVArgenta v2.0 release. The fork transforms TVArgenta from a basic retro TV experience into a comprehensive broadcast simulation system with physical VHS tape interaction, scheduled programming, and professional-grade audio management.
