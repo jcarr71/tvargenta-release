@@ -973,12 +973,23 @@ def get_total_recuerdos():
 # --- Preferencias UI ---
 def load_ui_prefs():
     cfg = load_config()
-    # default: mostrar el nombre del canal
-    return {"show_channel_name": bool(cfg.get("show_channel_name", True))}
+    return {
+        "show_channel_name": bool(cfg.get("show_channel_name", True)),
+        "timezone": cfg.get("timezone", "America/New_York")
+    }
 
 def save_ui_prefs(prefs):
     cfg = load_config()
-    cfg["show_channel_name"] = bool(prefs.get("show_channel_name", True))
+    if "show_channel_name" in prefs:
+        cfg["show_channel_name"] = bool(prefs.get("show_channel_name", True))
+    if "timezone" in prefs:
+        cfg["timezone"] = prefs.get("timezone", "America/New_York")
+        # Trigger timezone reload in settings module
+        try:
+            from settings import reload_timezone
+            reload_timezone()
+        except Exception as e:
+            logger.warning(f"[UI_PREFS] Could not reload timezone: {e}")
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
         

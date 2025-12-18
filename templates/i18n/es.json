@@ -44,6 +44,21 @@
   "settings.show_channel_name": "Mostrar nombre canal",
   "settings.yes": "Sí",
   "settings.no": "No",
+  "settings.timezone": "Zona horaria",
+
+  "tz.new_york": "Nueva York (EST)",
+  "tz.chicago": "Chicago (CST)",
+  "tz.denver": "Denver (MST)",
+  "tz.los_angeles": "Los Ángeles (PST)",
+  "tz.buenos_aires": "Buenos Aires (ART)",
+  "tz.sao_paulo": "São Paulo (BRT)",
+  "tz.london": "Londres (GMT)",
+  "tz.paris": "París (CET)",
+  "tz.madrid": "Madrid (CET)",
+  "tz.berlin": "Berlín (CET)",
+  "tz.tokyo": "Tokio (JST)",
+  "tz.sydney": "Sídney (AEST)",
+  "tz.utc": "UTC",
 
   "power.confirm": "Confirmar apagado",
 

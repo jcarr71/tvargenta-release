@@ -31,7 +31,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from settings import (
     CONTENT_DIR, VIDEO_DIR, METADATA_FILE, CANALES_FILE, SERIES_FILE,
-    SERIES_VIDEO_DIR
+    SERIES_VIDEO_DIR, app_now
 )
 
 logger = logging.getLogger("tvargenta.scheduler")
@@ -492,7 +492,7 @@ def get_next_episode_for_channel(channel_id: str, series_name: str,
         "season": next_episode["season"],
         "episode": next_episode["episode"],
         "last_index": next_index,
-        "updated_at": datetime.now().isoformat()
+        "updated_at": app_now().isoformat()
     }
 
     # Save cursors if we loaded them internally
@@ -579,7 +579,7 @@ def generate_weekly_schedule(channel_id: str = None) -> dict:
     canales = load_canales()
     series_data = load_series()
 
-    now = datetime.now()
+    now = app_now()
     # Find the most recent Sunday
     days_since_sunday = now.weekday() + 1  # Monday=0, Sunday=6, so +1
     if days_since_sunday == 7:
@@ -917,7 +917,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
     cursors = load_episode_cursors()
     commercials = get_commercials(metadata)
 
-    now = datetime.now()
+    now = app_now()
     schedule_date = now.date()
 
     # Schedule validity
@@ -1129,7 +1129,7 @@ def get_scheduled_content(channel_id: str, timestamp: datetime = None) -> Option
     }
 
     if timestamp is None:
-        timestamp = datetime.now()
+        timestamp = app_now()
 
     schedule = load_daily_schedule()
     if not schedule:
@@ -1272,7 +1272,7 @@ def needs_daily_regeneration(meta: dict, now: datetime) -> bool:
 def check_and_generate_schedules() -> None:
     """Check if schedules need regeneration and generate if needed."""
     meta = load_schedule_meta()
-    now = datetime.now()
+    now = app_now()
 
     schedules_updated = False
 

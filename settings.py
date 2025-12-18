@@ -7,6 +7,8 @@
 
 
 from pathlib import Path
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import os, getpass
 
 
@@ -69,3 +71,101 @@ VCR_REWIND_TRIGGER = TMP_DIR / "trigger_vcr_rewind.json"
 VCR_COUNTDOWN_TRIGGER = TMP_DIR / "trigger_vcr_countdown.json"
 VCR_RECORDING_STATE_FILE = TMP_DIR / "vcr_recording_state.json"
 TAPES_FILE = CONTENT_DIR / "tapes.json"
+
+# =============================================================================
+# Timezone Configuration
+# =============================================================================
+# The system runs in UTC. This setting defines the app's display/scheduling timezone.
+# All user-facing time operations should use app_now() instead of datetime.now().
+#
+# Timezone is configurable via:
+#   1. On-screen menu (stored in configuracion.json)
+#   2. Environment variable TVARGENTA_TIMEZONE (fallback)
+#   3. Default: America/New_York
+#
+# Common timezone examples:
+#   "America/New_York", "America/Los_Angeles", "America/Chicago"
+#   "Europe/London", "Europe/Paris", "Europe/Madrid"
+#   "Asia/Tokyo", "Australia/Sydney"
+#   "UTC" for no conversion
+
+# Default timezone (used if not configured elsewhere)
+DEFAULT_TIMEZONE = "America/New_York"
+
+# Cached ZoneInfo object and name
+_app_timezone = None
+_app_timezone_name = None
+
+def _load_timezone_from_config() -> str:
+    """Load timezone from configuracion.json, falling back to env var or default."""
+    # Try to load from config file first
+    try:
+        if CONFIG_FILE.exists():
+            import json
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                tz = cfg.get("timezone")
+                if tz:
+                    return tz
+    except Exception as e:
+        print(f"[SETTINGS] Could not load timezone from config: {e}")
+
+    # Fall back to environment variable or default
+    return os.environ.get("TVARGENTA_TIMEZONE", DEFAULT_TIMEZONE)
+
+def get_app_timezone_name() -> str:
+    """Get the name of the configured timezone."""
+    global _app_timezone_name
+    if _app_timezone_name is None:
+        _app_timezone_name = _load_timezone_from_config()
+    return _app_timezone_name
+
+def get_app_timezone() -> ZoneInfo:
+    """Get the configured app timezone as a ZoneInfo object."""
+    global _app_timezone, _app_timezone_name
+
+    # Check if we need to reload
+    current_name = _load_timezone_from_config()
+    if _app_timezone is None or _app_timezone_name != current_name:
+        _app_timezone_name = current_name
+        try:
+            _app_timezone = ZoneInfo(_app_timezone_name)
+        except Exception as e:
+            print(f"[SETTINGS] Invalid timezone '{_app_timezone_name}', falling back to UTC: {e}")
+            _app_timezone = ZoneInfo("UTC")
+            _app_timezone_name = "UTC"
+    return _app_timezone
+
+def reload_timezone() -> None:
+    """Force reload of timezone from config. Call after changing timezone setting."""
+    global _app_timezone, _app_timezone_name
+    _app_timezone = None
+    _app_timezone_name = None
+    get_app_timezone()  # Trigger reload
+
+def app_now() -> datetime:
+    """
+    Get the current time in the app's configured timezone.
+
+    Use this instead of datetime.now() for all user-facing time operations
+    (scheduling, display, etc.). The returned datetime is timezone-aware.
+
+    Returns:
+        datetime: Current time in the app's configured timezone (timezone-aware)
+    """
+    return datetime.now(get_app_timezone())
+
+def to_app_timezone(dt: datetime) -> datetime:
+    """
+    Convert a datetime to the app's configured timezone.
+
+    Args:
+        dt: A datetime object (naive datetimes are assumed to be UTC)
+
+    Returns:
+        datetime: The same instant in the app's configured timezone
+    """
+    if dt.tzinfo is None:
+        # Assume naive datetimes are UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(get_app_timezone())

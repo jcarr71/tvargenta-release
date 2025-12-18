@@ -830,8 +830,24 @@
 	  // sumá más si querés: {code:"it", key:"lang.it", label:"Italiano"}
 	];
 
-	
-	
+	// Timezones disponibles (orden = visual en el menú)
+	const AVAILABLE_TIMEZONES = [
+	  { code: "America/New_York", key: "tz.new_york", label: "New York (EST)" },
+	  { code: "America/Chicago", key: "tz.chicago", label: "Chicago (CST)" },
+	  { code: "America/Denver", key: "tz.denver", label: "Denver (MST)" },
+	  { code: "America/Los_Angeles", key: "tz.los_angeles", label: "Los Angeles (PST)" },
+	  { code: "America/Argentina/Buenos_Aires", key: "tz.buenos_aires", label: "Buenos Aires (ART)" },
+	  { code: "America/Sao_Paulo", key: "tz.sao_paulo", label: "São Paulo (BRT)" },
+	  { code: "Europe/London", key: "tz.london", label: "London (GMT)" },
+	  { code: "Europe/Paris", key: "tz.paris", label: "Paris (CET)" },
+	  { code: "Europe/Madrid", key: "tz.madrid", label: "Madrid (CET)" },
+	  { code: "Europe/Berlin", key: "tz.berlin", label: "Berlin (CET)" },
+	  { code: "Asia/Tokyo", key: "tz.tokyo", label: "Tokyo (JST)" },
+	  { code: "Australia/Sydney", key: "tz.sydney", label: "Sydney (AEST)" },
+	  { code: "UTC", key: "tz.utc", label: "UTC" }
+	];
+	let currentTimezone = "America/New_York";
+
 	// ---- I18N CORE (mínimo) ----
 	let I18N = { lang: "es", dict: {} };
 	let lastLangSeen = null;
@@ -1969,8 +1985,9 @@
 		  const onOff = uiShowChannelName ? tr("settings.yes") : tr("settings.no");
 		  items.push(`${tr("settings.show_channel_name")}: ${onOff}`);
 		  items.push(tr("settings.language"));
+		  items.push(tr("settings.timezone"));
 		  items.push(tr("settings.wifi"));
-		  items.push(tr("menu.bt"));       
+		  items.push(tr("menu.bt"));
 		  items.push(tr("menu.back"));
 		  break;
 		}
@@ -1984,6 +2001,19 @@
 			const isCur = (lang.code === I18N.lang);
 			const bullet = isCur ? " ●" : ""; // marca el activo
 			items.push(`${tr(lang.key) || lang.label}${bullet}`);
+		  }
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
+		// =========================
+		// tz_root (timezone selection)
+		// =========================
+		case "tz_root": {
+		  for (const tz of AVAILABLE_TIMEZONES) {
+			const isCur = (tz.code === currentTimezone);
+			const bullet = isCur ? " ●" : "";
+			items.push(`${tr(tz.key) || tz.label}${bullet}`);
 		  }
 		  items.push(tr("menu.back"));
 		  break;
@@ -2153,6 +2183,9 @@
 		case "lang_root":
 		  return go("config");
 
+		case "tz_root":
+		  return go("config");
+
 		case "bt_root":
 		  return go("config");
 		  
@@ -2256,6 +2289,10 @@ function ejecutarSeleccion() {
       return go("lang_root");
     }
 
+    if (label === tr("settings.timezone")) {
+      return go("tz_root");
+    }
+
     if (label === tr("settings.wifi")) {
       wifiShowStatusOverlay();
       return go("wifi_root");
@@ -2281,6 +2318,24 @@ function ejecutarSeleccion() {
     const lang = AVAILABLE_LANGS[idx];
     if (lang && lang.code !== I18N.lang) {
       setLanguage(lang.code).then(() => go("config"));
+    } else {
+      go("config");
+    }
+    return;
+  }
+
+  // =========================
+  // SUBMENÚ TIMEZONE
+  // =========================
+  if (menuMode === "tz_root") {
+    const last = items.length - 1;
+    const isBackItem = (menuIndex === last) || isBack(label);
+    if (isBackItem) return goBackFrom("tz_root");
+
+    const idx = menuIndex;
+    const tz = AVAILABLE_TIMEZONES[idx];
+    if (tz && tz.code !== currentTimezone) {
+      setTimezone(tz.code).then(() => go("config"));
     } else {
       go("config");
     }
@@ -2635,6 +2690,9 @@ function ejecutarSeleccion() {
 		const r = await fetch("/api/ui_prefs");
 		const d = await r.json();
 		uiShowChannelName = !!d.show_channel_name;
+		if (d.timezone) {
+		  currentTimezone = d.timezone;
+		}
 		aplicarVisibilidadBadge();
 	  } catch {}
 	}
@@ -2647,6 +2705,20 @@ function ejecutarSeleccion() {
 		  body: JSON.stringify({ show_channel_name: uiShowChannelName })
 		});
 	  } catch {}
+	}
+
+	async function setTimezone(tzCode) {
+	  try {
+		await fetch("/api/ui_prefs", {
+		  method: "POST",
+		  headers: {"Content-Type": "application/json"},
+		  body: JSON.stringify({ timezone: tzCode })
+		});
+		currentTimezone = tzCode;
+		console.log(`[TIMEZONE] Set to ${tzCode}`);
+	  } catch (e) {
+		console.error("[TIMEZONE] Failed to save:", e);
+	  }
 	}
 
 	function aplicarVisibilidadBadge() {
