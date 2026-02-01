@@ -66,12 +66,11 @@ def get_file_list(directory: Path) -> List[Path]:
     return sorted(files)
 
 
-def generate_unified_diff(from_file: Path, to_file: Path, from_dir: Path, to_dir: Path) -> str:
+def generate_unified_diff(from_file: Path, to_file: Path, from_dir: Path, to_dir: Path, relpath: Path) -> str:
     """Generate unified diff between two files"""
     
-    relative_path = from_file.relative_to(from_dir) if from_file.exists() else to_file.relative_to(to_dir)
-    # Normalize path to use forward slashes (Unix style) for cross-platform compatibility
-    relative_path_str = str(relative_path).replace('\\', '/')
+    # Use passed-in relpath to avoid calling relative_to() on non-existent files
+    relative_path_str = str(relpath).replace('\\', '/')
     
     try:
         # Read file contents
@@ -98,7 +97,7 @@ def generate_unified_diff(from_file: Path, to_file: Path, from_dir: Path, to_dir
         return ''.join(diff)
     
     except Exception as e:
-        logger.error(f"Diff generation error for {relative_path}: {e}")
+        logger.error(f"Diff generation error for {relative_path_str}: {e}")
         return ""
 
 
@@ -147,7 +146,8 @@ def generate_patch(from_dir: Path, to_dir: Path, output_file: Path, description:
                     from_file if from_file else to_file,
                     to_file if to_file else from_file,
                     from_dir,
-                    to_dir
+                    to_dir,
+                    relpath
                 )
                 
                 if file_diff.strip():
