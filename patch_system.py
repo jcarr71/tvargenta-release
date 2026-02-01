@@ -327,7 +327,7 @@ def apply_patch(bundle_path: Path, current_version: str) -> Tuple[bool, str, Opt
             # Create backup
             app_root = Path(__file__).parent.parent
             files_to_backup = []
-            for filename in manifest.files.keys():
+            for filename in manifest.files:
                 file_path = app_root / filename
                 if file_path.exists():
                     files_to_backup.append(file_path)
