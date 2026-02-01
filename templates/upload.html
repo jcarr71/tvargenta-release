@@ -85,9 +85,17 @@
 
 	  <!-- Back + idioma + navigation -->
 	  <div class="flex items-center gap-4 nav-links">
-		<a href="{{ url_for('index') }}"
+		<a href="{{ url_for('gestion') }}"
 		   class="text-blue-400 underline text-sm sm:text-base whitespace-nowrap">
 		  {{ tr("upload.nav.back_home") }}
+		</a>
+
+		<a href="{{ url_for('vertele') }}" class="text-green-400 underline text-sm sm:text-base whitespace-nowrap">
+		  📺 {{ tr("nav.watch_tv") if tr else "Ver TV" }}
+		</a>
+
+		<a href="{{ url_for('canales') }}" class="text-purple-400 underline text-sm sm:text-base whitespace-nowrap">
+		  🎯 {{ tr("nav.channels") if tr else "Canales" }}
 		</a>
 
 		<a href="/mod_manager" class="btn-mods whitespace-nowrap">

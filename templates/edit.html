@@ -43,9 +43,10 @@
   <div class="max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-6">
     <header class="flex items-center justify-between mb-4 sm:mb-6">
       <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">✏️ Editar video</h1>
-      <div class="flex items-center gap-3">
-        <a href="{{ url_for('index') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Inicio</a>
+      <div class="flex items-center gap-3 flex-wrap">
+        <a href="{{ url_for('gestion') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Gestión</a>
         <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">🛠 Tags</a>
+        <a href="{{ url_for('vertele') }}" class="text-green-400 underline text-sm sm:text-base">📺 Ver TV</a>
       </div>
     </header>
 

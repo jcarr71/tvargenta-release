@@ -19,10 +19,18 @@
         TV Series Management
       </h1>
 
-      <div class="flex items-center gap-4">
-        <a href="{{ url_for('index') }}"
+      <div class="flex items-center gap-4 flex-wrap">
+        <a href="{{ url_for('gestion') }}"
            class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          Back to Admin
+          ⬅ Back to Gestión
+        </a>
+        <a href="{{ url_for('vertele') }}"
+           class="text-green-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          📺 Ver TV
+        </a>
+        <a href="{{ url_for('canales') }}"
+           class="text-purple-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          🎯 Canales
         </a>
       </div>
     </header>

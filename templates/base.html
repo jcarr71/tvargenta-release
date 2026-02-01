@@ -197,7 +197,7 @@
       <a href="{{ url_for('vertele') }}" class="nav-link bg-green-600 hover:bg-green-700 text-white">
         {{ tr("nav.watch_tv") if tr else "Watch TV" }}
       </a>
-      <a href="{{ url_for('index') }}" class="nav-link text-gray-300 {% if active_page == 'library' %}active{% endif %}">
+      <a href="{{ url_for('gestion') }}" class="nav-link text-gray-300 {% if active_page == 'library' %}active{% endif %}">
         {{ tr("nav.library") if tr else "Library" }}
       </a>
       <a href="{{ url_for('canales') }}" class="nav-link text-gray-300 {% if active_page == 'channels' %}active{% endif %}">
