@@ -627,16 +627,6 @@
                 event.target.value = ''; // Reset input
             }
         }
-                    modManager.hasChanges = false;
-                    setTimeout(() => window.location.reload(), 2000);
-                } else {
-                    throw new Error(data.message || 'Restart failed');
-                }
-            } catch (e) {
-                modManager.showNotification('Restart failed: ' + e.message, 'error');
-                document.getElementById('btnRestart').disabled = false;
-            }
-        }
 
         // Drag and drop handlers
         function handleDragOver(event) {
