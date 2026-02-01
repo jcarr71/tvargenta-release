@@ -21,11 +21,84 @@
         aspect-ratio: 3 / 4;
       }
     }
+    .btn {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      margin: 0.25rem;
+      border-radius: 0.375rem;
+      font-weight: 600;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      font-size: 0.875rem;
+    }
+    .btn-secondary {
+      background: rgba(100, 116, 139, 0.5);
+      color: #94a3b8;
+      border: 1px solid #64748b;
+    }
+    .btn-secondary:hover {
+      background: rgba(100, 116, 139, 0.7);
+      border-color: #94a3b8;
+    }
+    .btn-mods {
+      background: rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      border: 1px solid rgba(0, 212, 255, 0.6);
+    }
+    .btn-mods:hover {
+      background: rgba(0, 212, 255, 0.5);
+      border-color: #00d4ff;
+    }
+    .btn-uploads {
+      background: rgba(76, 175, 80, 0.3);
+      color: #4caf50;
+      border: 1px solid rgba(76, 175, 80, 0.6);
+    }
+    .btn-uploads:hover {
+      background: rgba(76, 175, 80, 0.5);
+      border-color: #4caf50;
+    }
+    .btn-patches {
+      background: rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.6);
+    }
+    .btn-patches:hover {
+      background: rgba(255, 107, 107, 0.5);
+      border-color: #ff6b6b;
+    }
+    .btn-channels {
+      background: rgba(255, 193, 7, 0.3);
+      color: #ffc107;
+      border: 1px solid rgba(255, 193, 7, 0.6);
+    }
+    .btn-channels:hover {
+      background: rgba(255, 193, 7, 0.5);
+      border-color: #ffc107;
+    }
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
   </style>
 </head>
 <body class="bg-black text-white min-h-screen flex flex-col items-center justify-center p-4">
 
-  <h1 class="text-2xl text-yellow-400 font-bold mb-4">{{ tr("vertele.header") }}</h1>
+  <h1 class="text-2xl text-yellow-400 font-bold mb-4">📺 Watch TV</h1>
+  
+  <div class="nav-links">
+    <a href="/" class="btn btn-secondary">← Home</a>
+    <a href="/canales" class="btn btn-channels">📡 Channels</a>
+    <a href="/patches" class="btn btn-patches">📋 Patches</a>
+    <a href="/mod_manager" class="btn btn-mods">📦 Mods</a>
+    <a href="/upload" class="btn btn-uploads">📤 Uploads</a>
+  </div>
   
   <div class="flex items-center gap-4 mb-4">
 	  <a href="{{ url_for('index') }}"
