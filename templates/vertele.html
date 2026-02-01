@@ -231,7 +231,7 @@
       fetch("/api/set_canal_activo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ canal_id: id })
+        body: JSON.stringify({ channel_id: id })
       })
         .then(res => res.json())
         .then(() => {

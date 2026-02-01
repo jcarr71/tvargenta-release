@@ -2713,7 +2713,7 @@ def save_channel():
 
     channels[channel_id] = nuevo_channel
     save_channels(channels)
-    return redirect(url_for("canales"))
+    return redirect(url_for("channels"))
 
 
 @app.route("/eliminar_channel/<channel_id>", methods=["POST"])
@@ -2730,64 +2730,64 @@ def edit_channel(channel_id):
     return redirect(url_for("channels"))
 
 @app.route("/api/set_canal_activo", methods=["POST"])
-def api_set_canal_activo():
+def api_set_channel_active():
     data = request.get_json()
-    canal_id = data.get("canal_id")
-    if not canal_id:
+    channel_id = data.get("channel_id")
+    if not channel_id:
         return jsonify({"error": "Canal no especificado"}), 400
 
-    canales = load_canales()
-    if canal_id != "base" and canal_id not in canales:
+    channels = load_channels()
+    if channel_id != "base" and channel_id not in canales:
         return jsonify({"error": "Canal no vÃ¡lido"}), 404
 
-    set_canal_activo(canal_id)
-    return jsonify({"ok": True, "canal_id": canal_id})
+    set_canal_activo(channel_id)
+    return jsonify({"ok": True, "channel_id": channel_id})
 
-@app.route("/api/canales")
-def api_canales():
-    canales_data = load_canales()
-    canal_activo = get_canal_activo()
+@app.route("/api/channels")
+def api_channels():
+    channels_data = load_channels()
+    channel_active = get_canal_activo()
 
-    canales_list = []
-    for canal_id, canal_info in canales_data.items():
-        canales_list.append({
-            "id": canal_id,
-            "nombre": canal_info.get("nombre", canal_id),
+    channels_list = []
+    for channel_id, canal_info in channels_data.items():
+        channels_list.append({
+            "id": channel_id,
+            "nombre": canal_info.get("nombre", channel_id),
             "icono": canal_info.get("icono", "ðŸ“º")
         })
 
-    nombre_activo = canales_data.get(canal_activo, {}).get("nombre", "Canal Base")
+    nombre_activo = channels_data.get(channel_active, {}).get("nombre", "Canal Base")
 
     return jsonify({
-        "canales": canales_list,
+        "canales": channels_list,
         "canal_activo_nombre": nombre_activo
     })
 
-@app.route("/api/rebuild_schedule/<canal_id>", methods=["POST"])
-def api_rebuild_schedule(canal_id):
+@app.route("/api/rebuild_schedule/<channel_id>", methods=["POST"])
+def api_rebuild_schedule(channel_id):
     """Rebuild both weekly and daily schedules for a specific channel."""
-    logger.info(f"[API] Rebuild schedule requested for channel: {canal_id}")
+    logger.info(f"[API] Rebuild schedule requested for channel: {channel_id}")
 
-    canales = load_canales()
-    if canal_id not in canales:
+    channels = load_channels()
+    if channel_id not in canales:
         return jsonify({"ok": False, "error": "Channel not found"}), 404
 
-    canal = canales[canal_id]
+    channel = channels[channel_id]
     if not canal.get("series_filter"):
         return jsonify({"ok": False, "error": "Channel has no series filter (not a broadcast channel)"}), 400
 
     try:
         # Rebuild weekly schedule for this channel only
-        scheduler.generate_weekly_schedule(channel_id=canal_id)
-        logger.info(f"[API] Weekly schedule rebuilt for channel: {canal_id}")
+        scheduler.generate_weekly_schedule(channel_id=channel_id)
+        logger.info(f"[API] Weekly schedule rebuilt for channel: {channel_id}")
 
         # Rebuild daily schedule for this channel only
-        scheduler.generate_daily_schedule(channel_id=canal_id)
-        logger.info(f"[API] Daily schedule rebuilt for channel: {canal_id}")
+        scheduler.generate_daily_schedule(channel_id=channel_id)
+        logger.info(f"[API] Daily schedule rebuilt for channel: {channel_id}")
 
         return jsonify({"ok": True, "message": f"Schedule rebuilt successfully for {canal['nombre']}"})
     except Exception as e:
-        logger.error(f"[API] Error rebuilding schedule for {canal_id}: {e}")
+        logger.error(f"[API] Error rebuilding schedule for {channel_id}: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/tv")
