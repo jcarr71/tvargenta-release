@@ -85,12 +85,12 @@ def generate_unified_diff(from_file: Path, to_file: Path, from_dir: Path, to_dir
             with open(to_file, 'r', encoding='utf-8', errors='ignore') as f:
                 to_lines = f.readlines()
         
-        # Generate diff with proper line terminators
+        # Generate diff with standard a/ b/ prefixes for -p1 compatibility
         diff = difflib.unified_diff(
             from_lines,
             to_lines,
-            fromfile=relative_path_str,
-            tofile=relative_path_str,
+            fromfile=f'a/{relative_path_str}',
+            tofile=f'b/{relative_path_str}',
             lineterm='\n'
         )
         
