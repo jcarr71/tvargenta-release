@@ -16,17 +16,16 @@ def get_eq_panel():
     
     # Load eq_panel.html template
     template_path = Path(__file__).parent / "templates" / "eq_panel.html"
-    eq_js_path = Path(__file__).parent / "static" / "eq.js"
     
     try:
         with open(template_path, "r", encoding="utf-8") as f:
             eq_html = f.read()
         
-        with open(eq_js_path, "r", encoding="utf-8") as f:
-            eq_js = f.read()
-        
-        # Remove display:none to show the panel
+        # Remove display:none to show the panel and position it normally for standalone page
         eq_html = eq_html.replace('style="display: none;"', 'style="display: block;"')
+        eq_html = eq_html.replace('position: fixed;', 'position: static;')
+        eq_html = eq_html.replace('bottom: 100px;', '')
+        eq_html = eq_html.replace('right: 20px;', '')
         
         # Create a wrapper page with the EQ panel
         html = f"""
@@ -35,22 +34,27 @@ def get_eq_panel():
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Audio Equalizer</title>
+            <title>Audio Equalizer Settings</title>
             <style>
+                * {{
+                    box-sizing: border-box;
+                }}
                 body {{
-                    background: #1a1a1a;
+                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
                     color: #e0e0e0;
                     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     margin: 0;
                     padding: 20px;
+                    min-height: 100vh;
                 }}
-                h1 {{
-                    text-align: center;
+                .page-header {{
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
                     margin-bottom: 30px;
                 }}
-                .eq-container {{
-                    max-width: 500px;
-                    margin: 0 auto;
+                .page-header h1 {{
+                    margin: 0;
                 }}
                 .back-btn {{
                     background: rgba(0, 212, 255, 0.3);
@@ -59,23 +63,34 @@ def get_eq_panel():
                     padding: 10px 20px;
                     border-radius: 4px;
                     cursor: pointer;
-                    margin-bottom: 20px;
                     font-size: 1em;
+                    transition: all 0.2s;
                 }}
                 .back-btn:hover {{
                     background: rgba(0, 212, 255, 0.5);
                 }}
+                .eq-wrapper {{
+                    max-width: 500px;
+                    margin: 0 auto;
+                }}
+                /* Override eq-panel styling for standalone */
+                .eq-panel {{
+                    position: static !important;
+                    bottom: auto !important;
+                    right: auto !important;
+                    width: 100% !important;
+                    margin: 0 !important;
+                }}
             </style>
         </head>
         <body>
-            <button class="back-btn" onclick="window.location.href = document.referrer || '/'">← Back</button>
-            <h1>🎚️ Audio Equalizer</h1>
-            <div class="eq-container">
+            <div class="page-header">
+                <h1>🎚️ Audio Equalizer</h1>
+                <button class="back-btn" onclick="window.location.href = document.referrer || '/'">← Back</button>
+            </div>
+            <div class="eq-wrapper">
                 {eq_html}
             </div>
-            <script>
-                {eq_js}
-            </script>
         </body>
         </html>
         """
