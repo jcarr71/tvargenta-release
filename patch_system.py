@@ -200,6 +200,8 @@ def apply_patch_file(patch_path: Path, target_dir: Path) -> Tuple[bool, str]:
     Returns (success, message)
     """
     try:
+        target_dir = Path(target_dir).resolve()
+        
         # Read patch file
         with open(patch_path, 'r', encoding='utf-8') as f:
             patch_content = f.read()
@@ -210,7 +212,11 @@ def apply_patch_file(patch_path: Path, target_dir: Path) -> Tuple[bool, str]:
             tmp_path = tmp.name
         
         try:
-            # Apply patch
+            logger.info(f"Applying patch from {patch_path} to {target_dir}")
+            logger.debug(f"Working directory: {target_dir}")
+            logger.debug(f"Patch file: {tmp_path}")
+            
+            # Apply patch with -p1 (strip a/ prefix)
             result = subprocess.run(
                 ['patch', '-p1', '-i', tmp_path],
                 cwd=str(target_dir),
@@ -224,7 +230,10 @@ def apply_patch_file(patch_path: Path, target_dir: Path) -> Tuple[bool, str]:
                 return True, "Patch applied successfully"
             else:
                 msg = result.stderr or result.stdout or "Unknown error"
-                logger.error(f"Patch application failed: {msg}")
+                logger.error(f"Patch application failed")
+                logger.error(f"Return code: {result.returncode}")
+                logger.error(f"Stdout: {result.stdout}")
+                logger.error(f"Stderr: {msg}")
                 return False, msg
         finally:
             Path(tmp_path).unlink()
