@@ -3051,28 +3051,28 @@ def api_clear_intro():
 
 @app.route("/api/mods")
 def api_mods_list():
-    """List all mods with their current status."""
+    """List all mods (enabled and disabled) with their current status."""
     if not mod_registry:
         return jsonify({"status": "error", "message": "Mod system not initialized"}), 500
     
     try:
         mods_data = []
-        for mod in mod_registry.list_mods():
-            mod_obj = mod_registry.mods.get(mod)
-            if mod_obj:
-                manifest = mod_obj.manifest.data
-                mods_data.append({
-                    "id": mod,
-                    "name": manifest.get("name", mod),
-                    "version": manifest.get("version", "1.0.0"),
-                    "enabled": manifest.get("enabled", False),
-                    "description": manifest.get("description", ""),
-                    "dependencies": manifest.get("dependencies", []),
-                    "status": "loaded",
-                    "settings": manifest.get("settings", {})
-                })
+        # Discover ALL mods, not just loaded ones
+        all_manifests = mod_registry.discover_mods()
         
-        logger.info(f"Listed {len(mods_data)} mods")
+        for manifest in all_manifests:
+            mods_data.append({
+                "id": manifest.mod_id,
+                "name": manifest.data.get("name", manifest.mod_id),
+                "version": manifest.data.get("version", "1.0.0"),
+                "enabled": manifest.enabled,
+                "description": manifest.data.get("description", ""),
+                "dependencies": manifest.data.get("dependencies", []),
+                "status": "loaded" if manifest.mod_id in mod_registry.mods else "disabled",
+                "settings": manifest.data.get("settings", {})
+            })
+        
+        logger.info(f"Listed {len(mods_data)} mods ({len(mod_registry.mods)} loaded, {len(mods_data) - len(mod_registry.mods)} disabled)")
         return jsonify({"status": "ok", "mods": mods_data})
     except Exception as e:
         logger.error(f"Failed to list mods: {e}")
