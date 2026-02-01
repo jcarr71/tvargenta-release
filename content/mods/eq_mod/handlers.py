@@ -91,6 +91,149 @@ def get_eq_panel():
             <div class="eq-wrapper">
                 {eq_html}
             </div>
+            <script>
+                // Standalone EQ controller for settings page (no audio processing)
+                class StandaloneEQController {{
+                    constructor() {{
+                        this.settings = {{
+                            bass_gain: 0,
+                            mid_gain: 0,
+                            treble_gain: 0,
+                            active_preset: 'flat'
+                        }};
+                        this.presets = {{}};
+                        this.init();
+                    }}
+                    
+                    async init() {{
+                        try {{
+                            // Load presets
+                            const presetResp = await fetch('/api/eq/presets');
+                            if (presetResp.ok) {{
+                                const data = await presetResp.json();
+                                this.presets = data.presets || {{}};
+                            }}
+                            
+                            // Load current settings
+                            const settingsResp = await fetch('/api/eq/settings');
+                            if (settingsResp.ok) {{
+                                const data = await settingsResp.json();
+                                this.settings = data.settings || this.settings;
+                            }}
+                            
+                            this.setupUI();
+                        }} catch (e) {{
+                            console.error('[EQ] Init failed:', e);
+                        }}
+                    }}
+                    
+                    setupUI() {{
+                        // Set slider values
+                        document.getElementById('bassSlider').value = this.settings.bass_gain;
+                        document.getElementById('midSlider').value = this.settings.mid_gain;
+                        document.getElementById('trebleSlider').value = this.settings.treble_gain;
+                        this.updateValues();
+                        
+                        // Slider handlers
+                        document.getElementById('bassSlider').addEventListener('input', (e) => {{
+                            this.settings.bass_gain = parseInt(e.target.value);
+                            this.updateValues();
+                            this.saveSettings();
+                        }});
+                        document.getElementById('midSlider').addEventListener('input', (e) => {{
+                            this.settings.mid_gain = parseInt(e.target.value);
+                            this.updateValues();
+                            this.saveSettings();
+                        }});
+                        document.getElementById('trebleSlider').addEventListener('input', (e) => {{
+                            this.settings.treble_gain = parseInt(e.target.value);
+                            this.updateValues();
+                            this.saveSettings();
+                        }});
+                        
+                        // Preset buttons
+                        document.querySelectorAll('.eq-preset-btn').forEach(btn => {{
+                            btn.addEventListener('click', () => {{
+                                const preset = btn.dataset.preset;
+                                this.applyPreset(preset);
+                            }});
+                        }});
+                        
+                        // Reset button
+                        document.getElementById('eqReset').addEventListener('click', () => {{
+                            this.reset();
+                        }});
+                        
+                        this.updatePresetButtons(this.settings.active_preset);
+                    }}
+                    
+                    applyPreset(presetName) {{
+                        const preset = this.presets[presetName];
+                        if (!preset) return;
+                        
+                        this.settings.bass_gain = preset.bass_gain || 0;
+                        this.settings.mid_gain = preset.mid_gain || 0;
+                        this.settings.treble_gain = preset.treble_gain || 0;
+                        this.settings.active_preset = presetName;
+                        
+                        // Update UI
+                        document.getElementById('bassSlider').value = this.settings.bass_gain;
+                        document.getElementById('midSlider').value = this.settings.mid_gain;
+                        document.getElementById('trebleSlider').value = this.settings.treble_gain;
+                        this.updateValues();
+                        this.updatePresetButtons(presetName);
+                        this.saveSettings();
+                    }}
+                    
+                    reset() {{
+                        this.settings.bass_gain = 0;
+                        this.settings.mid_gain = 0;
+                        this.settings.treble_gain = 0;
+                        this.settings.active_preset = 'flat';
+                        
+                        document.getElementById('bassSlider').value = 0;
+                        document.getElementById('midSlider').value = 0;
+                        document.getElementById('trebleSlider').value = 0;
+                        this.updateValues();
+                        this.updatePresetButtons('flat');
+                        this.saveSettings();
+                    }}
+                    
+                    updateValues() {{
+                        const format = (v) => v > 0 ? '+' + v : v;
+                        document.getElementById('bassValue').textContent = format(this.settings.bass_gain);
+                        document.getElementById('midValue').textContent = format(this.settings.mid_gain);
+                        document.getElementById('trebleValue').textContent = format(this.settings.treble_gain);
+                    }}
+                    
+                    updatePresetButtons(activePreset) {{
+                        document.querySelectorAll('.eq-preset-btn').forEach(btn => {{
+                            if (btn.dataset.preset === activePreset) {{
+                                btn.classList.add('active');
+                            }} else {{
+                                btn.classList.remove('active');
+                            }}
+                        }});
+                    }}
+                    
+                    async saveSettings() {{
+                        try {{
+                            await fetch('/api/eq/settings', {{
+                                method: 'POST',
+                                headers: {{'Content-Type': 'application/json'}},
+                                body: JSON.stringify({{settings: this.settings}})
+                            }});
+                        }} catch (e) {{
+                            console.error('[EQ] Save failed:', e);
+                        }}
+                    }}
+                }}
+                
+                // Initialize on page load
+                document.addEventListener('DOMContentLoaded', () => {{
+                    window.eqController = new StandaloneEQController();
+                }});
+            </script>
         </body>
         </html>
         """
