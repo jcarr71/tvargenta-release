@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
-# Project: TVArgenta — Retro TV
+# SPDX-License-Identifier: LicenseRef-TV-CBIA-NC-Attribution-Consult-First
+# Project: TV-CBIA — Community Broadcast Interactive Archive
 # Author: Ricardo Sappia contact:rsflightronics@gmail.com
 # © 2025 Ricardo Sappia. All rights reserved.
 # License: Non-commercial, attribution and prior consultation. Distributed AS IS, without warranties.
@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo
 import os, getpass
 
 
-ENV_ROOT = os.environ.get("TVARGENTA_ROOT")
+ENV_ROOT = os.environ.get("TV_CBIA_ROOT")
 if ENV_ROOT:
     ROOT_DIR = Path(ENV_ROOT).resolve()
 else:
@@ -31,9 +31,9 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # State files (in /tmp by default)
 TMP_DIR = Path("/tmp")
 
-# Splash and Chromium profile: if /srv/tvargenta exists, use as “system data”
+# Splash and Chromium profile: if /srv/tv-cbia exists, use as "system data"
 # If not, use ROOT_DIR.
-SYSTEM_DATA_DIR = Path("/srv/tvargenta") if Path("/srv/tvargenta").exists() else ROOT_DIR
+SYSTEM_DATA_DIR = Path("/srv/tv-cbia") if Path("/srv/tv-cbia").exists() else ROOT_DIR
 SPLASH_DIR      = APP_DIR / "Splash" / "videos"
 I18N_DIR        = TEMPLATES_DIR / "i18n"
 CHROME_PROFILE  = SYSTEM_DATA_DIR / ".chromium-profile"

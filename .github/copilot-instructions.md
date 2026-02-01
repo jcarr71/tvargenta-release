@@ -1,7 +1,7 @@
-# TVArgenta AI Coding Agent Instructions
+# TV-CBIA AI Coding Agent Instructions
 
 ## Project Overview
-TVArgenta is a retro TV emulation system that combines broadcast scheduling, physical NFC tape interaction, web management UI, and audio normalization. It's a Flask-based application running on Linux (primarily Raspberry Pi with RetroPie). The codebase is **100% vibe-coded with Claude** and emphasizes pragmatic solutions over complexity—this is intentional and a source of pride.
+TV-CBIA (Community Broadcast Interactive Archive) is a retro TV emulation system that combines broadcast scheduling, physical NFC tape interaction, web management UI, and audio normalization. It's a Flask-based application running on Linux (primarily Raspberry Pi with RetroPie). The codebase is **100% vibe-coded with Claude** and emphasizes pragmatic solutions over complexity—this is intentional and a source of pride.
 
 ## Development Environment
 
@@ -17,7 +17,7 @@ TVArgenta is a retro TV emulation system that combines broadcast scheduling, phy
 **Development Context**:
 - Primary editor: Visual Studio Code
 - Primary shell: PowerShell (pwsh)
-- Repository: `lesterWritesCodeSometimes/tvargenta-release` (GitHub)
+- Repository: `jcarr71/tvargenta-release` (GitHub) - TV-CBIA fork
 - Default branch: `main`
 
 ## Major Recent Features (2025)

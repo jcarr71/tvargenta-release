@@ -51,8 +51,8 @@ log.setLevel(logging.ERROR)  # only errors visible
 app = Flask(__name__)
 
 # --- LOGGING ---------------------------------------------------------------
-LOG_PATH = str(LOG_DIR  / "tvargenta.log") 
-logger = logging.getLogger("tvargenta")
+LOG_PATH = str(LOG_DIR  / "tv-cbia.log") 
+logger = logging.getLogger("tv-cbia")
 logger.setLevel(logging.INFO)
 
 if not logger.handlers:
@@ -91,22 +91,22 @@ def _hdr(name):
 
 # Base path for videos and metadata
 TRIGGER_PATH = str(TMP_DIR / "trigger_reload.json")
-VOLUMEN_PATH = str(TMP_DIR / "tvargenta_volumen.json")
+VOLUMEN_PATH = str(TMP_DIR / "tv-cbia_volumen.json")
 MENU_TRIGGER_PATH = str(TMP_DIR / "trigger_menu.json")
 MENU_STATE_PATH  = str(TMP_DIR / "menu_state.json")
 MENU_NAV_PATH    = str(TMP_DIR / "trigger_menu_nav.json")
 MENU_SELECT_PATH = str(TMP_DIR / "trigger_menu_select.json")
 
-INTRO_FLAG  = "/tmp/tvargenta_show_intro"
-LAUNCH_FLAG      = str(TMP_DIR / "tvargenta_kiosk_launched")
-CURRENT_SPLASH_FILE = str(TMP_DIR / "tvargenta_current_splash.json")
+INTRO_FLAG  = "/tmp/tv-cbia_show_intro"
+LAUNCH_FLAG      = str(TMP_DIR / "tv-cbia_kiosk_launched")
+CURRENT_SPLASH_FILE = str(TMP_DIR / "tv-cbia_current_splash.json")
 
 
 ALSA_DEVICE   = "default"   
-SPLASH_DONE   = "/tmp/.tvargenta_splash_done"
+SPLASH_DONE   = "/tmp/.tv-cbia_splash_done"
 
-PING_FILE = "/tmp/tvargenta_kiosk_ping.txt"
-FRONT_PING_PATH = "/tmp/tvargenta_front_ping.json"
+PING_FILE = "/tmp/tv-cbia_kiosk_ping.txt"
+FRONT_PING_PATH = "/tmp/tv-cbia_front_ping.json"
 
 CONTENT_DIR = Path(CONTENT_DIR)
 
