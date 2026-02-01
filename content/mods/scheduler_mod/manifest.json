@@ -1,0 +1,18 @@
+{
+  "id": "scheduler_mod",
+  "name": "Broadcast Scheduler",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "Generates authentic 1990s TV programming with daily/weekly schedule generation, time-of-day zones, and episode tracking.",
+  "entry_point": "scheduler_mod.handlers",
+  "author": "TVArgenta",
+  "dependencies": [],
+  "settings": {
+    "weekly_schedule_time": "02:30",
+    "daily_schedule_time": "03:00",
+    "test_pattern_start": "03:00",
+    "test_pattern_end": "04:00",
+    "commercial_per_block": 3,
+    "enabled_channels": []
+  }
+}

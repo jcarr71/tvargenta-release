@@ -1,0 +1,406 @@
+<!-- 
+Audio Equalizer Control Panel
+Include this in player.html to add EQ controls to the player interface
+-->
+
+<div id="eqPanel" class="eq-panel" style="display: none;">
+    <div class="eq-header">
+        <h3>🎚️ Equalizer</h3>
+        <button id="eqClose" class="eq-close">×</button>
+    </div>
+    
+    <div class="eq-content">
+        <!-- Preset buttons -->
+        <div class="eq-presets">
+            <button class="eq-preset-btn" data-preset="flat">Flat</button>
+            <button class="eq-preset-btn" data-preset="warm">Warm</button>
+            <button class="eq-preset-btn" data-preset="bright">Bright</button>
+            <button class="eq-preset-btn" data-preset="bass_boost">Bass</button>
+            <button class="eq-preset-btn" data-preset="dialogue">Dialogue</button>
+        </div>
+        
+        <!-- Individual sliders -->
+        <div class="eq-sliders">
+            <div class="eq-slider-group">
+                <label class="eq-label">
+                    <span class="eq-name">Bass</span>
+                    <span class="eq-value" id="bassValue">0</span>dB
+                </label>
+                <input type="range" id="bassSlider" class="eq-slider" min="-12" max="12" value="0" step="1">
+            </div>
+            
+            <div class="eq-slider-group">
+                <label class="eq-label">
+                    <span class="eq-name">Mid</span>
+                    <span class="eq-value" id="midValue">0</span>dB
+                </label>
+                <input type="range" id="midSlider" class="eq-slider" min="-12" max="12" value="0" step="1">
+            </div>
+            
+            <div class="eq-slider-group">
+                <label class="eq-label">
+                    <span class="eq-name">Treble</span>
+                    <span class="eq-value" id="trebleValue">0</span>dB
+                </label>
+                <input type="range" id="trebleSlider" class="eq-slider" min="-12" max="12" value="0" step="1">
+            </div>
+        </div>
+        
+        <!-- Reset button -->
+        <div class="eq-actions">
+            <button id="eqReset" class="eq-reset-btn">Reset</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .eq-panel {
+        position: fixed;
+        bottom: 100px;
+        right: 20px;
+        background: rgba(20, 20, 30, 0.95);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        width: 280px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        z-index: 999;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        color: #e0e0e0;
+    }
+    
+    .eq-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        padding-bottom: 10px;
+    }
+    
+    .eq-header h3 {
+        margin: 0;
+        font-size: 1.1em;
+        color: #00d4ff;
+    }
+    
+    .eq-close {
+        background: none;
+        border: none;
+        color: #00d4ff;
+        font-size: 1.5em;
+        cursor: pointer;
+        padding: 0;
+        width: 25px;
+        height: 25px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .eq-close:hover {
+        color: #ff4444;
+    }
+    
+    .eq-content {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    /* Presets */
+    .eq-presets {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+    }
+    
+    .eq-preset-btn {
+        background: rgba(0, 212, 255, 0.2);
+        border: 1px solid rgba(0, 212, 255, 0.4);
+        color: #00d4ff;
+        padding: 6px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85em;
+        transition: all 0.2s ease;
+    }
+    
+    .eq-preset-btn:hover {
+        background: rgba(0, 212, 255, 0.4);
+        border-color: #00d4ff;
+    }
+    
+    .eq-preset-btn.active {
+        background: rgba(0, 212, 255, 0.6);
+        border-color: #00d4ff;
+        font-weight: 600;
+    }
+    
+    /* Sliders */
+    .eq-sliders {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 10px 0;
+        border-top: 1px solid rgba(0, 212, 255, 0.1);
+        border-bottom: 1px solid rgba(0, 212, 255, 0.1);
+    }
+    
+    .eq-slider-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .eq-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9em;
+        color: #b0b0b0;
+    }
+    
+    .eq-name {
+        font-weight: 500;
+    }
+    
+    .eq-value {
+        color: #00d4ff;
+        font-weight: 600;
+        min-width: 30px;
+        text-align: right;
+    }
+    
+    .eq-slider {
+        width: 100%;
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(to right, #4a4a6a, #00d4ff);
+        outline: none;
+        -webkit-appearance: none;
+        appearance: none;
+    }
+    
+    .eq-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #00d4ff;
+        cursor: pointer;
+        transition: all 0.1s ease;
+        box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+    }
+    
+    .eq-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #00d4ff;
+        cursor: pointer;
+        border: none;
+        transition: all 0.1s ease;
+        box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+    }
+    
+    .eq-slider::-webkit-slider-thumb:active {
+        width: 16px;
+        height: 16px;
+        box-shadow: 0 0 12px rgba(0, 212, 255, 0.8);
+    }
+    
+    .eq-slider::-moz-range-thumb:active {
+        width: 16px;
+        height: 16px;
+        box-shadow: 0 0 12px rgba(0, 212, 255, 0.8);
+    }
+    
+    /* Actions */
+    .eq-actions {
+        display: flex;
+        gap: 8px;
+    }
+    
+    .eq-reset-btn {
+        flex: 1;
+        background: rgba(100, 100, 120, 0.3);
+        border: 1px solid rgba(100, 100, 120, 0.5);
+        color: #a0a0a0;
+        padding: 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85em;
+        transition: all 0.2s ease;
+    }
+    
+    .eq-reset-btn:hover {
+        background: rgba(100, 100, 120, 0.5);
+        color: #d0d0d0;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .eq-panel {
+            width: 100%;
+            max-width: 90vw;
+            bottom: 60px;
+            right: 5%;
+            left: 5%;
+        }
+        
+        .eq-presets {
+            grid-template-columns: repeat(5, 1fr);
+        }
+    }
+</style>
+
+<script>
+    /**
+     * EQ Panel Controller
+     * Manages UI interactions and communicates with AudioEqualizer
+     */
+    class EQPanelController {
+        constructor() {
+            this.panel = document.getElementById('eqPanel');
+            this.equalizer = null;
+            this.initialized = false;
+            
+            if (!this.panel) {
+                console.warn('[EQ Panel] Panel element not found');
+                return;
+            }
+            
+            this.setupEventListeners();
+        }
+        
+        setupEventListeners() {
+            // Close button
+            document.getElementById('eqClose').addEventListener('click', () => {
+                this.hide();
+            });
+            
+            // Preset buttons
+            document.querySelectorAll('.eq-preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const preset = btn.dataset.preset;
+                    this.applyPreset(preset);
+                    this.updatePresetButtons(preset);
+                });
+            });
+            
+            // Sliders
+            document.getElementById('bassSlider').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('bassValue').textContent = value > 0 ? '+' + value : value;
+                if (this.equalizer) this.equalizer.setBandGain('bass', value);
+            });
+            
+            document.getElementById('midSlider').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('midValue').textContent = value > 0 ? '+' + value : value;
+                if (this.equalizer) this.equalizer.setBandGain('mid', value);
+            });
+            
+            document.getElementById('trebleSlider').addEventListener('input', (e) => {
+                const value = parseInt(e.target.value);
+                document.getElementById('trebleValue').textContent = value > 0 ? '+' + value : value;
+                if (this.equalizer) this.equalizer.setBandGain('treble', value);
+            });
+            
+            // Reset button
+            document.getElementById('eqReset').addEventListener('click', () => {
+                this.reset();
+            });
+        }
+        
+        async init(videoElement) {
+            if (this.initialized) return;
+            
+            console.log('[EQ Panel] Initializing with video element');
+            
+            this.equalizer = new AudioEqualizer(videoElement);
+            await this.equalizer.init();
+            this.equalizer.setupAudioGraph();
+            
+            // Load saved settings
+            const settings = this.equalizer.getSettings();
+            document.getElementById('bassSlider').value = settings.bass_gain;
+            document.getElementById('midSlider').value = settings.mid_gain;
+            document.getElementById('trebleSlider').value = settings.treble_gain;
+            document.getElementById('bassValue').textContent = settings.bass_gain > 0 ? '+' + settings.bass_gain : settings.bass_gain;
+            document.getElementById('midValue').textContent = settings.mid_gain > 0 ? '+' + settings.mid_gain : settings.mid_gain;
+            document.getElementById('trebleValue').textContent = settings.treble_gain > 0 ? '+' + settings.treble_gain : settings.treble_gain;
+            
+            this.updatePresetButtons(settings.active_preset);
+            
+            this.initialized = true;
+            console.log('[EQ Panel] Initialized');
+        }
+        
+        show() {
+            if (!this.initialized) return;
+            this.panel.style.display = 'block';
+        }
+        
+        hide() {
+            this.panel.style.display = 'none';
+        }
+        
+        toggle() {
+            if (!this.initialized) return;
+            if (this.panel.style.display === 'none') {
+                this.show();
+            } else {
+                this.hide();
+            }
+        }
+        
+        applyPreset(presetName) {
+            if (!this.equalizer) return;
+            this.equalizer.applyPreset(presetName);
+            
+            // Update sliders
+            const settings = this.equalizer.getSettings();
+            document.getElementById('bassSlider').value = settings.bass_gain;
+            document.getElementById('midSlider').value = settings.mid_gain;
+            document.getElementById('trebleSlider').value = settings.treble_gain;
+            document.getElementById('bassValue').textContent = settings.bass_gain > 0 ? '+' + settings.bass_gain : settings.bass_gain;
+            document.getElementById('midValue').textContent = settings.mid_gain > 0 ? '+' + settings.mid_gain : settings.mid_gain;
+            document.getElementById('trebleValue').textContent = settings.treble_gain > 0 ? '+' + settings.treble_gain : settings.treble_gain;
+        }
+        
+        reset() {
+            if (!this.equalizer) return;
+            this.equalizer.reset();
+            
+            // Update UI
+            document.getElementById('bassSlider').value = 0;
+            document.getElementById('midSlider').value = 0;
+            document.getElementById('trebleSlider').value = 0;
+            document.getElementById('bassValue').textContent = '0';
+            document.getElementById('midValue').textContent = '0';
+            document.getElementById('trebleValue').textContent = '0';
+            
+            this.updatePresetButtons('flat');
+        }
+        
+        updatePresetButtons(activePreset) {
+            document.querySelectorAll('.eq-preset-btn').forEach(btn => {
+                if (btn.dataset.preset === activePreset) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+    }
+    
+    // Create controller instance
+    const eqController = new EQPanelController();
+    
+    // Export for use in player
+    if (typeof window !== 'undefined') {
+        window.eqController = eqController;
+    }
+</script>

@@ -1,0 +1,53 @@
+{
+  "id": "eq_mod",
+  "name": "Audio Equalizer",
+  "version": "1.0.0",
+  "enabled": false,
+  "description": "3-band audio equalizer with preset curves (Flat, Warm, Bright, Bass Boost). Uses Web Audio API for real-time adjustment without app restart.",
+  "entry_point": "eq_mod.handlers",
+  "author": "TVArgenta",
+  "dependencies": [],
+  "settings": {
+    "bass_gain": 0,
+    "mid_gain": 0,
+    "treble_gain": 0,
+    "active_preset": "flat"
+  },
+  "presets": {
+    "flat": {
+      "name": "Flat",
+      "bass_gain": 0,
+      "mid_gain": 0,
+      "treble_gain": 0,
+      "description": "No equalization"
+    },
+    "warm": {
+      "name": "Warm",
+      "bass_gain": 4,
+      "mid_gain": 2,
+      "treble_gain": -3,
+      "description": "Warm, smooth sound"
+    },
+    "bright": {
+      "name": "Bright",
+      "bass_gain": -2,
+      "mid_gain": 1,
+      "treble_gain": 6,
+      "description": "Clear, crisp highs"
+    },
+    "bass_boost": {
+      "name": "Bass Boost",
+      "bass_gain": 8,
+      "mid_gain": 0,
+      "treble_gain": 0,
+      "description": "Enhanced low frequencies"
+    },
+    "dialogue": {
+      "name": "Dialogue",
+      "bass_gain": -1,
+      "mid_gain": 4,
+      "treble_gain": 1,
+      "description": "Enhanced speech clarity"
+    }
+  }
+}

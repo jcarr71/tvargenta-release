@@ -1,0 +1,17 @@
+{
+  "id": "vcr_mod",
+  "name": "VCR/NFC Tape System",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "Physical NFC tape interaction with persistent position, rewind animations, and position saves",
+  "entry_point": "vcr_mod.handlers",
+  "author": "Ricardo Sappia",
+  "dependencies": [
+    "nfcpy"
+  ],
+  "settings": {
+    "enable_hardware": true,
+    "rewind_speed_ratio": 45,
+    "position_persist_interval": 30
+  }
+}

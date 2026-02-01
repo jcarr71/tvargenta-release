@@ -41,12 +41,15 @@ build/
 # App data (runtime)
 # Mantener SOLO la estructura vacía de content/ y subcarpetas.
 # Ignorar todo lo demás (JSON, MP4, JPG, etc.)
+# EXCEPTION: Mods are versioned and should be committed
 # =========================
 content/**
 !content/.gitignore
 !content/.gitkeep
 !content/**/
 !content/**/.gitkeep
+!content/mods/
+!content/mods/**
 
 # (Si en el futuro quisieras permitir samples:)
 # !content/*.sample.json
