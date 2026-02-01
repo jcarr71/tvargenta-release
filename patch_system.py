@@ -29,8 +29,8 @@ PATCHES_DIR = CONTENT_DIR / "patches"
 BACKUPS_DIR = CONTENT_DIR / "backups"
 
 # Create directories if needed
-PATCHES_DIR.mkdir(exist_ok=True)
-BACKUPS_DIR.mkdir(exist_ok=True)
+PATCHES_DIR.mkdir(parents=True, exist_ok=True)
+BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class VersionInfo:
