@@ -25,6 +25,9 @@ def get_eq_panel():
         with open(eq_js_path, "r", encoding="utf-8") as f:
             eq_js = f.read()
         
+        # Remove display:none to show the panel
+        eq_html = eq_html.replace('style="display: none;"', 'style="display: block;"')
+        
         # Create a wrapper page with the EQ panel
         html = f"""
         <!DOCTYPE html>
@@ -57,6 +60,7 @@ def get_eq_panel():
                     border-radius: 4px;
                     cursor: pointer;
                     margin-bottom: 20px;
+                    font-size: 1em;
                 }}
                 .back-btn:hover {{
                     background: rgba(0, 212, 255, 0.5);
@@ -64,7 +68,7 @@ def get_eq_panel():
             </style>
         </head>
         <body>
-            <button class="back-btn" onclick="window.history.back()">← Back</button>
+            <button class="back-btn" onclick="window.location.href = document.referrer || '/'">← Back</button>
             <h1>🎚️ Audio Equalizer</h1>
             <div class="eq-container">
                 {eq_html}
@@ -78,7 +82,8 @@ def get_eq_panel():
         
         return html
     except Exception as e:
-        return f"<h1>Error loading EQ panel: {e}</h1>", 500
+        import traceback
+        return f"<h1>Error loading EQ panel: {e}</h1><pre>{traceback.format_exc()}</pre>", 500
 
 def get_routes():
     """Return list of (rule, function, methods) tuples for Flask."""
