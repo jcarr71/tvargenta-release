@@ -40,8 +40,8 @@ import bluetooth_manager
 import wifi_manager
 import vcr_manager
 import scheduler
-import mod_system
 import patch_system
+from tools import mod_system
 
 
        
