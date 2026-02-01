@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
-# Proyecto: TVArgenta — Retro TV
-# Autor: Ricardo Sappia (rsflightronics@gmail.com)
-# Gestión WiFi para TVArgenta (Bookworm + NetworkManager)
+# Project: TVArgenta — Retro TV
+# Author: Ricardo Sappia (rsflightronics@gmail.com)
+# Gestion WiFi for TVArgenta (Bookworm + NetworkManager)
 #
 # Requiere:
 #   - network-manager instalado y manejando wlan0
 #   - nmcli disponible
 #
 # Nota:
-#   - Las contraseñas quedan gestionadas por NetworkManager.
+#   - Las contrasenas quedan gestionadas por NetworkManager.
 #   - En wifi_known.json solo se guarda la lista de SSID conocidos + metadatos,
 #     no secretos.
 
@@ -37,7 +37,7 @@ WIFI_KNOWN_FILE = Path(CONTENT_DIR) / "wifi_known.json"
 AP_STATE_FILE = Path(TMP_DIR) / "wifi_ap_state.json"
 
 NMCLI_BIN = "/usr/bin/nmcli"
-USE_SUDO = True  # activamos sudo para nmcli
+USE_SUDO = True  # activamos sudo for nmcli
 
 log = logging.getLogger("tvargenta.wifi")
 
@@ -116,7 +116,7 @@ def get_known_networks():
       - wifi_known.json
       - la red WiFi actualmente activa (auto-import)
     Ignora:
-      - Cualquier SSID que empiece con AP_SSID_PREFIX (TVArgenta-Setup-)
+      - whichquier SSID que empiece con AP_SSID_PREFIX (TVArgenta-Setup-)
     """
     known = _load_known()
 
@@ -174,7 +174,7 @@ def mark_known(ssid: str):
     known = _load_known()
     info = known.get(ssid, {})
     info["last_used"] = _now_iso()
-    # campo reservado para futuro (prioridades, etc.)
+    # campo reservado for futuro (prioridades, etc.)
     info.setdefault("priority", 0)
     known[ssid] = info
     _save_known(known)
@@ -218,16 +218,16 @@ def forget_network(ssid: str):
 
 def restore_network_state():
     """
-    Restaura condiciones normales después del modo AP.
-    - Elimina la conexión AP si persiste.
-    - Normaliza perfiles WiFi activos (ipv4 auto, sin ipv6 si así se desea).
-    - Reafirma parámetros útiles para mDNS/LLMNR.
-    - Reinicia solo Avahi (no NetworkManager) para no cortar WiFi.
+    Restaura condiciones normales despues del modo AP.
+    - Elimina la conexion AP si persiste.
+    - Normaliza perfiles WiFi activos (ipv4 auto, sin ipv6 si asi se desea).
+    - Reafirma formetros utiles for mDNS/LLMNR.
+    - Reinicia solo Avahi (no NetworkManager) for no cortar WiFi.
     """
     try:
         log.info("[WiFi] restore_network_state() INICIO")
 
-        # 1) Borrar conexión AP (si sigue existiendo)
+        # 1) Borrar conexion AP (si sigue existiendo)
         _run_nmcli(["connection", "delete", AP_CON_NAME], timeout=5)
 
         # 2) Detectar conexiones wifi activas (excepto el AP)
@@ -250,17 +250,17 @@ def restore_network_state():
                 # IPv4 por DHCP normal
                 _run_nmcli(["connection", "modify", name, "ipv4.method", "auto"], timeout=5)
 
-                # Si querés matar IPv6 por diseño de TVArgenta, dejá esto:
+                # Si queres matar IPv6 por diseno de TVArgenta, deja esto:
                 _run_nmcli(["connection", "modify", name, "ipv6.method", "ignore"], timeout=5)
 
-                # Hints para mDNS/LLMNR (algunos NM los ignoran, pero no molestan)
+                # Hints for mDNS/LLMNR (algunos NM los ignoran, but no molestan)
                 _run_nmcli([
                     "connection", "modify", name,
                     "connection.mdns", "yes",
                     "connection.llmnr", "yes",
                 ], timeout=5)
 
-        # 3) Reiniciar sólo Avahi para refrescar anuncios mDNS
+        # 3) Reiniciar solo Avahi for refrescar anuncios mDNS
         try:
             subprocess.run(
                 ["sudo", "systemctl", "restart", "avahi-daemon"],
@@ -331,7 +331,7 @@ def get_status():
         log.warning(f"[WiFi] get_status: nmcli device wifi rc={rc_wifi} err={err_wifi!r}")
 
     # 3) Determinar modo
-    # AP detectado: SSID TVArgenta-Setup-XXXX o conexión tvargenta-ap activa
+    # AP detectado: SSID TVArgenta-Setup-XXXX o conexion tvargenta-ap activa
     is_ap = False
     if ssid and ssid.startswith("TVArgenta-Setup-"):
         is_ap = True
@@ -385,7 +385,7 @@ def scan_networks():
         except ValueError:
             signal = 0
         nets.append({"ssid": ssid, "signal": signal})
-    # eliminar duplicados quedándose con mejor señal
+    # eliminar duplicados quedandose con mejor senal
     dedup = {}
     for n in nets:
         cur = dedup.get(n["ssid"])
@@ -397,7 +397,7 @@ def scan_networks():
 
 def _wait_for_ip(iface=WIFI_IFACE, timeout=25, interval=1.5):
     """
-    Espera hasta timeout a que NM asigne IP al iface.
+    Espera until timeout a que NM asigne IP al iface.
     Devuelve (ip4, ip6) o (None, None).
     """
     deadline = time.time() + timeout
@@ -495,10 +495,10 @@ def choose_best_known_and_connect():
             candidates.append((prio, strength, ssid))
 
     if not candidates:
-        log.info("[WiFi] apply_best: no hay redes conocidas visibles con perfil válido")
+        log.info("[WiFi] apply_best: no hay redes conocidas visibles con perfil valido")
         return {"ok": False, "error": "no_known_visible"}
 
-    # ordenar por prioridad y señal descendente
+    # ordenar por prioridad y senal descendente
     candidates.sort(key=lambda x: (-x[0], -x[1]))
 
     for prio, strength, ssid in candidates:
@@ -539,13 +539,13 @@ def _random_password(length=AP_PASSWORD_LEN):
 
 def stop_ap_mode():
     """
-    Apaga el modo AP si está activo y limpia estado.
-    NO intenta decidir a qué WiFi conectarse: eso lo hace
+    Apaga el modo AP si esta activo y limpia estado.
+    NO intenta decidir a que WiFi conectarse: eso lo hace
     connect_with_credentials o choose_best_known_and_connect().
     """
     log.info("[WiFi] stop_ap_mode()")
 
-    # 1) Best-effort: bajar y borrar la conexión AP
+    # 1) Best-effort: bajar y borrar la conexion AP
     _run_nmcli(["connection", "down", AP_CON_NAME], timeout=10)
     _run_nmcli(["connection", "delete", AP_CON_NAME], timeout=5)
 
@@ -557,26 +557,26 @@ def stop_ap_mode():
     except Exception as e:
         log.warning(f"[WiFi] stop_ap_mode: no pude borrar AP_STATE_FILE: {e}")
 
-    # 3) Normalizar parámetros
+    # 3) Normalizar formetros
     restore_network_state()
 
-    # 4) Nada más acá. No llamamos device connect / apply_best automáticamente.
+    # 4) Nada mas aca. No llamamos device connect / apply_best automaticamente.
     return {"ok": True}
 
 
 
 def cleanup_ap_if_stale(max_age_seconds: int = 180):
     """
-    Si hay un AP registrado en AP_STATE_FILE pero:
-      - tiene más de max_age_seconds, o
-      - nmcli ya no muestra la conexión AP activa,
-    se limpia para evitar quedar clavado en modo AP.
+    Si hay un AP registrado en AP_STATE_FILE but:
+      - tiene mas de max_age_seconds, o
+      - nmcli ya no muestra la conexion AP activa,
+    se limpia for evitar quedar clavado en modo AP.
     """
     info = _read_json(AP_STATE_FILE, {})
     if not info:
         return
 
-    # ¿sigue activa la conexión AP?
+    # ¿sigue activa la conexion AP?
     rc, out, _ = _run_nmcli(
         ["-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"],
         timeout=5,
@@ -606,9 +606,9 @@ def cleanup_ap_if_stale(max_age_seconds: int = 180):
 def start_ap_mode():
     log.info("[WiFi] start_ap_mode() requested")
     """
-    Sube un AP propio para onboarding:
+    Sube un AP propio for onboarding:
       - baja conexiones wifi previas en WIFI_IFACE
-      - crea/levanta conexión AP_CON_NAME
+      - crea/levanta conexion AP_CON_NAME
       - guarda info en AP_STATE_FILE
     Devuelve:
       {"ap_ssid": "...", "ap_password": "...", "qr": "WIFI:...;"}
@@ -616,7 +616,7 @@ def start_ap_mode():
     # bajar conexiones activas de ese iface (best-effort)
     _run_nmcli(["device", "disconnect", WIFI_IFACE], timeout=10)
 
-    # limpiar conexión previa AP si existe
+    # limpiar conexion previa AP si existe
     _run_nmcli(["connection", "down", AP_CON_NAME], timeout=5)
     _run_nmcli(["connection", "delete", AP_CON_NAME], timeout=5)
 
@@ -624,7 +624,7 @@ def start_ap_mode():
     #password = _random_password()
     password = "TVA123456"
 
-    # crear conexión tipo AP
+    # crear conexion tipo AP
     rc, out, err = _run_nmcli([
         "connection", "add",
         "type", "wifi",
@@ -668,12 +668,12 @@ def start_ap_mode():
     _write_json(AP_STATE_FILE, data)
 
     qr_text_wifi = f"WIFI:T:WPA;S:{ssid};P:{password};;"
-    # URL a la cual queremos que vaya el celular una vez conectado:
+    # URL a la which queremos que vaya el celular una vez conectado:
     ap_url = f"http://{ap_ip}:5000/wifi_setup"  # <-- tu template wifi_setup.html
-    # QR para la URL (para abrir la página de configuración)
+    # QR for la URL (for abrir la pagina de configuracion)
     qr_url_data = _make_qr_data_url(ap_url) if qrcode else None
 
-    # QR para la configuración WIFI (WIFI:... - para que el celu lo agregue automáticamente)
+    # QR for la configuracion WIFI (WIFI:... - for que el celu lo agregue automaticamente)
     qr_wifi_data = _make_qr_data_url(qr_text_wifi) if qrcode else None
 
     log.info(f"[WiFi] AP up ssid={ssid} pass={password} ip={ap_ip}")
@@ -684,8 +684,8 @@ def start_ap_mode():
         "ap_password": password,
         "ap_ip": ap_ip,
         "ap_url": ap_url,
-        "qr_ap_url": qr_url_data,   # data URL PNG para abrir la página (http)
-        "qr_wifi": qr_wifi_data,    # data URL PNG con WIFI:... (para que el celu lo guarde)
+        "qr_ap_url": qr_url_data,   # data URL PNG for abrir la pagina (http)
+        "qr_wifi": qr_wifi_data,    # data URL PNG con WIFI:... (for que el celu lo guarde)
         "qr_text_wifi": qr_text_wifi
     }
 
@@ -720,14 +720,14 @@ def connect_with_credentials(ssid: str, password: str | None):
     log.info(f"[WiFi] nmcli connect rc={rc} out={out!r} err={err!r}")
 
     if rc != 0 and "activation was enqueued" not in msg:
-        # Si la red no se ve, creamos perfil manualmente para uso futuro
+        # Si la red no se ve, creamos perfil manualmente for uso futuro
         if "no network with ssid" in msg:
             log.warning(
-                "[WiFi] connect_with_credentials: SSID no visible, creando perfil persistente para %r",
+                "[WiFi] connect_with_credentials: SSID no visible, creando perfil persistente for %r",
                 ssid
             )
 
-            # Crear perfil tipo wifi sin requerir que esté visible
+            # Crear perfil tipo wifi sin requerir que este visible
             rc_add, out_add, err_add = _run_nmcli([
                 "connection", "add",
                 "type", "wifi",
@@ -752,10 +752,10 @@ def connect_with_credentials(ssid: str, password: str | None):
 
                 mark_known(ssid)
                 log.info(
-                    "[WiFi] connect_with_credentials: perfil creado para %r aunque no se pudo conectar ahora",
+                    "[WiFi] connect_with_credentials: perfil creado for %r although no se pudo conectar ahora",
                     ssid
                 )
-                # Devolvemos error de conexión pero perfil listo
+                # Devolvemos error de conexion but perfil listo
                 return {
                     "ok": False,
                     "error": "network_not_visible_profile_saved",
@@ -771,17 +771,17 @@ def connect_with_credentials(ssid: str, password: str | None):
         return {"ok": False, "error": err or "nmcli_failed"}
 
     if "activation was enqueued" in msg:
-        log.warning("[WiFi] connect_with_credentials: activation enqueued; espero como async")
+        log.warning("[WiFi] connect_with_credentials: activation enqueued; esbut como async")
 
     # 4) Esperar IP
     ip4, ip6 = _wait_for_ip()
 
     if not ip4 and not ip6:
         log.error(
-            f"[WiFi] connect_with_credentials: sin IP para {ssid!r} tras timeout "
+            f"[WiFi] connect_with_credentials: sin IP for {ssid!r} tras timeout "
             f"(ip4={ip4}, ip6={ip6})"
         )
-        # dejamos el perfil creado para futuros apply_best()
+        # dejamos el perfil creado for futuros apply_best()
         mark_known(ssid)
         return {
             "ok": False,
@@ -808,13 +808,13 @@ def connect_with_credentials(ssid: str, password: str | None):
 # -------------------------QR Helpers-------------------------    
 def _get_iface_ipv4_addr(iface=WIFI_IFACE):
     """
-    Intenta obtener la IP IPv4 asignada al iface. Primero con nmcli, luego con ip.
+    Intenta obtener la IP IPv4 asignada al iface. Primero con nmcli, then con ip.
     Devuelve string ip o None.
     """
     try:
         rc, out, err = _run_nmcli(["-g", "IP4.ADDRESS", "device", "show", iface], timeout=3)
         if rc == 0 and out:
-            # nmcli puede devolver '192.168.x.x/24' o múltiples entradas
+            # nmcli puede devolver '192.168.x.x/24' o multiples entradas
             first = out.splitlines()[0].strip()
             ip = first.split("/")[0].strip()
             if ip:
@@ -839,7 +839,7 @@ def _get_iface_ipv4_addr(iface=WIFI_IFACE):
 def _make_qr_data_url(text: str, box_size=6, border=2):
     """
     Genera un PNG data URL con el contenido text. Requiere qrcode + pillow.
-    Si no está la librería devuelve None.
+    Si no esta la libreria devuelve None.
     """
     if not qrcode:
         log.warning("[WiFi] qrcode library not available, QR data URL won't be generated.")

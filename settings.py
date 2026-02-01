@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
-# Proyecto: TVArgenta — Retro TV
-# Autor: Ricardo Sappia contact:rsflightronics@gmail.com
-# © 2025 Ricardo Sappia. Todos los derechos reservados.
-# Licencia: No comercial, atribución y consulta previa. Se distribuye TAL CUAL, sin garantías.
-# Ver LICENSE para términos completos.
+# Project: TVArgenta — Retro TV
+# Author: Ricardo Sappia contact:rsflightronics@gmail.com
+# © 2025 Ricardo Sappia. All rights reserved.
+# License: Non-commercial, attribution and prior consultation. Distributed AS IS, without warranties.
+# See LICENSE for full terms.
 
 
 from pathlib import Path
@@ -28,11 +28,11 @@ LOG_DIR = ROOT_DIR / "logs"
 
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-# Archivos de estado (en /tmp por defecto)
+# State files (in /tmp by default)
 TMP_DIR = Path("/tmp")
 
-# Splash y perfil de Chromium: si existe /srv/tvargenta, usamos como “datos del sistema”
-# Si no, usamos ROOT_DIR.
+# Splash and Chromium profile: if /srv/tvargenta exists, use as “system data”
+# If not, use ROOT_DIR.
 SYSTEM_DATA_DIR = Path("/srv/tvargenta") if Path("/srv/tvargenta").exists() else ROOT_DIR
 SPLASH_DIR      = APP_DIR / "Splash" / "videos"
 I18N_DIR        = TEMPLATES_DIR / "i18n"
@@ -42,10 +42,10 @@ CHROME_CACHE    = SYSTEM_DATA_DIR / ".chromium-cache"
 # Archivos JSON
 METADATA_FILE       = CONTENT_DIR / "metadata.json"
 TAGS_FILE           = CONTENT_DIR / "tags.json"
-CONFIG_FILE         = CONTENT_DIR / "configuracion.json"
+config_FILE         = CONTENT_DIR / "configuracion.json"
 CANALES_FILE        = CONTENT_DIR / "canales.json"
 CANAL_ACTIVO_FILE   = CONTENT_DIR / "canal_activo.json"
-CONFIG_PATH         = CONTENT_DIR / "menu_configuracion.json"
+config_PATH         = CONTENT_DIR / "menu_configuracion.json"
 SERIES_FILE         = CONTENT_DIR / "series.json"
 PLAYS_FILE          = SYSTEM_DATA_DIR / "content" / "plays.json"  # persiste fuera del repo si corres en /srv
 
@@ -58,7 +58,7 @@ COMMERCIALS_DIR     = VIDEO_DIR / "commercials"
 SPLASH_STATE_FILE   = SYSTEM_DATA_DIR / "Splash" / "splash_state.json"
 INTRO_PATH          = SPLASH_DIR / "splash_1.mp4"
 
-# Usuario que corre el kiosk 
+# User running the kiosk 
 USER = os.environ.get("TVARGENTA_USER") or getpass.getuser()
 
 UPLOAD_STATUS = TMP_DIR / "upload_status.txt"
@@ -100,9 +100,9 @@ def _load_timezone_from_config() -> str:
     """Load timezone from configuracion.json, falling back to env var or default."""
     # Try to load from config file first
     try:
-        if CONFIG_FILE.exists():
+        if config_FILE.exists():
             import json
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            with open(config_FILE, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
                 tz = cfg.get("timezone")
                 if tz:

@@ -8,17 +8,17 @@ import traceback
 # --------------------------
 
 def _log(msg):
-    # Todo lo que pase por acá termina en journalctl -u tvargenta.service -f
+    # Todo lo que pase por aca termina en journalctl -u tvargenta.service -f
     print(f"[BT] {msg}")
 
-# Patron para lineas "Device XX:XX:.. Nombre Bonito"
+# Patron for lineas "Device XX:XX:.. Nombre Bonito"
 _device_re = re.compile(r"Device\s+([0-9A-Fa-f:]{17})\s+(.+)$")
 
 
 def _run_bt_cmd(args, timeout=5, check=True):
     """
     Ejecuta bluetoothctl y devuelve stdout completo.
-    Si check=True levanta excepción si el exit code !=0 (como antes).
+    Si check=True levanta excepcion si el exit code !=0 (como before).
     """
     full_cmd = ["sudo", "-n", "/usr/bin/bluetoothctl"] + args
     _log(f"RUN {full_cmd}")
@@ -36,7 +36,7 @@ def _run_bt_cmd(args, timeout=5, check=True):
 
 def _fire_and_forget(args):
     """
-    Lanza un bluetoothctl que no esperamos que termine rápido
+    Lanza un bluetoothctl que no esperamos que termine rapido
     (ej: 'scan on') y no bloqueamos.
     """
     full_cmd = ["sudo", "-n", "/usr/bin/bluetoothctl"] + args
@@ -53,7 +53,7 @@ def _fire_and_forget(args):
 def _parse_devices_list(raw_text):
     """
     Devuelve lista [{ 'mac': 'XX:..', 'name': 'Algo' }, ...]
-    a partir de líneas bluetoothctl tipo 'Device XX:XX... Nombre'.
+    a partir de lineas bluetoothctl tipo 'Device XX:XX... Nombre'.
     """
     found = []
     for line in raw_text.splitlines():
@@ -90,9 +90,9 @@ def ensure_adapter_on():
         status["power_cmd_ok"] = True
     except subprocess.CalledProcessError as e:
         status["err"] = f"power on FAILED: {e}"
-        # capturá igual salida parcial si existe (para log)
+        # captura igual salida parcial si existe (for log)
         _log(f"ensure_adapter_on: power on FAILED {e}")
-        # seguimos, pero marcamos que falló
+        # seguimos, but marcamos que fallo
 
     # 1b. chequeo del adaptador de verdad
     try:
@@ -160,20 +160,20 @@ def get_paired_devices():
 
     for line in raw_list.splitlines():
         line = line.strip()
-        # buscamos líneas tipo:
+        # buscamos lineas tipo:
         # Device XX:XX:XX:XX:XX:XX Name Here
         if not line.startswith("Device "):
             continue
         parts = line.split(" ", 2)
         # parts[0] = "Device"
         # parts[1] = MAC
-        # parts[2] = nombre (puede faltar => usamos MAC después)
+        # parts[2] = nombre (puede faltar => usamos MAC despues)
         if len(parts) < 2:
             continue
         mac = parts[1].strip()
         name = parts[2].strip() if len(parts) >= 3 else mac
 
-        # 2. Para cada device, pedimos info detallada
+        # 2. for cada device, pedimos info detallada
         raw_info = _run_bt_cmd(["info", mac], timeout=3, check=False)
         # ahora parseamos flags del info:
         paired = False
@@ -194,7 +194,7 @@ def get_paired_devices():
             elif iline.startswith("Connected:"):
                 connected = "yes" in iline
             elif iline.startswith("Name:"):
-                # forzamos name más humano si lo vemos acá
+                # forzamos name mas humano si lo vemos aca
                 # ej "Name: Pro Controller"
                 n = iline.split(":", 1)[1].strip()
                 if n:
@@ -275,7 +275,7 @@ def scan_new_devices(timeout_s=5):
 
 def get_unpaired_devices():
     """
-    Devuelve los escaneados que NO están todavía emparejados.
+    Devuelve los escaneados que NO estan todavia emparejados.
     """
     _log("get_unpaired_devices: BEGIN")
     try:
@@ -363,7 +363,7 @@ def pair_and_connect(mac):
     run(["agent", "NoInputNoOutput"], check=False)
     run(["default-agent"], check=False)  # puede fallar, no importa
 
-    # 2. mirar estado actual del device antes de tocar nada
+    # 2. mirar estado actual del device before de tocar nada
     info_before = run(["info", mac], check=False)
     already_paired   = ("Paired: yes"   in info_before) or ("Bonded: yes" in info_before)
     already_trusted  = ("Trusted: yes"  in info_before)
@@ -371,7 +371,7 @@ def pair_and_connect(mac):
 
     _log(f"pair_and_connect: info_before for {mac} -> paired={already_paired} trusted={already_trusted} connected={already_connected}")
 
-    # Si ya está conectado, listo
+    # Si ya esta conectado, listo
     if already_connected:
         paired = already_paired
         trusted = already_trusted
@@ -409,7 +409,7 @@ def pair_and_connect(mac):
                 }
                 _log(f"pair_and_connect: END (pair failed) -> {result}")
                 return result
-        # si no marcó explícitamente failed, asumimos paired=True igual.
+        # si no marco explicitamente failed, asumimos paired=True igual.
         if not paired:
             paired = True
 
@@ -426,7 +426,7 @@ def pair_and_connect(mac):
     else:
         trusted = True
 
-    # 5. Intentar connect hasta 2 veces
+    # 5. Intentar connect until 2 veces
     if not already_connected:
         for attempt in [1, 2]:
             out_conn = run(["connect", mac], timeout=8, check=False)
@@ -436,7 +436,7 @@ def pair_and_connect(mac):
             _log(f"pair_and_connect: connect attempt {attempt} for {mac} got: {out_conn.strip()}")
 
     result = {
-        "ok": connected or paired,  # si al menos quedó emparejado lo damos por ok-ish
+        "ok": connected or paired,  # si al menos quedo emparejado lo damos por ok-ish
         "paired": paired,
         "trusted": trusted,
         "connected": connected,

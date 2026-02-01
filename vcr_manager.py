@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+# Project: TVArgenta — Retro TV VCR Manager
+# Author: Ricardo Sappia contact:rsflightronics@gmail.com
+# © 2025 Ricardo Sappia. All rights reserved.
+# License: Non-commercial, attribution and prior consultation. Distributed AS IS, without warranties.
+# See LICENSE for full terms.
 """
 VCR State Manager for TVArgenta
 

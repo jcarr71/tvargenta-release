@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TVArgenta - Patch Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid rgba(255, 107, 107, 0.3);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e72 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ff8e72 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 107, 107, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff8e72;
+            border: 1px solid #ff8e72;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 107, 107, 0.3);
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #ff8e72;
+        }
+
+        .card h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #999;
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .version-display {
+            background: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .version-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 107, 107, 0.1);
+        }
+
+        .version-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            color: #999;
+            font-size: 0.9rem;
+        }
+
+        .value {
+            font-weight: 600;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(255, 107, 107, 0.4);
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 107, 107, 0.05);
+        }
+
+        .upload-area:hover {
+            border-color: rgba(255, 107, 107, 0.7);
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        .upload-area.dragover {
+            border-color: #ff8e72;
+            background: rgba(255, 107, 107, 0.15);
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-input-label {
+            cursor: pointer;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .action-buttons .btn {
+            flex: 1;
+            text-align: center;
+        }
+
+        .btn-danger {
+            background: rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 107, 107, 0.5);
+        }
+
+        .btn-danger:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .patch-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .patch-item {
+            background: rgba(255, 107, 107, 0.05);
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .patch-info h4 {
+            color: #ff8e72;
+            margin-bottom: 0.25rem;
+        }
+
+        .patch-info p {
+            font-size: 0.85rem;
+            color: #999;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+        }
+
+        .status-applied {
+            background: #4ade80;
+        }
+
+        .status-pending {
+            background: #fbbf24;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid #ff8e72;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+            max-width: 400px;
+        }
+
+        .toast.error {
+            border-left-color: #ff6b6b;
+        }
+
+        .toast.success {
+            border-left-color: #4ade80;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .loading {
+            display: inline-block;
+            width: 1rem;
+            height: 1rem;
+            border: 2px solid rgba(255, 107, 107, 0.3);
+            border-top-color: #ff8e72;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-applied {
+            background: rgba(74, 222, 128, 0.2);
+            color: #4ade80;
+        }
+
+        .badge-pending {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.75rem;
+            }
+
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .nav-buttons {
+                justify-content: center;
+            }
+
+            .toast {
+                left: 1rem;
+                right: 1rem;
+                bottom: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔧 Patch Manager</h1>
+            <div class="nav-buttons">
+                <a href="/" class="btn btn-secondary">← Back to Home</a>
+                <a href="/mod_manager" class="btn btn-secondary">Mods</a>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Current Version -->
+            <div class="card">
+                <h2>System Status</h2>
+                
+                <div class="version-display">
+                    <div class="version-row">
+                        <span class="label">Version</span>
+                        <span class="value" id="version-number">Loading...</span>
+                    </div>
+                    <div class="version-row">
+                        <span class="label">Build Number</span>
+                        <span class="value" id="build-number">Loading...</span>
+                    </div>
+                    <div class="version-row">
+                        <span class="label">Rollback Available</span>
+                        <span class="value" id="rollback-status">Loading...</span>
+                    </div>
+                </div>
+
+                <h3>Patch History</h3>
+                <div class="patch-history" id="patch-history">
+                    <p style="color: #666; text-align: center;">No patches applied yet</p>
+                </div>
+            </div>
+
+            <!-- Apply Patch -->
+            <div class="card">
+                <h2>Apply Patch</h2>
+                
+                <div class="upload-area" id="upload-area" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <div class="upload-icon">📦</div>
+                    <p style="margin-bottom: 1rem;">
+                        <strong>Drag & Drop your patch here</strong><br/>
+                        or click to select a .tvpatch file
+                    </p>
+                    <label class="file-input-label">
+                        <input type="file" id="patch-file" accept=".tvpatch" onchange="handleFileSelect(event)">
+                        <span class="btn btn-primary">Browse Files</span>
+                    </label>
+                </div>
+
+                <div id="file-info" style="display: none; margin-top: 1rem;">
+                    <div class="version-display">
+                        <div class="version-row">
+                            <span class="label">Selected File</span>
+                            <span class="value" id="selected-filename">-</span>
+                        </div>
+                        <div class="version-row">
+                            <span class="label">File Size</span>
+                            <span class="value" id="selected-filesize">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="apply-btn" onclick="applyPatch()" disabled>
+                        Apply Patch
+                    </button>
+                    <button class="btn btn-danger" id="rollback-btn" onclick="rollbackPatch()" disabled>
+                        Rollback
+                    </button>
+                </div>
+
+                <p style="font-size: 0.85rem; color: #999; margin-top: 1rem; text-align: center;">
+                    ⚠️ App restart required after patching
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class PatchManager {
+            constructor() {
+                this.selectedFile = null;
+                this.versionInfo = null;
+                this.pollInterval = setInterval(() => this.loadVersion(), 5000);
+                this.loadVersion();
+            }
+
+            async loadVersion() {
+                try {
+                    const response = await fetch('/api/version');
+                    if (response.ok) {
+                        this.versionInfo = await response.json();
+                        this.updateUI();
+                    }
+                } catch (error) {
+                    console.error('Version load error:', error);
+                }
+            }
+
+            updateUI() {
+                if (!this.versionInfo) return;
+
+                // Update version info
+                document.getElementById('version-number').textContent = this.versionInfo.version;
+                document.getElementById('build-number').textContent = this.versionInfo.build_number;
+                
+                // Rollback status
+                const rollbackBtn = document.getElementById('rollback-btn');
+                if (this.versionInfo.rollback_available) {
+                    document.getElementById('rollback-status').innerHTML = 
+                        '<span class="status-indicator status-applied"></span>Available';
+                    rollbackBtn.disabled = false;
+                } else {
+                    document.getElementById('rollback-status').innerHTML = 
+                        '<span class="status-indicator status-pending"></span>Not available';
+                    rollbackBtn.disabled = true;
+                }
+
+                // Update patch history
+                this.updatePatchHistory();
+            }
+
+            updatePatchHistory() {
+                const historyContainer = document.getElementById('patch-history');
+                if (!this.versionInfo.patches || this.versionInfo.patches.length === 0) {
+                    historyContainer.innerHTML = '<p style="color: #666; text-align: center;">No patches applied yet</p>';
+                    return;
+                }
+
+                historyContainer.innerHTML = this.versionInfo.patches.map(patch => `
+                    <div class="patch-item">
+                        <div class="patch-info">
+                            <h4><span class="status-indicator status-applied"></span>${patch}</h4>
+                            <p>Applied patch</p>
+                        </div>
+                        <span class="status-badge badge-applied">Applied</span>
+                    </div>
+                `).join('');
+            }
+
+            showToast(message, type = 'info') {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                setTimeout(() => {
+                    toast.style.animation = 'slideOut 0.3s ease-out';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+        }
+
+        const patchManager = new PatchManager();
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            document.getElementById('upload-area').classList.add('dragover');
+        }
+
+        function handleDragLeave(e) {
+            e.preventDefault();
+            document.getElementById('upload-area').classList.remove('dragover');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            document.getElementById('upload-area').classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect({ target: { files } });
+            }
+        }
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (!file.name.endsWith('.tvpatch')) {
+                patchManager.showToast('Invalid file type. Please select a .tvpatch file.', 'error');
+                return;
+            }
+
+            patchManager.selectedFile = file;
+            
+            // Update UI
+            document.getElementById('file-info').style.display = 'block';
+            document.getElementById('selected-filename').textContent = file.name;
+            document.getElementById('selected-filesize').textContent = 
+                (file.size / 1024).toFixed(2) + ' KB';
+            document.getElementById('apply-btn').disabled = false;
+        }
+
+        async function applyPatch() {
+            if (!patchManager.selectedFile) {
+                patchManager.showToast('No patch selected', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('apply-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Applying...';
+
+            try {
+                const formData = new FormData();
+                formData.append('patch', patchManager.selectedFile);
+
+                const response = await fetch('/api/patches/apply', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    patchManager.showToast(data.message, 'success');
+                    if (data.restart_required) {
+                        setTimeout(() => {
+                            patchManager.showToast('Restarting app...', 'info');
+                            location.reload();
+                        }, 2000);
+                    }
+                } else {
+                    patchManager.showToast(data.error || 'Patch application failed', 'error');
+                }
+            } catch (error) {
+                patchManager.showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = !patchManager.selectedFile;
+                btn.innerHTML = 'Apply Patch';
+            }
+        }
+
+        async function rollbackPatch() {
+            if (!confirm('Are you sure you want to rollback? This will restore the previous version.')) {
+                return;
+            }
+
+            const btn = document.getElementById('rollback-btn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>Rolling back...';
+
+            try {
+                const response = await fetch('/api/patches/rollback', {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    patchManager.showToast(data.message, 'success');
+                    if (data.restart_required) {
+                        setTimeout(() => {
+                            patchManager.showToast('Restarting app...', 'info');
+                            location.reload();
+                        }, 2000);
+                    }
+                } else {
+                    patchManager.showToast(data.error || 'Rollback failed', 'error');
+                }
+            } catch (error) {
+                patchManager.showToast(`Error: ${error.message}`, 'error');
+            } finally {
+                btn.disabled = !patchManager.versionInfo?.rollback_available;
+                btn.innerHTML = 'Rollback';
+            }
+        }
+    </script>
+</body>
+</html>

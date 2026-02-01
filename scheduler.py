@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
-# Proyecto: TVArgenta — Retro TV
-# Autor: Ricardo Sappia contact:rsflightronics@gmail.com
-# © 2025 Ricardo Sappia. Todos los derechos reservados.
-# Licencia: No comercial, atribución y consulta previa. Se distribuye TAL CUAL, sin garantías.
-# Ver LICENSE para términos completos.
+# Project: TVArgenta — Retro TV
+# Author: Ricardo Sappia contact:rsflightronics@gmail.com
+# © 2025 Ricardo Sappia. All rights reserved.
+# License: Non-commercial, attribution and prior consultation. Distributed AS IS, without warranties.
+# See LICENSE for full terms.
 
 """
 Broadcast TV Scheduler Module
@@ -44,7 +44,7 @@ logger = logging.getLogger("tvargenta.scheduler")
 WEEKLY_SCHEDULE_FILE = CONTENT_DIR / "weekly_schedule.json"
 DAILY_SCHEDULE_FILE = CONTENT_DIR / "daily_schedule.json"
 EPISODE_CURSORS_FILE = CONTENT_DIR / "episode_cursors.json"
-SCHEDULE_META_FILE = CONTENT_DIR / "schedule_meta.json"
+SCHEDULE_meta_FILE = CONTENT_DIR / "schedule_meta.json"
 
 # System video directory (for test pattern, sponsors placeholder)
 SYSTEM_VIDEO_DIR = VIDEO_DIR / "system"
@@ -258,8 +258,8 @@ def save_episode_cursors(data: dict) -> None:
 def load_schedule_meta() -> dict:
     """Load schedule generation metadata."""
     try:
-        if SCHEDULE_META_FILE.exists():
-            with open(SCHEDULE_META_FILE, "r", encoding="utf-8") as f:
+        if SCHEDULE_meta_FILE.exists():
+            with open(SCHEDULE_meta_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
         logger.error(f"[SCHEDULER] Error loading schedule_meta.json: {e}")
@@ -268,7 +268,7 @@ def load_schedule_meta() -> dict:
 
 def save_schedule_meta(data: dict) -> None:
     """Save schedule generation metadata."""
-    _write_json_atomic(SCHEDULE_META_FILE, data)
+    _write_json_atomic(SCHEDULE_meta_FILE, data)
 
 
 # ============================================================================

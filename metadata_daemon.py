@@ -50,6 +50,7 @@ NICE_LEVEL = 19               # Lowest CPU priority (19 = nicest)
 IONICE_CLASS = 2              # Best-effort I/O class
 IONICE_PRIORITY = 7           # Lowest priority within best-effort (0-7)
 FFMPEG_THREADS = 1            # Single-threaded FFmpeg
+SUPPORTED_VIDEO_FORMATS = ('.mp4', '.mkv', '.webm', '.mov')  # Supported video formats
 
 # Paths
 ROOT_DIR = Path(__file__).parent
@@ -227,7 +228,10 @@ def scan_series_directories():
                 changes_made = True
 
             # Scan for video files in this series
-            for video_file in series_dir.glob("*.mp4"):
+            for video_file in series_dir.iterdir():
+                if not video_file.is_file() or video_file.suffix.lower() not in SUPPORTED_VIDEO_FORMATS:
+                    continue
+                
                 video_id = video_file.stem  # filename without extension
                 series_path = f"series/{series_name}/{video_id}"
 
@@ -251,7 +255,8 @@ def scan_series_directories():
                         "fecha": existing.get("fecha", ""),
                         "modo": existing.get("modo", []),
                         "duracion": existing.get("duracion"),
-                        "loudness_lufs": existing.get("loudness_lufs")
+                        "loudness_lufs": existing.get("loudness_lufs"),
+                        "extension": video_file.suffix[1:]  # Store without the dot
                     }
                     logger.info(f"Added series video: {series_path}")
                     changes_made = True
@@ -289,7 +294,10 @@ def scan_commercials_directory():
         metadata = load_metadata()
 
         # Scan for video files in commercials directory
-        for video_file in COMMERCIALS_DIR.glob("*.mp4"):
+        for video_file in COMMERCIALS_DIR.iterdir():
+            if not video_file.is_file() or video_file.suffix.lower() not in SUPPORTED_VIDEO_FORMATS:
+                continue
+            
             video_id = video_file.stem  # filename without extension
             commercials_path = f"commercials/{video_id}"
 
@@ -307,7 +315,8 @@ def scan_commercials_directory():
                     "fecha": existing.get("fecha", ""),
                     "modo": existing.get("modo", []),
                     "duracion": existing.get("duracion"),
-                    "loudness_lufs": existing.get("loudness_lufs")
+                    "loudness_lufs": existing.get("loudness_lufs"),
+                    "extension": video_file.suffix[1:]  # Store without the dot
                 }
                 logger.info(f"Added commercial: {commercials_path}")
                 changes_made = True
@@ -348,11 +357,26 @@ def scan_all_directories():
 
 def get_video_path(video_id, info):
     """Determine the file path for a video based on its metadata."""
+    # Try to find the file with any supported extension
+    ext = info.get("extension", "mp4")  # Default to mp4 if not stored
+    
     if info.get("commercials_path"):
+        video_path = VIDEO_DIR / f"{info['commercials_path']}.{ext}"
+        if video_path.exists():
+            return video_path
+        # Fallback: try .mp4
         return VIDEO_DIR / f"{info['commercials_path']}.mp4"
     elif info.get("series_path"):
+        video_path = VIDEO_DIR / f"{info['series_path']}.{ext}"
+        if video_path.exists():
+            return video_path
+        # Fallback: try .mp4
         return VIDEO_DIR / f"{info['series_path']}.mp4"
     else:
+        video_path = VIDEO_DIR / f"{video_id}.{ext}"
+        if video_path.exists():
+            return video_path
+        # Fallback: try .mp4
         return VIDEO_DIR / f"{video_id}.mp4"
 
 

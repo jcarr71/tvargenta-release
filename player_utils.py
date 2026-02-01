@@ -33,9 +33,9 @@ def cambiar_canal(nuevo_canal_id, resetear_cola=True):
         indice_video_actual = 0
 
     if videos_en_cola:
-        print(f"[CANAL] {nuevo_canal_id} tiene {len(videos_en_cola)} video(s) válidos.")
-        print(f"[DEBUG] Lista de videos en cola para {nuevo_canal_id}:")
+        print(f"[CANAL] {nuevo_canal_id} tiene {len(videos_en_cola)} video(s) validos.")
+        print(f"[DEBUG] Lista de videos en cola for {nuevo_canal_id}:")
         for i, vid in enumerate(videos_en_cola):
             print(f"  {i+1}. {vid}")
     else:
-        print(f"[CANAL] No hay videos válidos para el canal {nuevo_canal_id}")
+        print(f"[CANAL] No hay videos validos for el canal {nuevo_canal_id}")

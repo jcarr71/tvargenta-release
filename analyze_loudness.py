@@ -67,11 +67,26 @@ def analyze_loudness(filepath):
 
 def get_video_path(video_id, info):
     """Determine the file path for a video based on its metadata."""
+    # Try to find the file with any supported extension
+    ext = info.get("extension", "mp4")  # Default to mp4 if not stored
+    
     if info.get("commercials_path"):
+        video_path = VIDEO_DIR / f"{info['commercials_path']}.{ext}"
+        if video_path.exists():
+            return video_path
+        # Fallback: try .mp4
         return VIDEO_DIR / f"{info['commercials_path']}.mp4"
     elif info.get("series_path"):
+        video_path = VIDEO_DIR / f"{info['series_path']}.{ext}"
+        if video_path.exists():
+            return video_path
+        # Fallback: try .mp4
         return VIDEO_DIR / f"{info['series_path']}.mp4"
     else:
+        video_path = VIDEO_DIR / f"{video_id}.{ext}"
+        if video_path.exists():
+            return video_path
+        # Fallback: try .mp4
         return VIDEO_DIR / f"{video_id}.mp4"
 
 

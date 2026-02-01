@@ -5,7 +5,10 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-User=rs
+# IMPORTANT: This is a template file for reference only.
+# The install.sh script generates this service dynamically with the correct user.
+# Do not use this file directly; run install.sh for proper setup.
+User=<TVARGENTA_USER>
 WorkingDirectory=/srv/tvargenta
 ExecStart=/srv/tvargenta/venv/bin/python /srv/tvargenta/app.py
 

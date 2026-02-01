@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+# Project: TVArgenta — Retro TV NFC Reader
+# Author: Ricardo Sappia contact:rsflightronics@gmail.com
+# © 2025 Ricardo Sappia. All rights reserved.
+# License: Non-commercial, attribution and prior consultation. Distributed AS IS, without warranties.
+# See LICENSE for full terms.
 """
 NFC Reader Daemon for TVArgenta VCR Feature
 
@@ -55,7 +61,7 @@ def ts():
 
 
 def uid_to_string(uid_bytes) -> str:
-    """Convert UID bytes to colon-separated hex string."""
+    """Convert UID bytes to colon-seforted hex string."""
     return ":".join(f"{b:02X}" for b in uid_bytes)
 
 

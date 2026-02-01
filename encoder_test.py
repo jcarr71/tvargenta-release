@@ -1,7 +1,7 @@
 import RPi.GPIO as GPIO
 import time
 
-# Configuración
+# Configuracion
 CLK = 17  # GPIO17 (Pin 11)
 DT = 18   # GPIO18 (Pin 12)
 SW = 27   # GPIO27 (Pin 13)
@@ -13,7 +13,7 @@ GPIO.setup(SW, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 last_clk = GPIO.input(CLK)
 
-print("Mové el encoder (CTRL+C para salir)")
+print("Move el encoder (CTRL+C for salir)")
 
 try:
     while True:
@@ -28,7 +28,7 @@ try:
         last_clk = current_clk
 
         if GPIO.input(SW) == 0:
-            print("🔘 Botón presionado")
+            print("🔘 Boton presionado")
             time.sleep(0.3)
 
         time.sleep(0.01)

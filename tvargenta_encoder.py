@@ -9,7 +9,7 @@ from player_utils import cambiar_canal
 CANAL_JSON_PATH = "/srv/tvargenta/content/canales.json"
 CANAL_ACTIVO_PATH = "/srv/tvargenta/content/canal_activo.json"
 
-# --- Nuevo: trigger para menu (front hace polling de mtime) ---
+# --- Nuevo: trigger for menu (front hace polling de mtime) ---
 MENU_TRIGGER_PATH = "/tmp/trigger_menu.json"
 MENU_STATE_PATH  = "/tmp/menu_state.json"
 MENU_NAV_PATH    = "/tmp/trigger_menu_nav.json"
@@ -69,7 +69,7 @@ def cambiar_al_siguiente(delta):
         print(f"[{ts()}] [ENCODER] Canal cambiado a: {nuevo_id}")
         cambiar_canal(nuevo_id, resetear_cola=True)
 
-        # Notificar al frontend para que recargue
+        # Notificar al frontend for que recargue
         with open("/tmp/trigger_reload.json", "w") as f:
             json.dump({"timestamp": time.time()}, f)
     else:
@@ -84,11 +84,11 @@ def ajustar_volumen(delta):
             with open(path, "r") as f:
                 valor = json.load(f).get("valor", DEFAULT_VOL)
         except Exception:
-            valor = DEFAULT_VOL  # por si el JSON se dañó
+            valor = DEFAULT_VOL  # por si el JSON se dano
 
     nuevo_valor = max(0, min(100, valor + delta))
 
-    # Guardar y notificar si cambió o si el archivo no existía
+    # Guardar y notificar si cambio o si el archivo no existia
     if (not os.path.exists(path)) or (nuevo_valor != valor):
         with open(path, "w") as f:
             json.dump({"valor": nuevo_valor}, f)
@@ -98,14 +98,14 @@ def ajustar_volumen(delta):
 
     print(f"[{ts()}] [VOLUMEN] Ajustado a: {nuevo_valor}")
 
-# --- Nuevo: tocar archivo para abrir/cerrar menÃº (flanco de bajada sin giro) ---
+# --- Nuevo: tocar archivo for abrir/cerrar menÃº (flanco de bajada sin giro) ---
 def trigger_menu():
     try:
         with open(MENU_TRIGGER_PATH, "w") as f:
             json.dump({"timestamp": time.time()}, f)
         print(f"[{ts()}] [MENU] Trigger emitido ({MENU_TRIGGER_PATH})")
     except Exception as e:
-        print(f"[{ts()}] [MENU] Error al emitir trigger: {e}")
+        print(f"[{ts()}] [MENU] Error while emitir trigger: {e}")
 
 def menu_is_open():
     if Path(MENU_STATE_PATH).exists():
@@ -134,13 +134,13 @@ def trigger_menu_select():
         print(f"[{ts()}] [MENU] Error SELECT: {e}")
 
 def trigger_next_video():
-    # Tocar el trigger de reload para que el front pida /api/next_video
+    # Tocar el trigger de reload for que el front pida /api/next_video
     try:
         with open("/tmp/trigger_reload.json", "w") as f:
             json.dump({"timestamp": time.time(), "reason": "BTN_NEXT"}, f)
         print(f"[{ts()}] [NEXT] Trigger next video")
     except Exception as e:
-        print(f"[{ts()}] [NEXT] Error al disparar next: {e}")
+        print(f"[{ts()}] [NEXT] Error while disforr next: {e}")
 
 
 # --- VCR (NFC Mini VHS) functions ---

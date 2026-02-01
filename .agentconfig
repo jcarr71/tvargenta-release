@@ -1,0 +1,58 @@
+# TVArgenta Agent Configuration
+# This file configures the AI coding agent behavior for this project
+
+# Operating System and Shell
+OS=windows
+SHELL=powershell
+TERMINAL=pwsh
+
+# PowerShell Settings
+USE_POWERSHELL=true
+CMDLET_STYLE=true
+NO_BASH_EQUIVALENTS=true
+
+# File Path Convention
+PATH_SEPARATOR=\
+PATH_STYLE=windows
+
+# Repository Information
+REPOSITORY=tvargenta-release
+OWNER=lesterWritesCodeSometimes
+BRANCH=main
+DEFAULT_BRANCH=main
+
+# Development Settings
+EDITOR=vscode
+PYTHON_STYLE=unix_type_hints
+JSON_ENSURE_ASCII=false
+ENCODING=utf-8
+
+# Command Preferences
+COMMANDS_ONLY_POWERSHELL=true
+NO_FIND_COMMAND=true
+NO_GREP_COMMAND=true
+NO_LS_COMMAND=true
+NO_CAT_COMMAND=true
+
+# PowerShell Equivalents
+COMMAND_LIST_FILES=Get-ChildItem
+COMMAND_SEARCH=Select-String
+COMMAND_TEST_PATH=Test-Path
+COMMAND_READ_FILE=Get-Content
+COMMAND_WRITE_FILE=Set-Content
+COMMAND_COPY=Copy-Item
+COMMAND_REMOVE=Remove-Item
+COMMAND_MOVE=Move-Item
+COMMAND_FORMAT_OUTPUT=Format-Table,Out-String
+
+# Project Paths (use backslashes)
+PROJECT_ROOT=s:\VisualStudio\tvargenta-release
+CONTENT_DIR=s:\VisualStudio\tvargenta-release\content
+MODS_DIR=s:\VisualStudio\tvargenta-release\content\mods
+TEMPLATES_DIR=s:\VisualStudio\tvargenta-release\templates
+
+# Coding Guidelines
+USE_ATOMIC_WRITES=true
+PRESERVE_SPANISH_KEYS=true
+UTF8_ENCODING=true
+ENSURE_ASCII_FALSE=true
