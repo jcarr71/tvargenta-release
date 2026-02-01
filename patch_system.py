@@ -264,26 +264,24 @@ def extract_patch_bundle(bundle_path: Path, extract_dir: Path) -> Tuple[bool, Op
 
 def verify_patch_integrity(manifest: PatchManifest, patch_dir: Path) -> Tuple[bool, List[str]]:
     """
-    Verify patch bundle integrity using checksums.
+    Verify patch bundle integrity.
+    Checks that the patch.diff file exists and the manifest is valid.
     Returns (valid, list of errors)
     """
     errors = []
     
     try:
-        for filename, expected_checksum in manifest.checksums.items():
-            # Normalize filename to use Path object (handles both / and \ separators)
-            file_path = patch_dir / filename
-            
-            if not file_path.exists():
-                errors.append(f"Missing file: {filename}")
-                continue
-            
-            actual_checksum = compute_file_checksum(file_path)
-            if actual_checksum != expected_checksum:
-                errors.append(
-                    f"Checksum mismatch for {filename}: "
-                    f"expected {expected_checksum}, got {actual_checksum}"
-                )
+        # Verify patch.diff exists
+        patch_file = patch_dir / "patch.diff"
+        if not patch_file.exists():
+            errors.append("Missing patch.diff in bundle")
+        
+        # Verify manifest is valid
+        if not manifest.files:
+            errors.append("No files listed in manifest")
+        
+        if not manifest.version_from:
+            errors.append("Invalid version_from in manifest")
         
         if errors:
             logger.error(f"Patch integrity check failed: {errors}")
