@@ -4429,17 +4429,26 @@ if __name__ == "__main__":
         print(f"[APP] No se pudo lanzar el encoder: {e}")
         encoder_proc = None
 
-    # Lanzar NFC reader daemon for VCR
+    # Lanzar NFC reader daemon for VCR (only if vcr_mod is enabled)
     nfc_reader_path = str(Path(APP_DIR, "nfc_reader.py"))
     nfc_proc = None
-    try:
-        # Kill any existing NFC reader process
-        subprocess.run(["pkill", "-f", "nfc_reader.py"], check=False)
-        time.sleep(0.2)
-        nfc_proc = subprocess.Popen(["python3", nfc_reader_path], start_new_session=True)
-        print("[APP] NFC reader daemon launched")
-    except Exception as e:
-        print(f"[APP] No se pudo lanzar el NFC reader: {e}")
+    if mod_registry and mod_registry.get_mod('vcr_mod'):
+        vcr_mod = mod_registry.get_mod('vcr_mod')
+        if vcr_mod.manifest.enabled:
+            try:
+                # Kill any existing NFC reader process
+                subprocess.run(["pkill", "-f", "nfc_reader.py"], check=False)
+                time.sleep(0.2)
+                nfc_proc = subprocess.Popen(["python3", nfc_reader_path], start_new_session=True)
+                print("[APP] NFC reader daemon launched (vcr_mod enabled)")
+            except Exception as e:
+                print(f"[APP] No se pudo lanzar el NFC reader: {e}")
+        else:
+            # Kill NFC reader if vcr_mod is disabled
+            subprocess.run(["pkill", "-f", "nfc_reader.py"], check=False)
+            print("[APP] NFC reader daemon not started (vcr_mod disabled)")
+    else:
+        print("[APP] Warning: vcr_mod not found, skipping NFC reader")
 
     # Lanzar metadata daemon for analisis de fondo
     metadata_daemon_path = str(Path(APP_DIR, "metadata_daemon.py"))
@@ -4457,10 +4466,18 @@ if __name__ == "__main__":
     _start_vcr_tracker()
     print("[APP] VCR position tracker started")
 
-    # Initialize broadcast TV scheduler
+    # Initialize broadcast TV scheduler (only if scheduler_mod is enabled)
     try:
-        scheduler.initialize_scheduler()
-        print("[APP] Broadcast TV scheduler initialized")
+        if mod_registry and mod_registry.get_mod('scheduler_mod'):
+            scheduler_mod = mod_registry.get_mod('scheduler_mod')
+            if scheduler_mod.manifest.enabled:
+                scheduler.initialize_scheduler()
+                print("[APP] Broadcast TV scheduler initialized (scheduler_mod enabled)")
+            else:
+                print("[APP] Broadcast TV scheduler not initialized (scheduler_mod disabled)")
+        else:
+            scheduler.initialize_scheduler()
+            print("[APP] Broadcast TV scheduler initialized (mod not found, using default)")
     except Exception as e:
         print(f"[APP] Warning: Could not initialize scheduler: {e}")
 
