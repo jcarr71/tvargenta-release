@@ -3086,22 +3086,27 @@ def api_mods_toggle(mod_id):
         return jsonify({"status": "error", "message": "Mod system not initialized"}), 500
     
     try:
-        mod_obj = mod_registry.mods.get(mod_id)
-        if not mod_obj:
+        # Find the mod manifest (works for both loaded and disabled mods)
+        all_manifests = mod_registry.discover_mods()
+        target_manifest = None
+        
+        for manifest in all_manifests:
+            if manifest.mod_id == mod_id:
+                target_manifest = manifest
+                break
+        
+        if not target_manifest:
             return jsonify({"status": "error", "message": f"Mod not found: {mod_id}"}), 404
         
         # Toggle enabled state
-        manifest_path = mod_obj.manifest.path
-        manifest_data = mod_obj.manifest.data
-        
-        current_state = manifest_data.get("enabled", False)
+        current_state = target_manifest.enabled
         new_state = not current_state
         
-        manifest_data["enabled"] = new_state
+        target_manifest.data["enabled"] = new_state
         
         # Save updated manifest
-        with open(manifest_path, "w", encoding="utf-8") as f:
-            json.dump(manifest_data, f, indent=2, ensure_ascii=False)
+        with open(target_manifest.path, "w", encoding="utf-8") as f:
+            json.dump(target_manifest.data, f, indent=2, ensure_ascii=False)
         
         logger.info(f"Toggled mod {mod_id}: {current_state} -> {new_state} (restart required)")
         
