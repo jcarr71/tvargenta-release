@@ -1341,4 +1341,21 @@
     setInterval(updateReaderStatus, 2000);
     setInterval(loadVhsTapes, 10000);
   });
+
+  // Footer navigation
+  document.addEventListener('DOMContentLoaded', () => {
+    const contentDiv = document.querySelector('[class*="block"]');
+    if (contentDiv && !document.querySelector('.footer-nav')) {
+      const footer = document.createElement('footer');
+      footer.className = 'footer-nav text-center mt-8 pt-6 border-t border-gray-700 space-x-4';
+      footer.innerHTML = `
+        <a href="{{ url_for('vertele') }}" class="text-green-400 hover:underline">📺 Ver TV</a>
+        <a href="{{ url_for('canales') }}" class="text-purple-400 hover:underline">🎯 Canales</a>
+        <a href="{{ url_for('upload') }}" class="text-yellow-400 hover:underline">📹 Upload</a>
+        <a href="/mod_manager" class="text-cyan-400 hover:underline">📦 Mods</a>
+        <a href="/patches" class="text-red-400 hover:underline">🔧 Patches</a>
+      `;
+      document.querySelector('.relative.z-10').appendChild(footer);
+    }
+  });
 {% endblock %}

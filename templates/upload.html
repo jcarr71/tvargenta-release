@@ -12,6 +12,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    body {
+      background: linear-gradient(to bottom, #0a0a0a, #1a0000);
+    }
+
     .marquee-bar {
       height: 8px;
       background: repeating-linear-gradient(
@@ -26,100 +30,47 @@
     }
 
     @keyframes marquee {
-      from {
-        background-position: 0 0;
-      }
-      to {
-        background-position: 40px 0;
-      }
+      from { background-position: 0 0; }
+      to { background-position: 40px 0; }
     }
 
-    .nav-links {
-      display: flex;
-      gap: 1rem;
-      align-items: center;
-      flex-wrap: wrap;
+    .input {
+      background: #111827;
+      color: #fff;
+      border: 1px solid #4b5563;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
     }
 
-    .nav-links a {
-      display: inline-block;
-      padding: 0.5rem 1rem;
-      border-radius: 0.25rem;
-      text-decoration: none;
-      transition: all 0.2s ease;
-      font-size: 0.875rem;
-      border: 1px solid transparent;
+    .input:focus {
+      outline: none;
+      border-color: #f59e0b;
     }
 
-    .nav-links .btn-mods {
-      background: rgba(0, 212, 255, 0.3);
-      color: #00d4ff;
-      border-color: rgba(0, 212, 255, 0.6);
-    }
-
-    .nav-links .btn-mods:hover {
-      background: rgba(0, 212, 255, 0.5);
-      border-color: #00d4ff;
-    }
-
-    .nav-links .btn-patches {
-      background: rgba(255, 107, 107, 0.3);
-      color: #ff6b6b;
-      border-color: rgba(255, 107, 107, 0.6);
-    }
-
-    .nav-links .btn-patches:hover {
-      background: rgba(255, 107, 107, 0.5);
-      border-color: #ff6b6b;
+    .section {
+      border: 1px solid rgba(234, 179, 8, 0.3);
+      background: rgba(17, 24, 39, 0.5);
     }
   </style>
-  
-	</head>
-	<body class="bg-black text-white font-mono min-h-screen">
-		<div class="max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-6">
-	<header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
-	  <!-- Título -->
-	  <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400 leading-tight">
-		{{ tr("upload.header") }}
-	  </h1>
+</head>
+<body class="bg-black text-white font-mono min-h-screen">
+  <div class="max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-6">
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
+      <!-- Title -->
+      <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">
+        {{ tr("upload.header") }}
+      </h1>
 
-	  <!-- Back + idioma + navigation -->
-	  <div class="flex items-center gap-4 nav-links">
-		<a href="{{ url_for('gestion') }}"
-		   class="text-blue-400 underline text-sm sm:text-base whitespace-nowrap">
-		  {{ tr("upload.nav.back_home") }}
-		</a>
-
-		<a href="{{ url_for('vertele') }}" class="text-green-400 underline text-sm sm:text-base whitespace-nowrap">
-		  📺 {{ tr("nav.watch_tv") if tr else "Ver TV" }}
-		</a>
-
-		<a href="{{ url_for('canales') }}" class="text-purple-400 underline text-sm sm:text-base whitespace-nowrap">
-		  🎯 {{ tr("nav.channels") if tr else "Canales" }}
-		</a>
-
-		<a href="/mod_manager" class="btn-mods whitespace-nowrap">
-		  📦 Mods
-		</a>
-
-		<a href="/patches" class="btn-patches whitespace-nowrap">
-		  🔧 Patches
-		</a>
-
-		<select id="upload-lang-select"
-				class="bg-gray-900 border border-gray-600 text-xs sm:text-sm px-2 py-1 rounded">
-		  <option value="es">🇦🇷 ES</option>
-		  <option value="en">🇺🇸 EN</option>
-		  <option value="de">🇩🇪 DE</option>
-		</select>
-	  </div>
-	</header>
-
-
-
-
-
-    <!-- Mensaje de estado -->
+      <!-- Navigation -->
+      <div class="flex items-center gap-3 flex-wrap">
+        <a href="{{ url_for('gestion') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Gestión</a>
+        <a href="{{ url_for('vertele') }}" class="text-green-400 underline text-sm sm:text-base">📺 Ver TV</a>
+        <a href="{{ url_for('canales') }}" class="text-purple-400 underline text-sm sm:text-base">🎯 Channels</a>
+        <a href="/mod_manager" class="text-cyan-400 underline text-sm sm:text-base">📦 Mods</a>
+        <a href="/patches" class="text-red-400 underline text-sm sm:text-base">🔧 Patches</a>
+      </div>
+    </header>
+    <!-- Status Messages -->
     {% if request.args.get("ok") %}
     <div class="bg-green-600 text-white text-center font-bold py-2 mb-4 rounded">
       {{ tr("upload.status.ok") }}
@@ -134,35 +85,37 @@
     </div>
     {% endif %}
 
-    <!-- Estado de procesamiento -->
-    <div id="uploadStatusBox" class="bg-gray-700 text-yellow-300 font-bold py-2 px-4 rounded mb-4 hidden"></div>
-
-    <!-- Barrita animada -->
-    <div id="loadingBar" class="hidden mb-4 marquee-bar rounded overflow-hidden"></div>
-
-    <!-- Formulario -->
+    <!-- Upload Form -->
     <form id="uploadForm" method="POST" action="/upload" enctype="multipart/form-data"
-          class="border-2 border-dashed border-yellow-500 rounded-lg p-6 bg-gray-800 text-center relative"
+          class="section rounded-lg p-6 mb-6"
           ondrop="handleDrop(event)" ondragover="event.preventDefault()">
 
-      <label for="fileInput" class="block cursor-pointer text-yellow-300 mb-4">
-        {{ tr("upload.form.label") }}
-      </label>
+      <div class="text-center mb-6">
+        <div class="text-4xl mb-3">📹</div>
+        <label for="fileInput" class="block cursor-pointer text-yellow-300 font-bold mb-2">
+          {{ tr("upload.form.label") }}
+        </label>
+        <p class="text-sm text-gray-400">{{ tr("upload.form.description") or "Drag & drop files or click to browse" }}</p>
+      </div>
 
       <input type="file" id="fileInput" name="videos[]" accept=".mp4" multiple class="hidden"
              onchange="updateFileList(this.files)">
-      
-      <div id="fileList" class="text-sm text-gray-400 mt-2 italic">{{ tr("upload.form.no_files") }}</div>
 
+      <!-- File List -->
+      <div id="fileList" class="text-sm text-gray-400 mb-4 italic text-center">{{ tr("upload.form.no_files") }}</div>
+
+      <!-- Loading Bar -->
+      <div id="loadingBar" class="hidden mb-4 marquee-bar rounded overflow-hidden"></div>
+
+      <!-- Status Box -->
+      <div id="uploadStatusBox" class="bg-gray-700 text-yellow-300 font-bold py-2 px-4 rounded mb-4 hidden"></div>
+
+      <!-- Submit Button -->
       <button type="submit"
-              class="mt-6 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded">
-        {{ tr("upload.form.button") }}
+              class="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded font-bold transition">
+        {{ tr("upload.form.button") or "Upload Videos" }}
       </button>
     </form>
-
-    <div class="mt-8 text-center">
-      <a href="{{ url_for('gestion') }}" class="text-blue-400 underline">{{ tr("upload.nav.back_home") }}</a>
-    </div>
   </div>
 
   <script>
