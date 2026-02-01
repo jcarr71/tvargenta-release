@@ -44,9 +44,9 @@
     <header class="flex items-center justify-between mb-4 sm:mb-6">
       <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">✏️ Editar video</h1>
       <div class="flex items-center gap-3 flex-wrap">
-        <a href="{{ url_for('gestion') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Gestión</a>
+        <a href="{{ url_for('library') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Library</a>
         <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">🛠 Tags</a>
-        <a href="{{ url_for('vertele') }}" class="text-green-400 underline text-sm sm:text-base">📺 Ver TV</a>
+        <a href="{{ url_for('watch') }}" class="text-green-400 underline text-sm sm:text-base">📺 Watch TV</a>
       </div>
     </header>
 
@@ -216,7 +216,7 @@
 
       <!-- Acciones -->
       <div class="flex justify-between items-center mt-2 flex-wrap gap-3">
-        <a href="{{ url_for('gestion') }}" class="text-sm text-blue-400 hover:underline">⬅ Back to Gestión</a>
+        <a href="{{ url_for('library') }}" class="text-sm text-blue-400 hover:underline">⬅ Back to Library</a>
         <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-sm text-blue-400 hover:underline">🛠 Edit Tags</a>
         <a href="{{ url_for('vertele') }}" class="text-sm text-green-400 hover:underline">📺 Watch TV</a>
         <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold">
