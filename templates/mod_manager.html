@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TVArgenta - Mod Manager</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
     <style>
         * {
             margin: 0;
@@ -12,92 +13,355 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             min-height: 100vh;
-            padding: 20px;
+            overflow-x: hidden;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1200px;
             margin: 0 auto;
+            padding: 2rem;
         }
 
         header {
-            text-align: center;
-            margin-bottom: 40px;
-            padding: 30px 20px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            border-left: 4px solid #00d4ff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3rem;
+            padding-bottom: 2rem;
+            border-bottom: 2px solid rgba(0, 212, 255, 0.3);
         }
 
-        header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d4ff 0%, #0088ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff 0%, #0088ff 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(0, 212, 255, 0.2);
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(0, 212, 255, 0.3);
+        }
+
+        .btn-patches {
+            background: rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.6);
+        }
+
+        .btn-patches:hover {
+            background: rgba(255, 107, 107, 0.5);
+            border-color: #ff6b6b;
+        }
+
+        .btn-uploads {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.6);
+        }
+
+        .btn-uploads:hover {
+            background: rgba(76, 175, 80, 0.5);
+            border-color: #4caf50;
+        }
+
+        .main-content {
+            display: grid;
+            gap: 2rem;
+        }
+
+        .card {
+            background: rgba(22, 33, 62, 0.6);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            color: #00d4ff;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card h3 {
+            font-size: 1.1rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
             color: #00d4ff;
         }
 
-        header p {
-            font-size: 0.95em;
+        .mod-list {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .mod-item {
+            background: rgba(0, 212, 255, 0.05);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .mod-item:hover {
+            background: rgba(0, 212, 255, 0.1);
+            border-color: rgba(0, 212, 255, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 212, 255, 0.1);
+        }
+
+        .mod-info h3 {
+            font-size: 1.1rem;
+            color: #e0e0e0;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .mod-info p {
+            font-size: 0.9rem;
+            color: #a0a0a0;
+            margin: 0;
+        }
+
+        .mod-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .badge-enabled {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.5);
+        }
+
+        .badge-disabled {
+            background: rgba(200, 200, 200, 0.1);
+            color: #999;
+            border: 1px solid rgba(200, 200, 200, 0.3);
+        }
+
+        .mod-toggle {
+            width: 60px;
+            height: 30px;
+            background: rgba(200, 200, 200, 0.2);
+            border: 1px solid rgba(200, 200, 200, 0.3);
+            border-radius: 15px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .mod-toggle.enabled {
+            background: rgba(76, 175, 80, 0.2);
+            border-color: rgba(76, 175, 80, 0.5);
+        }
+
+        .mod-toggle::after {
+            content: '';
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            background: #999;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .mod-toggle.enabled::after {
+            background: #4caf50;
+            left: 32px;
+        }
+
+        .upload-area {
+            border: 2px dashed rgba(0, 212, 255, 0.3);
+            border-radius: 0.75rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(0, 212, 255, 0.05);
+        }
+
+        .upload-area:hover {
+            border-color: rgba(0, 212, 255, 0.6);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-area p {
+            margin: 0 0 1.5rem 0;
             color: #a0a0a0;
         }
 
-        .warning {
-            background: rgba(255, 193, 7, 0.2);
-            border-left: 4px solid #ffc107;
-            padding: 15px;
-            margin-bottom: 30px;
-            border-radius: 4px;
+        .upload-area p strong {
+            color: #00d4ff;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .file-input-label {
+            display: inline-block;
+        }
+
+        .file-input-label input {
+            display: none;
+        }
+
+        .action-buttons {
             display: flex;
-            align-items: center;
-            gap: 15px;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            justify-content: center;
         }
 
-        .warning-icon {
-            font-size: 1.5em;
-            flex-shrink: 0;
+        .btn-danger {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.5);
         }
 
-        .mods-grid {
-            display: grid;
-            gap: 20px;
-            margin-bottom: 30px;
+        .btn-danger:hover:not(:disabled) {
+            background: rgba(255, 107, 107, 0.3);
         }
 
-        .mod-card {
-            background: rgba(45, 45, 68, 0.8);
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            border-radius: 8px;
-            padding: 20px;
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .mod-card::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 0;
-            height: 100%;
-            width: 4px;
-            background: linear-gradient(180deg, #00d4ff 0%, #0088ff 100%);
-            opacity: 0;
-            transition: opacity 0.3s ease;
+        .warning-box {
+            background: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #ffc107;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            color: #ffc107;
         }
 
-        .mod-card:hover {
-            border-color: rgba(0, 212, 255, 0.6);
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
         }
 
-        .mod-card:hover::before {
-            opacity: 1;
+        .status-applied {
+            background: #4caf50;
+        }
+
+        .status-pending {
+            background: #ffc107;
+        }
+
+        .status-error {
+            background: #ff6b6b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 2rem;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 768px) {
+            header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .nav-buttons {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            .mod-item {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .mod-status {
+                justify-content: space-between;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .card {
+                padding: 1rem;
+            }
+        }
+    </style>
         }
 
         .mod-card.disabled {
@@ -427,25 +691,59 @@
     <div class="container">
         <header>
             <h1>📦 Mod Manager</h1>
-            <p>Manage TVArgenta extensions and features</p>
+            <div class="nav-buttons">
+                <a href="/" class="btn btn-secondary">← Back to Home</a>
+                <a href="/patches" class="btn btn-patches">📋 Patches</a>
+                <a href="/upload" class="btn btn-uploads">📤 Uploads</a>
+            </div>
         </header>
 
-        <div class="warning">
-            <div class="warning-icon">⚠️</div>
-            <div>Changes require app restart to take effect</div>
-        </div>
+        <div class="main-content">
+            <!-- Installed Mods -->
+            <div class="card">
+                <h2>📦 Installed Mods</h2>
+                
+                <div class="warning-box">
+                    ⚠️ Changes require app restart to take effect
+                </div>
 
-        <div class="mods-grid" id="modsContainer">
-            <div class="loading" style="margin: 40px auto;">Loading mods...</div>
-        </div>
+                <div class="mod-list" id="modsContainer">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📦</div>
+                        <p>Loading mods...</p>
+                    </div>
+                </div>
+            </div>
 
-        <div class="footer-actions">
-            <button class="btn btn-primary" id="btnRefresh" onclick="refreshMods()">⟳ Refresh</button>
-            <button class="btn btn-info" id="btnUpload" onclick="document.getElementById('modUploadInput').click()">⬆️ Upload Mod</button>
-            <input type="file" id="modUploadInput" style="display: none;" accept=".zip,.tar.gz" onchange="uploadMod(event)">
-            <button class="btn btn-success" id="btnRestart" onclick="restartApp()" disabled>🔄 Restart App Now</button>
-            <a href="/patches" class="btn btn-primary" style="background: rgba(255, 107, 107, 0.3); border: 1px solid rgba(255, 107, 107, 0.6); color: #ff6b6b;">📋 Patches</a>
-            <a href="/upload" class="btn btn-primary" style="background: rgba(76, 175, 80, 0.3); border: 1px solid rgba(76, 175, 80, 0.6); color: #4caf50;">📤 Uploads</a>
+            <!-- Upload Mod -->
+            <div class="card">
+                <h2>⬆️ Upload Mod</h2>
+                
+                <div class="upload-area" id="upload-area" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <div class="upload-icon">📦</div>
+                    <p>
+                        <strong>Drag & Drop your mod here</strong><br/>
+                        or click to select a .zip or .tar.gz file
+                    </p>
+                    <label class="file-input-label">
+                        <input type="file" id="modUploadInput" accept=".zip,.tar.gz" onchange="handleFileSelect(event)">
+                        <span class="btn btn-primary">Browse Files</span>
+                    </label>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" id="refreshBtn" onclick="refreshMods()">
+                        ⟳ Refresh Mods
+                    </button>
+                    <button class="btn btn-primary" id="restartBtn" onclick="restartApp()" disabled>
+                        🔄 Restart App Now
+                    </button>
+                </div>
+
+                <p style="font-size: 0.85rem; color: #999; margin-top: 1rem; text-align: center;">
+                    ⚠️ App restart required for changes to take effect
+                </p>
+            </div>
         </div>
     </div>
 
@@ -485,39 +783,38 @@
                 const container = document.getElementById('modsContainer');
                 
                 if (!this.mods || this.mods.length === 0) {
-                    container.innerHTML = `<div style="grid-column: 1/-1; padding: 40px; text-align: center; color: #a0a0a0;">
-                        No mods installed
-                    </div>`;
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📦</div>
+                            <p>No mods installed</p>
+                        </div>
+                    `;
                     return;
                 }
 
                 container.innerHTML = this.mods.map(mod => `
-                    <div class="mod-card ${mod.enabled ? '' : 'disabled'} ${mod.status === 'error' ? 'error' : ''}" data-mod-id="${mod.id}">
+                    <div class="mod-item ${mod.status === 'error' ? 'error' : ''}" data-mod-id="${mod.id}">
                         <div class="mod-info">
-                            <div class="mod-header">
-                                <span class="mod-icon">${this.getModIcon(mod.id)}</span>
-                                <span class="mod-title">${mod.name}</span>
-                                <span class="mod-version">v${mod.version}</span>
-                            </div>
-                            <div class="mod-description">${mod.description}</div>
-                            <div class="mod-status">
-                                <div class="status-indicator ${this.getStatusClass(mod)}"></div>
-                                <span>${this.getStatusText(mod)}</span>
-                            </div>
-                            <div class="mod-dependencies">
-                                Requires: <strong>${mod.dependencies.length > 0 ? mod.dependencies.join(', ') : 'none'}</strong>
-                            </div>
+                            <h3>${this.getModIcon(mod.id)} ${mod.name}</h3>
+                            <p>${mod.description}</p>
                         </div>
-                        <div class="mod-controls">
-                            <div class="toggle-switch">
-                                <div class="switch ${mod.enabled ? 'active' : ''}" data-mod-id="${mod.id}" onclick="modManager.toggleMod('${mod.id}', this)">
-                                    <div class="toggle-slider"></div>
-                                </div>
-                                <span class="switch-label">${mod.enabled ? 'ON' : 'OFF'}</span>
+                        <div class="mod-status">
+                            <span class="status-badge ${mod.enabled ? 'badge-enabled' : 'badge-disabled'}">
+                                ${mod.enabled ? '✓ Enabled' : '○ Disabled'}
+                            </span>
+                            <div class="mod-toggle ${mod.enabled ? 'enabled' : ''}" 
+                                 data-mod-id="${mod.id}" 
+                                 onclick="modManager.toggleMod('${mod.id}', this)">
                             </div>
                         </div>
                     </div>
                 `).join('');
+                
+                // Update restart button visibility
+                const restartBtn = document.getElementById('restartBtn');
+                if (this.hasChanges) {
+                    restartBtn.disabled = false;
+                }
             }
 
             getModIcon(modId) {
@@ -662,6 +959,41 @@
             } catch (e) {
                 modManager.showNotification('Restart failed: ' + e.message, 'error');
                 document.getElementById('btnRestart').disabled = false;
+            }
+        }
+
+        // Drag and drop handlers
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('upload-area').style.background = 'rgba(0, 212, 255, 0.2)';
+            document.getElementById('upload-area').style.borderColor = 'rgba(0, 212, 255, 0.8)';
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('upload-area').style.background = 'rgba(0, 212, 255, 0.05)';
+            document.getElementById('upload-area').style.borderColor = 'rgba(0, 212, 255, 0.3)';
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            document.getElementById('upload-area').style.background = 'rgba(0, 212, 255, 0.05)';
+            document.getElementById('upload-area').style.borderColor = 'rgba(0, 212, 255, 0.3)';
+
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('modUploadInput').files = files;
+                handleFileSelect({ target: { files: files } });
+            }
+        }
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                modManager.uploadMod(event);
             }
         }
     </script>
