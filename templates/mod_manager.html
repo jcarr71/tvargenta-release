@@ -336,6 +336,18 @@
             box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
         }
 
+        .btn-info {
+            background: rgba(33, 150, 243, 0.3);
+            border: 1px solid rgba(33, 150, 243, 0.6);
+            color: #2196f3;
+        }
+
+        .btn-info:hover {
+            background: rgba(33, 150, 243, 0.5);
+            border-color: #2196f3;
+            box-shadow: 0 0 15px rgba(33, 150, 243, 0.3);
+        }
+
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -429,6 +441,8 @@
 
         <div class="footer-actions">
             <button class="btn btn-primary" id="btnRefresh" onclick="refreshMods()">⟳ Refresh</button>
+            <button class="btn btn-info" id="btnUpload" onclick="document.getElementById('modUploadInput').click()">⬆️ Upload Mod</button>
+            <input type="file" id="modUploadInput" style="display: none;" accept=".zip,.tar.gz" onchange="uploadMod(event)">
             <button class="btn btn-success" id="btnRestart" onclick="restartApp()" disabled>🔄 Restart App Now</button>
         </div>
     </div>
@@ -595,6 +609,49 @@
 
                 if (data.status === 'ok') {
                     modManager.showNotification('Restarting app...', 'warning');
+                } else {
+                    modManager.showNotification('Failed to restart: ' + data.message, 'error');
+                    document.getElementById('btnRestart').disabled = false;
+                }
+            } catch (e) {
+                console.error('[ModManager] Restart failed:', e);
+                modManager.showNotification('Restart error: ' + e.message, 'error');
+                document.getElementById('btnRestart').disabled = false;
+            }
+        }
+
+        async function uploadMod(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                document.getElementById('btnUpload').disabled = true;
+                modManager.showNotification('Uploading mod...', 'warning');
+
+                const response = await fetch('/api/mods/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    modManager.showNotification('Mod uploaded successfully! Refresh to see changes.', 'success');
+                    modManager.loadMods();
+                } else {
+                    modManager.showNotification('Upload failed: ' + (data.message || 'Unknown error'), 'error');
+                }
+            } catch (e) {
+                console.error('[ModManager] Upload failed:', e);
+                modManager.showNotification('Upload error: ' + e.message, 'error');
+            } finally {
+                document.getElementById('btnUpload').disabled = false;
+                event.target.value = ''; // Reset input
+            }
+        }
                     modManager.hasChanges = false;
                     setTimeout(() => window.location.reload(), 2000);
                 } else {
