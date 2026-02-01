@@ -356,6 +356,10 @@ def apply_patch(bundle_path: Path, current_version: str) -> Tuple[bool, str, Opt
                     restore_from_backup(backup_id)
                     return False, f"Patch application failed: {msg}", backup_id
             
+            # Record patch in version history
+            version_info = VersionInfo()
+            version_info.add_patch(manifest.patch_id)
+            
             logger.info(f"Patch {manifest.patch_id} applied successfully")
             return True, f"Patch applied: {manifest.description}", backup_id
     
