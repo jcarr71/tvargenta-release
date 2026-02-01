@@ -29,7 +29,7 @@ import socket
 from pathlib import Path
 from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
-    METADATA_FILE, TAGS_FILE, config_FILE, CANALES_FILE, CANAL_ACTIVO_FILE,
+    METADATA_FILE, TAGS_FILE, config_FILE, CHANNELS_FILE, CHANNEL_ACTIVE_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, config_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
@@ -111,7 +111,7 @@ FRONT_PING_PATH = "/tmp/tv-cbia_front_ping.json"
 CONTENT_DIR = Path(CONTENT_DIR)
 
 DEFAULT_CONFIG = {"tags_prioridad": [], "tags_incluidos": []}
-DEFAULT_CANAL_ACTIVO = {"canal_id": "1"}
+DEFAULT_CHANNEL_ACTIVE = {"channel_id": "1"}
 
 # Supported video formats
 SUPPORTED_VIDEO_FORMATS = ('.mp4', '.mkv', '.webm', '.mov')
@@ -232,7 +232,7 @@ DEFAULT_TAGS = {
 }
 
 # Canales predefinidos (Channel 03 is a system channel, not stored here)
-DEFAULT_CANALES = {
+DEFAULT_CHANNELS = {
     "Canal de Prueba": {
         "nombre": "Test",
         "descripcion": "Canal de prueba",
@@ -243,16 +243,16 @@ DEFAULT_CANALES = {
     }
 }
 
-shown_videos_por_canal = {}
+shown_videos_per_channel = {}
 
 # --- Anti-bounce / cooldown ---
-last_next_call = {}   # canal_id -> timestamp del Ãºltimo /api/next_video servido
+last_next_call = {}   # channel_id -> timestamp del ultimo /api/next_video servido
 NEXT_COOLDOWN = 0.5   # segundos de ventana anti-encadenados (reduced for responsiveness)
 STICKY_WINDOW = 1.0   # segundos (reduced for responsiveness)
-last_choice_per_canal = {}  # canal_id -> {"video_id": str, "ts": float}
+last_choice_per_channel = {}  # channel_id -> {"video_id": str, "ts": float}
 
-# --- De-dupe primer NEXT por canal ---
-pending_pick = {}  # canal_id -> {"video_id": str, "ts": float}
+# --- De-dupe primer NEXT por channel ---
+pending_pick = {}  # channel_id -> {"video_id": str, "ts": float}
 PENDING_TTL = 12.0  # segundos; reusar el mismo pick dentro de este tiempo
 
 _last_trigger_mtime_served = 0.0  # for /api/should_reload (one-shot)
@@ -368,9 +368,9 @@ def _bootstrap_config_from_tags_if_empty():
 # Semillas de JSONs (no pisan si ya existen)
 _ensure_json(TAGS_FILE,       DEFAULT_TAGS)
 _ensure_json(config_FILE,     DEFAULT_CONFIG)
-_ensure_json(CANALES_FILE,    DEFAULT_CANALES)
+_ensure_json(CHANNELS_FILE,    DEFAULT_CHANNELS)
 _ensure_json(METADATA_FILE,   {})
-_ensure_json(CANAL_ACTIVO_FILE, DEFAULT_CANAL_ACTIVO)
+_ensure_json(CHANNEL_ACTIVE_FILE, DEFAULT_CHANNEL_ACTIVE)
 _ensure_json(SERIES_FILE,     {})
 
 # Ensure series video directory exists
@@ -690,16 +690,16 @@ def launch_kiosk_once():
 
 
    
-# FunciÃ³n for cargar canales
-def load_canales():
-    if os.path.exists(CANALES_FILE):
-        with open(CANALES_FILE, "r", encoding="utf-8") as f:
+# Function to load channels
+def load_channels():
+    if os.path.exists(CHANNELS_FILE):
+        with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
-# FunciÃ³n for guardar canales
-def save_canales(data):
-    with open(CANALES_FILE, "w", encoding="utf-8") as f:
+# Function to save channels
+def save_channels(data):
+    with open(CHANNELS_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def load_config():
@@ -719,39 +719,39 @@ def save_tags(tags_data):
 
 _bootstrap_config_from_tags_if_empty()
 
-def get_canal_activo():
-    if os.path.exists(CANAL_ACTIVO_FILE):
-        with open(CANAL_ACTIVO_FILE, "r", encoding="utf-8") as f:
-            return json.load(f).get("canal_id", "base")
+def get_channel_active():
+    if os.path.exists(CHANNEL_ACTIVE_FILE):
+        with open(CHANNEL_ACTIVE_FILE, "r", encoding="utf-8") as f:
+            return json.load(f).get("channel_id", "base")
     return "base"
 
-def set_canal_activo(canal_id):
-    with open(CANAL_ACTIVO_FILE, "w", encoding="utf-8") as f:
-        json.dump({"canal_id": canal_id}, f, indent=2, ensure_ascii=False)
+def set_channel_active(channel_id):
+    with open(CHANNEL_ACTIVE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"channel_id": channel_id}, f, indent=2, ensure_ascii=False)
 
 
-def get_canal_numero(canal_id, canales=None):
+def get_channel_number(channel_id, channels=None):
     """
-    Get the display channel number for a given canal_id.
+    Get the display channel number for a given channel_id.
     - Channel "03" is always "03" (system AV input channel)
     - User channels can specify a custom "numero" field
     - Otherwise auto-assigned starting from "04" based on position
     """
-    if canal_id == "03":
+    if channel_id == "03":
         return "03"
 
-    if canales is None:
-        canales = load_canales()
+    if channels is None:
+        channels = load_channels()
 
     # Check if channel has explicit numero
-    canal_config = canales.get(canal_id, {})
-    if canal_config.get("numero"):
-        return str(canal_config["numero"]).zfill(2)
+    channel_config = channels.get(channel_id, {})
+    if channel_config.get("numero"):
+        return str(channel_config["numero"]).zfill(2)
 
     # Auto-assign based on position (starting from 04, since 03 is system)
-    canal_ids = list(canales.keys())
+    channel_ids = list(channels.keys())
     try:
-        idx = canal_ids.index(canal_id)
+        idx = channel_ids.index(channel_id)
         return str(idx + 4).zfill(2)  # 04, 05, 06, ...
     except ValueError:
         return "04"  # fallback
@@ -1189,7 +1189,7 @@ def _ctx_gestion():
         tags=load_tags(),
         config=load_config(),
         recuerdos=get_total_recuerdos(),
-        canales=load_canales(),
+        channels=load_channels(),
         active_page='library'
     )
 
@@ -1645,65 +1645,65 @@ def guardar_configuracion():
 
 @app.route("/vertele")
 def vertele():
-    canales = load_canales()
+    channels = load_channels()
 
-    canal_activo_path = str(CANAL_ACTIVO_FILE)
-    canal_activo = None
+    channel_active_path = str(CHANNEL_ACTIVE_FILE)
+    channel_active = None
 
-    if not os.path.exists(canal_activo_path):
-        # ElegÃ­ un id real: primero el de DEFAULT_CANAL_ACTIVO si existe, si no, el primer canal disponible
-        preferido = DEFAULT_CANAL_ACTIVO.get("canal_id", "1")
-        if preferido not in canales:
-            preferido = next(iter(canales.keys()), "1")
-        with open(canal_activo_path, "w", encoding="utf-8") as f:
-            json.dump({"canal_id": preferido}, f, ensure_ascii=False, indent=2)
-        canal_activo = preferido
+    if not os.path.exists(channel_active_path):
+        # Elegí un id real: primero el de DEFAULT_CHANNEL_ACTIVE si existe, si no, el primer channel disponible
+        preferido = DEFAULT_CHANNEL_ACTIVE.get("channel_id", "1")
+        if preferido not in channels:
+            preferido = next(iter(channels.keys()), "1")
+        with open(channel_active_path, "w", encoding="utf-8") as f:
+            json.dump({"channel_id": preferido}, f, ensure_ascii=False, indent=2)
+        channel_active = preferido
     else:
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
+        with open(channel_active_path, "r", encoding="utf-8") as f:
             activo_data = json.load(f)
-            canal_activo = activo_data.get("canal_id") or DEFAULT_CANAL_ACTIVO.get("canal_id", "1")
-            if canal_activo not in canales and canales:
-                canal_activo = next(iter(canales.keys()))
-                set_canal_activo(canal_activo)  # persistÃ­ la migraciÃ³n
+            channel_active = activo_data.get("channel_id") or DEFAULT_CHANNEL_ACTIVE.get("channel_id", "1")
+            if channel_active not in channels and channels:
+                channel_active = next(iter(channels.keys()))
+                set_channel_active(channel_active)  # persisti la migracion
 
     return render_template("vertele.html",
-                           canales=canales,
-                           canal_activo=canal_activo)
+                           channels=channels,
+                           channel_active=channel_active)
 
 
 
 @app.route("/api/next_video")
 def api_next_video():
     # Check if we're on Channel 03 (system AV input channel)
-    canal_activo_path = str(CANAL_ACTIVO_FILE)
-    if os.path.exists(canal_activo_path):
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
+    channel_active_path = str(CHANNEL_ACTIVE_FILE)
+    if os.path.exists(channel_active_path):
+        with open(channel_active_path, "r", encoding="utf-8") as f:
             activo = json.load(f)
-            if activo.get("canal_id") == "03":
+            if activo.get("channel_id") == "03":
                 # Channel 03 is the AV input - frontend handles display based on VCR state
                 return jsonify({
                     "channel_type": "av_input",
                     "modo": "03",
-                    "canal_nombre": "03",
-                    "canal_id": "03",
-                    "canal_numero": "03",
+                    "channel_name": "03",
+                    "channel_id": "03",
+                    "channel_number": "03",
                 })
 
     # Check for broadcast TV scheduling
     # If channel has series_filter, use scheduled content instead of fairness-based selection
-    canales = load_canales()
-    if os.path.exists(canal_activo_path):
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
+    channels = load_channels()
+    if os.path.exists(channel_active_path):
+        with open(channel_active_path, "r", encoding="utf-8") as f:
             activo = json.load(f)
-            canal_id = activo.get("canal_id")
-            if canal_id and canal_id in canales:
-                config = canales[canal_id]
+            channel_id = activo.get("channel_id")
+            if channel_id and channel_id in channels:
+                config = channels[channel_id]
                 if config.get("series_filter"):
                     # This is a broadcast TV channel - use scheduler
                     try:
-                        scheduled = scheduler.get_scheduled_content(canal_id)
+                        scheduled = scheduler.get_scheduled_content(channel_id)
                         if scheduled:
-                            logger.info(f"[NEXT] Broadcast channel {canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
+                            logger.info(f"[NEXT] Broadcast channel {channel_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
 
                             # Get loudness data for automatic volume adjustment
                             video_id = scheduled["video_id"]
@@ -1718,15 +1718,15 @@ def api_next_video():
                                 "seek_to": scheduled.get("seek_to", 0),
                                 "title": scheduled.get("title", ""),
                                 "tags": [],
-                                "modo": canal_id,
-                                "canal_nombre": config.get("nombre", canal_id),
-                                "canal_numero": get_canal_numero(canal_id, canales),
+                                "modo": channel_id,
+                                "channel_name": config.get("nombre", channel_id),
+                                "channel_number": get_channel_number(channel_id, channels),
                                 "broadcast_type": scheduled["type"],
                                 "is_broadcast": True,
                                 "loudness_lufs": loudness_lufs
                             })
                     except Exception as e:
-                        logger.error(f"[NEXT] Broadcast scheduling error for {canal_id}: {e}")
+                        logger.error(f"[NEXT] Broadcast scheduling error for {channel_id}: {e}")
                         # Fall through to normal selection if scheduler fails
 
     metadata = load_metadata()
@@ -1735,41 +1735,41 @@ def api_next_video():
     force_next = _force_next_once
     _force_next_once = False
 
-    # Canal activo + config
-    canal_id = "canal_base"
+    # Channel active + config
+    channel_id = "channel_base"
     config = load_config()
 
-    if os.path.exists(canal_activo_path):
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
+    if os.path.exists(channel_active_path):
+        with open(channel_active_path, "r", encoding="utf-8") as f:
             activo = json.load(f)
-            if activo.get("canal_id") in canales:
-                canal_id = activo["canal_id"]
-                config = canales[canal_id]
+            if activo.get("channel_id") in channels:
+                channel_id = activo["channel_id"]
+                config = channels[channel_id]
     
     # --- De-dupe: si hay pick pendiente "fresco", reusalo ---
     now = time.time()
-    pp = pending_pick.get(canal_id)
+    pp = pending_pick.get(channel_id)
     if (not force_next) and pp and (now - pp.get("ts", 0.0)) < PENDING_TTL:
         vid = pp["video_id"]
         info = metadata.get(vid, {})
         series_path = info.get("series_path")
         video_url = get_video_url(video_id=vid, series_path=series_path)
-        logger.info(f"[NEXT-DUPE] Reuso pick pendiente canal={canal_id} video={vid}")
+        logger.info(f"[NEXT-DUPE] Reuso pick pendiente channel={channel_id} video={vid}")
         return jsonify({
             "video_id": vid,
             "video_url": video_url,
             "title": info.get("title", vid.replace("_", " ")),
             "tags": info.get("tags", []),
-            "modo": canal_id,
-            "canal_nombre": canales[canal_id].get("nombre", canal_id),
-            "canal_numero": get_canal_numero(canal_id, canales),
+            "modo": channel_id,
+            "channel_name": channels[channel_id].get("nombre", channel_id),
+            "channel_number": get_channel_number(channel_id, channels),
             "reused": True,
             "do_not_restart": True
         })
 
     # --- Sticky window ---
     now = time.time()
-    sticky = last_choice_per_canal.get(canal_id)
+    sticky = last_choice_per_channel.get(channel_id)
     if (not force_next) and sticky and (now - sticky["ts"]) < STICKY_WINDOW:
         elegido_id = sticky["video_id"]
         elegido_data = metadata.get(elegido_id, {})
@@ -1784,19 +1784,19 @@ def api_next_video():
                 "score_tags": 0,
                 "fair_plays_norm": 0.0,
                 "fair_last_ts": 0.0,
-                "modo": canal_id,
-                "canal_nombre": canales[canal_id].get("nombre", canal_id),
-                "canal_numero": get_canal_numero(canal_id, canales),
+                "modo": channel_id,
+                "channel_name": channels[channel_id].get("nombre", channel_id),
+                "channel_number": get_channel_number(channel_id, channels),
                 "sticky": True
             })
 
-    # --- Cooldown por canal ---
+    # --- Cooldown por channel ---
     now = time.time()
-    ultimo = last_next_call.get(canal_id, 0.0)
-    sticky = last_choice_per_canal.get(canal_id)
+    ultimo = last_next_call.get(channel_id, 0.0)
+    sticky = last_choice_per_channel.get(channel_id)
     if (not force_next) and (now - ultimo) < NEXT_COOLDOWN and sticky and (now - sticky["ts"]) >= STICKY_WINDOW:
-        logger.info(f"[NEXT] cooldown canal={canal_id} dt={now-ultimo:.2f}s -> bloqueo")
-        return jsonify({"cooldown": True, "canal_id": canal_id}), 200
+        logger.info(f"[NEXT] cooldown channel={channel_id} dt={now-ultimo:.2f}s -> bloqueo")
+        return jsonify({"cooldown": True, "channel_id": channel_id}), 200
 
     # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
     series_filter = config.get("series_filter", [])
@@ -1809,10 +1809,10 @@ def api_next_video():
     if not incluidos and not series_filter_set:
         return jsonify({"error": "No hay tags incluidos definidos en la configuracion."}), 400
 
-    canal_shown = shown_videos_por_canal.get(canal_id, [])
+    channel_shown = shown_videos_per_channel.get(channel_id, [])
 
-    # ====== (ya lo tenias) tags del ultimo video del canal ======
-    prev = last_choice_per_canal.get(canal_id)
+    # ====== (ya lo tenias) tags del ultimo video del channel ======
+    prev = last_choice_per_channel.get(channel_id)
     last_tags = set()
     if prev:
         prev_md = metadata.get(prev["video_id"], {})
@@ -1825,10 +1825,10 @@ def api_next_video():
         for vid, ser in tv_episodes[:5]:  # Log first 5
             logger.info(f"[NEXT]   - {vid}: series={ser}, match={ser in series_filter_set if ser else False}")
 
-    # --- Candidatos por tags e ineditos en el canal ---
+    # --- Candidatos por tags e ineditos en el channel ---
     candidatos = []
     for video_id, data in metadata.items():
-        if video_id in canal_shown:
+        if video_id in channel_shown:
             continue
 
         # Series filter: when active, only include TV Episodes with matching series
@@ -1886,12 +1886,12 @@ def api_next_video():
 
     # Si no quedan, limpia "ya vistos" y reintenta
     if not candidatos:
-        if canal_shown:
-            shown_videos_por_canal[canal_id] = []
+        if channel_shown:
+            shown_videos_per_channel[channel_id] = []
             return api_next_video()
         else:
-            logger.warning(f"[NEXT] No videos found for canal={canal_id}, series_filter={series_filter}")
-            return jsonify({"no_videos": True, "canal_id": canal_id})
+            logger.warning(f"[NEXT] No videos found for channel={channel_id}, series_filter={series_filter}")
+            return jsonify({"no_videos": True, "channel_id": channel_id})
 
     # --- Fairness + diversidad + prioridad + jitter ---
     def sort_key(t):
@@ -1903,19 +1903,19 @@ def api_next_video():
     candidatos.sort(key=sort_key)
 
     elegido_id, elegido_data, tag_score, elegido_tags, elegido_overlap = candidatos[0]
-    pending_pick[canal_id] = {"video_id": elegido_id, "ts": time.time()}
+    pending_pick[channel_id] = {"video_id": elegido_id, "ts": time.time()}
 
-    canal_shown.append(elegido_id)
-    shown_videos_por_canal[canal_id] = canal_shown
+    channel_shown.append(elegido_id)
+    shown_videos_per_channel[channel_id] = channel_shown
 
-    last_next_call[canal_id] = time.time()
+    last_next_call[channel_id] = time.time()
 
     fair_plays_norm, fair_last_ts, _ = score_for_video(elegido_id, metadata, plays_map)
     edad_s = _age_seconds(elegido_id)  # for debug
-    logger.info(f"[NEXT] canal={canal_id} elegido={elegido_id} tagscore={tag_score} plays_norm={fair_plays_norm:.3f} overlap_prev={elegido_overlap} age={edad_s:.0f}s gap={MIN_GAP_MIN}m")
+    logger.info(f"[NEXT] channel={channel_id} elegido={elegido_id} tagscore={tag_score} plays_norm={fair_plays_norm:.3f} overlap_prev={elegido_overlap} age={edad_s:.0f}s gap={MIN_GAP_MIN}m")
 
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Reproduciendo video: {elegido_id} del canal {canal_id}")
-    last_choice_per_canal[canal_id] = {"video_id": elegido_id, "ts": time.time()}
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Reproduciendo video: {elegido_id} del channel {channel_id}")
+    last_choice_per_channel[channel_id] = {"video_id": elegido_id, "ts": time.time()}
 
     # Determine video path - series videos use series_path, regular videos use video_id
     series_path = elegido_data.get("series_path")
@@ -1930,9 +1930,9 @@ def api_next_video():
         "fair_plays_norm": fair_plays_norm,
         "fair_last_ts": fair_last_ts,
         "overlap_prev": elegido_overlap,
-        "modo": canal_id,
-        "canal_nombre": canales[canal_id].get("nombre", canal_id),
-        "canal_numero": get_canal_numero(canal_id, canales),
+        "modo": channel_id,
+        "channel_name": channels[channel_id].get("nombre", channel_id),
+        "channel_number": get_channel_number(channel_id, channels),
         "min_gap_minutes": MIN_GAP_MIN,        # debug util
         "age_seconds": None if edad_s == float('inf') else int(edad_s)
     })
@@ -2668,9 +2668,9 @@ def upload_movies_post():
     return jsonify({"ok": True, "results": results})
 
 
-@app.route("/canales")
-def canales():
-    canales_data = load_canales()
+@app.route("/channels")
+def channels():
+    channels_data = load_channels()
 
     # Get series with display names
     all_series = [
@@ -2678,11 +2678,11 @@ def canales():
         for name in _get_all_series()
     ]
 
-    return render_template("canales.html", canales=canales_data, all_series=all_series, active_page='channels')
+    return render_template("channels.html", channels=channels_data, all_series=all_series, active_page='channels')
 
-@app.route("/guardar_canal", methods=["POST"])
-def guardar_canal():
-    canal_id = request.form.get("canal_id")
+@app.route("/guardar_channel", methods=["POST"])
+def save_channel():
+    channel_id = request.form.get("channel_id")
     nombre = request.form.get("nombre", "").strip()
     descripcion = request.form.get("descripcion", "").strip()
     icono = request.form.get("icono", "").strip()
@@ -2691,16 +2691,16 @@ def guardar_canal():
     intro = request.form.get("intro_video_id", "").strip()
 
     if not nombre:
-        return redirect(url_for("canales"))
+        return redirect(url_for("channels"))
 
-    canales = load_canales()
+    channels = load_channels()
 
     # Si es nuevo, generar ID automÃ¡ticamente
-    if not canal_id:
-        existing_ids = [int(k) for k in canales.keys() if k.isdigit()]
-        canal_id = str(max(existing_ids, default=0) + 1)
+    if not channel_id:
+        existing_ids = [int(k) for k in channels.keys() if k.isdigit()]
+        channel_id = str(max(existing_ids, default=0) + 1)
 
-    nuevo_canal = {
+    nuevo_channel = {
         "nombre": nombre,
         "descripcion": descripcion,
         "icono": icono,
@@ -2709,25 +2709,25 @@ def guardar_canal():
     }
 
     if intro:
-        nuevo_canal["intro_video_id"] = intro
+        nuevo_channel["intro_video_id"] = intro
 
-    canales[canal_id] = nuevo_canal
-    save_canales(canales)
+    channels[channel_id] = nuevo_channel
+    save_channels(channels)
     return redirect(url_for("canales"))
 
 
-@app.route("/eliminar_canal/<canal_id>", methods=["POST"])
-def eliminar_canal(canal_id):
-    canales = load_canales()
-    if canal_id in canales:
-        del canales[canal_id]
-        save_canales(canales)
-    return redirect(url_for("canales"))
+@app.route("/eliminar_channel/<channel_id>", methods=["POST"])
+def delete_channel(channel_id):
+    channels = load_channels()
+    if channel_id in channels:
+        del channels[channel_id]
+        save_channels(channels)
+    return redirect(url_for("channels"))
 
-@app.route("/editar_canal/<canal_id>")
-def editar_canal(canal_id):
+@app.route("/editar_channel/<channel_id>")
+def edit_channel(channel_id):
     # Editing is now inline, redirect to main channels page
-    return redirect(url_for("canales"))
+    return redirect(url_for("channels"))
 
 @app.route("/api/set_canal_activo", methods=["POST"])
 def api_set_canal_activo():
