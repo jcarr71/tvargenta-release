@@ -178,7 +178,7 @@ def restore_from_backup(backup_id: str) -> bool:
         return False
     
     try:
-        app_root = Path(__file__).parent.parent
+        app_root = Path(__file__).parent
         
         for backup_file in backup_dir.rglob('*'):
             if backup_file.is_file():
@@ -334,7 +334,7 @@ def apply_patch(bundle_path: Path, current_version: str) -> Tuple[bool, str, Opt
                 return False, f"Integrity check failed: {', '.join(errors)}", None
             
             # Create backup
-            app_root = Path(__file__).parent.parent
+            app_root = Path(__file__).parent
             files_to_backup = []
             for filename in manifest.files:
                 file_path = app_root / filename
