@@ -30,7 +30,7 @@ settings.CONTENT_DIR = TEST_CONTENT_DIR
 settings.VIDEO_DIR = TEST_VIDEO_DIR
 settings.SERIES_VIDEO_DIR = TEST_SERIES_DIR
 settings.METADATA_FILE = TEST_CONTENT_DIR / "metadata.json"
-settings.CANALES_FILE = TEST_CONTENT_DIR / "canales.json"
+settings.CHANNELS_FILE = TEST_CONTENT_DIR / "canales.json"
 settings.SERIES_FILE = TEST_CONTENT_DIR / "series.json"
 
 # Now import scheduler with patched settings
@@ -41,7 +41,7 @@ scheduler.CONTENT_DIR = TEST_CONTENT_DIR
 scheduler.VIDEO_DIR = TEST_VIDEO_DIR
 scheduler.SERIES_VIDEO_DIR = TEST_SERIES_DIR
 scheduler.METADATA_FILE = TEST_CONTENT_DIR / "metadata.json"
-scheduler.CANALES_FILE = TEST_CONTENT_DIR / "canales.json"
+scheduler.CHANNELS_FILE = TEST_CONTENT_DIR / "canales.json"
 scheduler.SERIES_FILE = TEST_CONTENT_DIR / "series.json"
 scheduler.WEEKLY_SCHEDULE_FILE = TEST_CONTENT_DIR / "weekly_schedule.json"
 scheduler.DAILY_SCHEDULE_FILE = TEST_CONTENT_DIR / "daily_schedule.json"

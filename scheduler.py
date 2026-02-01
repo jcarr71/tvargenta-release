@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
 from settings import (
-    CONTENT_DIR, VIDEO_DIR, METADATA_FILE, CANALES_FILE, SERIES_FILE,
+    CONTENT_DIR, VIDEO_DIR, METADATA_FILE, CHANNELS_FILE, SERIES_FILE,
     SERIES_VIDEO_DIR, app_now
 )
 
@@ -155,8 +155,8 @@ def save_series(data: dict) -> None:
 def load_canales() -> dict:
     """Load channel configurations from canales.json."""
     try:
-        if CANALES_FILE.exists():
-            with open(CANALES_FILE, "r", encoding="utf-8") as f:
+        if CHANNELS_FILE.exists():
+            with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
         logger.error(f"[SCHEDULER] Error loading canales.json: {e}")
