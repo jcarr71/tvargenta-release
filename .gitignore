@@ -30,6 +30,14 @@ dist/
 build/
 
 # =========================
+# Temporary patch files and backups
+# =========================
+*.rej
+*.orig
+*_old/
+*_backup/
+
+# =========================
 # App data (runtime)
 # Mantener SOLO la estructura vacía de content/ y subcarpetas.
 # Ignorar todo lo demás (JSON, MP4, JPG, etc.)
