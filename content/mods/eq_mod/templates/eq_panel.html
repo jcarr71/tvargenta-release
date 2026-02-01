@@ -46,8 +46,9 @@ Include this in player.html to add EQ controls to the player interface
             </div>
         </div>
         
-        <!-- Reset button -->
+        <!-- Action buttons -->
         <div class="eq-actions">
+            <button id="eqApply" class="eq-apply-btn">✓ Apply Settings</button>
             <button id="eqReset" class="eq-reset-btn">Reset</button>
         </div>
     </div>
@@ -220,6 +221,31 @@ Include this in player.html to add EQ controls to the player interface
     .eq-actions {
         display: flex;
         gap: 8px;
+    }
+    
+    .eq-apply-btn {
+        flex: 1;
+        background: rgba(76, 175, 80, 0.3);
+        border: 1px solid rgba(76, 175, 80, 0.5);
+        color: #4caf50;
+        padding: 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85em;
+        transition: all 0.2s ease;
+        font-weight: 600;
+    }
+    
+    .eq-apply-btn:hover {
+        background: rgba(76, 175, 80, 0.5);
+        color: #66bb6a;
+        box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+    }
+    
+    .eq-apply-btn.applied {
+        background: rgba(76, 175, 80, 0.6);
+        border-color: #4caf50;
+        box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
     }
     
     .eq-reset-btn {

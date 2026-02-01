@@ -164,6 +164,14 @@ def get_eq_panel():
                             this.reset();
                         }});
                         
+                        // Apply button
+                        const applyBtn = document.getElementById('eqApply');
+                        if (applyBtn) {{
+                            applyBtn.addEventListener('click', () => {{
+                                this.applySettings();
+                            }});
+                        }}
+                        
                         this.updatePresetButtons(this.settings.active_preset);
                     }}
                     
@@ -225,6 +233,59 @@ def get_eq_panel():
                             }});
                         }} catch (e) {{
                             console.error('[EQ] Save failed:', e);
+                        }}
+                    }}
+                    
+                    async applySettings() {{
+                        try {{
+                            // Save settings
+                            await this.saveSettings();
+                            
+                            // Visual feedback - highlight Apply button
+                            const applyBtn = document.getElementById('eqApply');
+                            if (applyBtn) {{
+                                applyBtn.classList.add('applied');
+                                
+                                // Create notification
+                                const notification = document.createElement('div');
+                                notification.style.cssText = `
+                                    position: fixed;
+                                    top: 50%;
+                                    left: 50%;
+                                    transform: translate(-50%, -50%);
+                                    background: rgba(76, 175, 80, 0.95);
+                                    color: white;
+                                    padding: 20px 40px;
+                                    border-radius: 8px;
+                                    font-size: 1.1em;
+                                    font-weight: bold;
+                                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+                                    z-index: 10000;
+                                    animation: fadeInOut 2s ease-in-out forwards;
+                                `;
+                                
+                                // Add animation
+                                const style = document.createElement('style');
+                                style.textContent = `
+                                    @keyframes fadeInOut {{
+                                        0% {{ opacity: 0; transform: translate(-50%, -50%) scale(0.8); }}
+                                        10% {{ opacity: 1; transform: translate(-50%, -50%) scale(1); }}
+                                        90% {{ opacity: 1; transform: translate(-50%, -50%) scale(1); }}
+                                        100% {{ opacity: 0; transform: translate(-50%, -50%) scale(0.8); }}
+                                    }}
+                                `;
+                                document.head.appendChild(style);
+                                
+                                notification.textContent = '✓ EQ Settings Applied!';
+                                document.body.appendChild(notification);
+                                
+                                setTimeout(() => {{
+                                    notification.remove();
+                                    applyBtn.classList.remove('applied');
+                                }}, 2000);
+                            }}
+                        }} catch (e) {{
+                            console.error('[EQ] Apply failed:', e);
                         }}
                     }}
                 }}
