@@ -70,6 +70,8 @@ def generate_unified_diff(from_file: Path, to_file: Path, from_dir: Path, to_dir
     """Generate unified diff between two files"""
     
     relative_path = from_file.relative_to(from_dir) if from_file.exists() else to_file.relative_to(to_dir)
+    # Normalize path to use forward slashes (Unix style) for cross-platform compatibility
+    relative_path_str = str(relative_path).replace('\\', '/')
     
     try:
         # Read file contents
@@ -87,8 +89,8 @@ def generate_unified_diff(from_file: Path, to_file: Path, from_dir: Path, to_dir
         diff = difflib.unified_diff(
             from_lines,
             to_lines,
-            fromfile=str(relative_path),
-            tofile=str(relative_path),
+            fromfile=relative_path_str,
+            tofile=relative_path_str,
             lineterm=''
         )
         
