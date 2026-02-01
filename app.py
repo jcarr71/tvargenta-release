@@ -1175,7 +1175,7 @@ def _touch_frontend_ping(stage: str = None):
 
 # --- GestiÃ³n: /gestion -------------------------------------------------
 
-def _ctx_gestion():
+def _ctx_library():
     # Carga y saneos mÃ­nimos for que el dashboard estÃ© al dÃ­a
     global metadata
     metadata = load_metadata()
@@ -1643,8 +1643,8 @@ def guardar_configuracion():
 
     return redirect(url_for("configuracion"))
 
-@app.route("/vertele")
-def vertele():
+@app.route("/watch")
+def watch():
     channels = load_channels()
 
     channel_active_path = str(CHANNEL_ACTIVE_FILE)
@@ -1666,7 +1666,7 @@ def vertele():
                 channel_active = next(iter(channels.keys()))
                 set_channel_active(channel_active)  # persisti la migracion
 
-    return render_template("vertele.html",
+    return render_template("watch.html",
                            channels=channels,
                            channel_active=channel_active)
 
@@ -3338,19 +3338,19 @@ def api_ping():
     return jsonify(ok=True, stage=stage)
     
 
-@app.route("/gestion")
-def gestion():
-    return render_template("index.html", **_ctx_gestion())
+@app.route("/library")
+def library():
+    return render_template("index.html", **_ctx_library())
 
 # Alias de compatibilidad: si en algÃºn lado quedÃ³ url_for("index"), redirige a /gestion
 @app.route("/index")
 def index():
-    return redirect(url_for("gestion"))
+    return redirect(url_for("library"))
 
 # (Opcional) atajo cÃ³modo
 @app.route("/admin")
 def admin():
-    return redirect(url_for("gestion"))
+    return redirect(url_for("library"))
     
     
 # --- Power control (halt) ---
@@ -3609,10 +3609,10 @@ def api_wifi_stop_ap():
 
 @app.route("/api/wifi/qr", methods=["GET"])
 def api_wifi_qr():
-    target = request.args.get("target", "gestion")
+    target = request.args.get("target", "library")
 
     # 1️⃣ QR for gestion de contenido (solo si hay IP valida)
-    if target == "gestion":
+    if target == "library":
         ip = wifi_manager._get_iface_ipv4_addr(wifi_manager.WIFI_IFACE)
         if not ip:
             logger.warning("[WiFi][QR] sin IPv4 asignada -> offline, no genero QR")
@@ -4302,7 +4302,7 @@ def _i18n_before_request():
     # Mapear endpoints Flask -> nombre base de JSON de pagina
     endpoint_to_page = {
         # Dashboard / gestion
-        "gestion": "index",
+        "library": "index",
         "index": "index",
 
         # Tags
@@ -4321,7 +4321,7 @@ def _i18n_before_request():
         "eliminar_canal": "canales",
         
          # modo tele
-        "vertele": "vertele",
+        "watch": "watch",
         
         "wifi_setup": "wifi_setup"
 
