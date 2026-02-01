@@ -33,6 +33,45 @@
         background-position: 40px 0;
       }
     }
+
+    .nav-links {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .nav-links a {
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      font-size: 0.875rem;
+      border: 1px solid transparent;
+    }
+
+    .nav-links .btn-mods {
+      background: rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      border-color: rgba(0, 212, 255, 0.6);
+    }
+
+    .nav-links .btn-mods:hover {
+      background: rgba(0, 212, 255, 0.5);
+      border-color: #00d4ff;
+    }
+
+    .nav-links .btn-patches {
+      background: rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+      border-color: rgba(255, 107, 107, 0.6);
+    }
+
+    .nav-links .btn-patches:hover {
+      background: rgba(255, 107, 107, 0.5);
+      border-color: #ff6b6b;
+    }
   </style>
   
 	</head>
@@ -44,11 +83,19 @@
 		{{ tr("upload.header") }}
 	  </h1>
 
-	  <!-- Back + idioma -->
-	  <div class="flex items-center gap-4">
+	  <!-- Back + idioma + navigation -->
+	  <div class="flex items-center gap-4 nav-links">
 		<a href="{{ url_for('index') }}"
 		   class="text-blue-400 underline text-sm sm:text-base whitespace-nowrap">
 		  {{ tr("upload.nav.back_home") }}
+		</a>
+
+		<a href="/mod_manager" class="btn-mods whitespace-nowrap">
+		  📦 Mods
+		</a>
+
+		<a href="/patches" class="btn-patches whitespace-nowrap">
+		  🔧 Patches
 		</a>
 
 		<select id="upload-lang-select"

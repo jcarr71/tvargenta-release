@@ -80,6 +80,28 @@
             background: rgba(255, 107, 107, 0.3);
         }
 
+        .btn-mods {
+            background: rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+            border: 1px solid rgba(0, 212, 255, 0.6);
+        }
+
+        .btn-mods:hover {
+            background: rgba(0, 212, 255, 0.5);
+            border-color: #00d4ff;
+        }
+
+        .btn-uploads {
+            background: rgba(76, 175, 80, 0.3);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.6);
+        }
+
+        .btn-uploads:hover {
+            background: rgba(76, 175, 80, 0.5);
+            border-color: #4caf50;
+        }
+
         .main-content {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -345,7 +367,8 @@
             <h1>🔧 Patch Manager</h1>
             <div class="nav-buttons">
                 <a href="/" class="btn btn-secondary">← Back to Home</a>
-                <a href="/mod_manager" class="btn btn-secondary">Mods</a>
+                <a href="/mod_manager" class="btn btn-mods">📦 Mods</a>
+                <a href="/upload" class="btn btn-uploads">📤 Uploads</a>
             </div>
         </header>
 
