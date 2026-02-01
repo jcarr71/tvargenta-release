@@ -149,10 +149,12 @@ def generate_patch(from_dir: Path, to_dir: Path, output_file: Path, description:
                 
                 if file_diff.strip():
                     diff_lines.append(file_diff)
-                    changed_files.append(str(relpath))
+                    # Normalize path to use forward slashes (Unix style)
+                    relpath_str = str(relpath).replace('\\', '/')
+                    changed_files.append(relpath_str)
                     
                     if to_file and to_file.exists():
-                        checksums[str(relpath)] = compute_checksum(to_file)
+                        checksums[relpath_str] = compute_checksum(to_file)
             
             if not diff_lines:
                 return False, "No changes found between versions"

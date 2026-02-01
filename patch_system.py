@@ -271,6 +271,7 @@ def verify_patch_integrity(manifest: PatchManifest, patch_dir: Path) -> Tuple[bo
     
     try:
         for filename, expected_checksum in manifest.checksums.items():
+            # Normalize filename to use Path object (handles both / and \ separators)
             file_path = patch_dir / filename
             
             if not file_path.exists():
