@@ -12,8 +12,11 @@ import os
 import json
 import subprocess
 import fcntl
-import msvcrt
 import sys
+
+# Windows-only module for file locking
+if sys.platform == 'win32':
+    import msvcrt
 from contextlib import contextmanager
 from werkzeug.utils import secure_filename
 import tempfile
