@@ -42,12 +42,14 @@ build/
 # Mantener SOLO la estructura vacía de content/ y subcarpetas.
 # Ignorar todo lo demás (JSON, MP4, JPG, etc.)
 # EXCEPTION: Mods are versioned and should be committed
+# EXCEPTION: Pre-built test pattern MP4 is versioned for faster install
 # =========================
 content/**
 !content/.gitignore
 !content/.gitkeep
 !content/**/
 !content/**/.gitkeep
+!content/videos/system/test_pattern.mp4
 !content/mods/
 !content/mods/**
 
