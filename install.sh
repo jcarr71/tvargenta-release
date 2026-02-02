@@ -590,8 +590,13 @@ generate_test_pattern() {
     elif [[ -f "$PATTERN_FILE" ]]; then
         log_info "Test pattern already exists, skipping copy"
     else
-        log_warn "Test pattern not found in repository - skipping setup"
-        log_warn "To use test pattern, ensure content/videos/system/test_pattern.mp4 exists in the repo"
+        log_info "Test pattern not found locally - downloading from jcarr71 repository..."
+        if curl -f -L -o "$PATTERN_FILE" "https://github.com/jcarr71/tvargenta-release/raw/main/content/videos/system/test_pattern.mp4" 2>/dev/null; then
+            log_info "Test pattern downloaded successfully ($(du -h "$PATTERN_FILE" | cut -f1))"
+        else
+            log_warn "Failed to download test pattern from GitHub"
+            log_warn "To use test pattern, ensure test_pattern.mp4 exists at: $PATTERN_FILE"
+        fi
     fi
 }
 
