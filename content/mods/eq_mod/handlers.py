@@ -314,10 +314,10 @@ def get_routes():
     ]
 
 def get_hooks():
-    """Return list of hook registrations for inter-mod communication."""
-    return [
-        ("playback_started", on_playback_started),
-    ]
+    """Return dict of hook registrations for inter-mod communication."""
+    return {
+        "playback_started": on_playback_started,
+    }
 
 def get_eq_settings():
     """Return current EQ settings."""

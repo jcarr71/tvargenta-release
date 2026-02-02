@@ -20,11 +20,11 @@ def get_routes():
     ]
 
 def get_hooks():
-    """Return list of hook registrations for inter-mod communication."""
-    return [
-        ("daily_schedule", on_daily_schedule),
-        ("weekly_schedule", on_weekly_schedule),
-    ]
+    """Return dict of hook registrations for inter-mod communication."""
+    return {
+        "daily_schedule": on_daily_schedule,
+        "weekly_schedule": on_weekly_schedule,
+    }
 
 def rebuild_schedule_endpoint(canal_id):
     """Rebuild schedule for a specific channel."""
