@@ -9,11 +9,11 @@ After=network-online.target
 # The install.sh script generates this service dynamically with the correct user.
 # Do not use this file directly; run install.sh for proper setup.
 User=<TVARGENTA_USER>
-WorkingDirectory=/srv/tvargenta
-ExecStart=/srv/tvargenta/venv/bin/python /srv/tvargenta/app.py
+WorkingDirectory=/srv/tv-cbia
+ExecStart=/srv/tv-cbia/venv/bin/python /srv/tv-cbia/app.py
 
 # PATH completo para que encuentre pkill y demás
-Environment="PATH=/srv/tvargenta/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin"
+Environment="PATH=/srv/tv-cbia/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin"
 Environment="PYTHONUNBUFFERED=1"
 Environment="FLASK_ENV=production"
 

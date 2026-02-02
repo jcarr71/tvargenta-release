@@ -82,18 +82,18 @@ sudo bash install.sh poweron_experience
 
 ### 4. Install Application
 
-Clones TVArgenta to `/srv/tvargenta` (system location) or allows custom path:
+Clones TVArgenta to `/srv/tv-cbia` (system location) or allows custom path:
 
 ```bash
 sudo bash install.sh install_app
 ```
 
 **Installs to:**
-- `/srv/tvargenta/` (default system location)
+- `/srv/tv-cbia/` (default system location)
 
 **Directory structure:**
 ```
-/srv/tvargenta/
+/srv/tv-cbia/
 ├── app.py                 # Main Flask application
 ├── scheduler.py           # Broadcast schedule generator
 ├── metadata_daemon.py     # Video metadata processor
@@ -218,7 +218,7 @@ After installation, verify everything is working:
 
 ```bash
 # Navigate to app directory
-cd /srv/tvargenta
+cd /srv/tv-cbia
 
 # Test Flask app directly (Ctrl+C to stop)
 python3 app.py
@@ -240,7 +240,7 @@ systemctl status tvargenta.service
 journalctl -u tvargenta.service -f
 
 # View application logs
-tail -f /srv/tvargenta/content/logs/app.log
+tail -f /srv/tv-cbia/content/logs/app.log
 ```
 
 ### Access Web UI
@@ -266,13 +266,13 @@ Each service can be run independently for development/debugging:
 
 ```bash
 # Start main application
-python3 /srv/tvargenta/app.py
+python3 /srv/tv-cbia/app.py
 
 # Start metadata daemon
-python3 /srv/tvargenta/metadata_daemon.py
+python3 /srv/tv-cbia/metadata_daemon.py
 
 # Start NFC reader daemon
-python3 /srv/tvargenta/nfc_reader.py
+python3 /srv/tv-cbia/nfc_reader.py
 ```
 
 ---
@@ -293,7 +293,7 @@ export TVARGENTA_USER=customuser
 
 ### Settings File
 
-After installation, configure `/srv/tvargenta/content/configuracion.json`:
+After installation, configure `/srv/tv-cbia/content/configuracion.json`:
 
 ```json
 {

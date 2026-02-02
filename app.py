@@ -1156,7 +1156,7 @@ def score_for_video(video_id, metadata, plays_map):
     return (plays_norm, last_ts, jitter)
 
 def _load_splash_state():
-    """Lee /srv/tvargenta/Splash/splash_state.json -> {"index": int}"""
+    """Lee /srv/tv-cbia/Splash/splash_state.json -> {"index": int}"""
     try:
         if os.path.exists(SPLASH_STATE_FILE):
             with open(SPLASH_STATE_FILE, "r", encoding="utf-8") as f:

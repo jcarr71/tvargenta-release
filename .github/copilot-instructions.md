@@ -120,7 +120,7 @@ with metadata_lock(timeout=30):
 ### Settings & Paths
 - `settings.py` defines all paths as `Path` objects
 - Environment variable `TVARGENTA_ROOT` overrides default location
-- Respect `/srv/tvargenta` for persistent system data vs `ROOT_DIR` for repo code
+- Respect `/srv/tv-cbia` for persistent system data vs `ROOT_DIR` for repo code
 - Use `app_now()` for timezone-aware datetime (respects config timezone)
 
 ### User Configuration

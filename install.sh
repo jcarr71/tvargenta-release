@@ -167,13 +167,13 @@ dtoverlay=disable-bt' "$CONFIG_FILE"
 
 # =============================================================================
 # INSTALL APP
-# Clones the TVArgenta repository to /srv/tvargenta
+# Clones the TVArgenta repository to /srv/tv-cbia
 # =============================================================================
 install_app() {
     log_info "Installing TVArgenta application..."
 
-    local INSTALL_DIR="/srv/tvargenta"
-    local REPO_URL="https://github.com/lesterWritesCodeSometimes/tvargenta-release.git"
+    local INSTALL_DIR="/srv/tv-cbia"
+    local REPO_URL="https://github.com/jcarr71/tvargenta-release.git"
     local CURRENT_USER="${SUDO_USER:-$USER}"
 
     # Create /srv directory if it doesn't exist
@@ -454,7 +454,7 @@ EOF
 setup_venv() {
     log_info "Setting up Python virtual environment..."
 
-    local INSTALL_DIR="/srv/tvargenta"
+    local INSTALL_DIR="/srv/tv-cbia"
     local VENV_DIR="${INSTALL_DIR}/venv"
     local CURRENT_USER="${SUDO_USER:-$USER}"
 
@@ -517,7 +517,7 @@ setup_venv() {
 setup_audio() {
     log_info "Setting up audio configuration..."
 
-    local INSTALL_DIR="/srv/tvargenta"
+    local INSTALL_DIR="/srv/tv-cbia"
     local ASOUND_SRC="${INSTALL_DIR}/Config_files/audio_keepalive/etc/asound.conf"
     local ASOUND_DST="/etc/asound.conf"
 
@@ -657,7 +657,7 @@ EOF
 build_encoder() {
     log_info "Building encoder_reader binary..."
 
-    local INSTALL_DIR="/srv/tvargenta"
+    local INSTALL_DIR="/srv/tv-cbia"
     local SOURCE_FILE="${INSTALL_DIR}/encoder_reader.c"
     local OUTPUT_FILE="${INSTALL_DIR}/encoder_reader"
     local CURRENT_USER="${SUDO_USER:-$USER}"
@@ -751,7 +751,7 @@ main() {
             echo "Commands:"
             echo "  bootloader         - Configure boot settings for TVArgenta"
             echo "  poweron_experience - Set up black boot splash screen"
-            echo "  install_app        - Clone TVArgenta repo to /srv/tvargenta"
+            echo "  install_app        - Clone TVArgenta repo to /srv/tv-cbia"
             echo "  setup_venv         - Create Python venv and install packages"
             echo "  build_encoder      - Compile encoder_reader C binary"
             echo "  install_services   - Install systemd services"
