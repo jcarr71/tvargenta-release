@@ -671,8 +671,14 @@ EOF
     # (disabling autostart is not sufficient as it can be started by PAM/session)
     if dpkg -l | grep -q "^ii  gnome-keyring"; then
         log_info "Removing gnome-keyring package..."
-        sudo DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y gnome-keyring
-        log_info "Removed gnome-keyring (prevents password prompt on autologin)"
+        sudo DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y gnome-keyring 2>&1 | grep -q "done" || true
+        # Verify removal
+        if ! dpkg -l | grep -q "^ii  gnome-keyring"; then
+            log_info "Successfully removed gnome-keyring (prevents password prompt on autologin)"
+        else
+            log_warn "gnome-keyring removal may have failed - attempting again"
+            sudo DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y gnome-keyring 2>&1 > /dev/null || true
+        fi
     else
         log_info "gnome-keyring not installed, skipping removal"
     fi
