@@ -94,7 +94,7 @@
   
   <div class="nav-links">
     <a href="/" class="btn btn-secondary">← Home</a>
-    <a href="/canales" class="btn btn-channels">📡 Channels</a>
+    <a href="/channels" class="btn btn-channels">📡 Channels</a>
     <a href="/patches" class="btn btn-patches">📋 Patches</a>
     <a href="/mod_manager" class="btn btn-mods">📦 Mods</a>
     <a href="/upload" class="btn btn-uploads">📤 Uploads</a>
@@ -202,7 +202,7 @@
 	  loadNextVideo();
 
     // Cargar grilla de canales
-    fetch("/api/canales")
+    fetch("/api/channels")
       .then(res => {
         if (!res.ok) throw new Error("{{ tr('vertele.channel.error') }}");
         return res.json();
