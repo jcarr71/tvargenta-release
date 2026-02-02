@@ -540,23 +540,23 @@ def load_config_i18n():
             with open(config_PATH, "r", encoding="utf-8") as f:
                 cfg = json.load(f) or {}
             if "language" not in cfg:
-                cfg["language"] = "es"
+                cfg["language"] = "en"
                 save_config_i18n(cfg)
                 logger.warning(
-                    f"[I18N] Falta 'language' en {config_PATH}, agregado 'es'."
+                    f"[I18N] Falta 'language' en {config_PATH}, agregado 'en'."
                 )
             #logger.info(
             #    f"[I18N] Cargado config de {config_PATH} -> language={cfg.get('language')!r}"
             #)
             return cfg
         else:
-            cfg = {"language": "es"}
+            cfg = {"language": "en"}
             save_config_i18n(cfg)
-            logger.warning(f"[I18N] {config_PATH} no existia. Creado con language='es'.")
+            logger.warning(f"[I18N] {config_PATH} no existia. Creado con language='en'.")
             return cfg
     except Exception as e:
         logger.error(f"[I18N] Error leyendo {config_PATH}: {e}")
-        return {"language": "es"}
+        return {"language": "en"}
 
 
 def save_config_i18n(cfg):
