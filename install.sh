@@ -543,6 +543,85 @@ setup_audio() {
 }
 
 # =============================================================================
+# GENERATE TEST PATTERN
+# Pre-generates test pattern video (SMPTE bars + 1kHz tone) at install time
+# This prevents long first-boot delay caused by runtime FFmpeg encoding
+# =============================================================================
+generate_test_pattern() {
+    log_info "Generating test pattern video (will take 2-3 minutes on Pi)..."
+
+    local INSTALL_DIR="/srv/tv-cbia"
+    local VIDEO_DIR="${INSTALL_DIR}/content/videos/system"
+    local PATTERN_FILE="${VIDEO_DIR}/test_pattern.mp4"
+    local BARS_FILE="${VIDEO_DIR}/smpte_bars.png"
+
+    # Create system video directory
+    if [[ ! -d "$VIDEO_DIR" ]]; then
+        mkdir -p "$VIDEO_DIR"
+        log_info "Created system video directory"
+    fi
+
+    # Skip if test pattern already exists
+    if [[ -f "$PATTERN_FILE" ]]; then
+        log_info "Test pattern already exists, skipping generation"
+        return 0
+    fi
+
+    # Check if SMPTE bars image exists, if not create a simple placeholder
+    if [[ ! -f "$BARS_FILE" ]]; then
+        log_info "Creating SMPTE bars placeholder image..."
+        ffmpeg -f lavfi -i color=c=black:s=960x720:d=1 -frames:v 1 "$BARS_FILE" 2>/dev/null
+    fi
+
+    # Generate test pattern with progress indicator
+    log_info "Encoding test pattern (1-hour loop of SMPTE bars + 1kHz tone)..."
+    
+    # Create FIFO for progress tracking
+    local PROGRESS_FIFO="/tmp/ffmpeg_progress_$$"
+    mkfifo "$PROGRESS_FIFO" 2>/dev/null || true
+
+    # Start FFmpeg in background and track progress
+    (
+        ffmpeg -y -loop 1 -i "$BARS_FILE" \
+            -f lavfi -i sine=frequency=1000:sample_rate=48000 \
+            -c:v libx264 -preset ultrafast -tune stillimage \
+            -c:a aac -b:a 128k -pix_fmt yuv420p \
+            -t 3600 -shortest \
+            -progress pipe:1 \
+            "$PATTERN_FILE" 2>&1 | \
+        grep -oP 'frame=\K[0-9]+' | \
+        while read frame; do
+            # Simple progress indicator: 1-hour video = 90000 frames at 25fps
+            percent=$((frame * 100 / 90000))
+            percent=$((percent > 100 ? 100 : percent))
+            
+            # Draw progress bar
+            bar_length=30
+            filled=$((percent * bar_length / 100))
+            empty=$((bar_length - filled))
+            bar=$(printf '[%-*s]' "$bar_length" "$(printf '#%.0s' $(seq 1 $filled))")
+            
+            echo -ne "\r${GREEN}[FFmpeg]${NC} ${bar} ${percent}%  "
+        done
+    ) &
+    local ffmpeg_pid=$!
+
+    # Wait for FFmpeg to complete
+    wait $ffmpeg_pid 2>/dev/null
+    
+    # Clean up progress FIFO
+    rm -f "$PROGRESS_FIFO" 2>/dev/null || true
+    
+    if [[ -f "$PATTERN_FILE" ]]; then
+        echo ""  # New line after progress bar
+        log_info "Test pattern generated successfully ($(du -h "$PATTERN_FILE" | cut -f1))"
+    else
+        log_error "Failed to generate test pattern"
+        return 1
+    fi
+}
+
+# =============================================================================
 # SETUP DISPLAY
 # Configures LightDM for autologin with X11 session
 # =============================================================================
@@ -728,6 +807,9 @@ main() {
         setup_display)
             setup_display
             ;;
+        generate_test_pattern)
+            generate_test_pattern
+            ;;
         build_encoder)
             build_encoder
             ;;
@@ -743,6 +825,7 @@ main() {
             build_encoder
             install_services
             setup_audio
+            generate_test_pattern
             setup_display
             ;;
         *)
@@ -756,6 +839,7 @@ main() {
             echo "  build_encoder      - Compile encoder_reader C binary"
             echo "  install_services   - Install systemd services"
             echo "  setup_audio        - Configure ALSA for HiFiBerry DAC"
+            echo "  generate_test_pattern - Pre-generate test pattern video (2-3 min)"
             echo "  setup_display      - Configure autologin with X11 session"
             echo "  legacy             - Run legacy installation steps"
             echo "  all                - Run all installation steps"
