@@ -210,6 +210,12 @@ install_app() {
         log_error "Installation verification failed - app.py not found"
         exit 1
     fi
+
+    # Fix directory permissions to ensure app can create/write to content directories
+    log_info "Setting directory permissions for ${CURRENT_USER}..."
+    sudo chown -R "${CURRENT_USER}:${CURRENT_USER}" "${INSTALL_DIR}"
+    sudo chmod -R 755 "${INSTALL_DIR}"
+    log_info "Directory permissions fixed"
 }
 
 # =============================================================================
@@ -222,7 +228,7 @@ install_services() {
     local CURRENT_USER="${SUDO_USER:-$USER}"
     local CURRENT_UID=$(id -u "$CURRENT_USER")
     local SERVICE_DIR="/etc/systemd/system"
-    local INSTALL_DIR="/srv/tvargenta"
+    local INSTALL_DIR="/srv/tv-cbia"
     local CONFIG_DIR="${INSTALL_DIR}/Config_files/servicios_y_scripts_toggle_tva_games"
     local SCRIPTS_DIR="/usr/local/bin"
 
@@ -505,7 +511,14 @@ setup_venv() {
         python-dotenv \
         psutil \
         python-uinput \
-        nfcpy
+        nfcpy \
+        ffmpeg-python
+
+    # Ensure proper permissions on the installation directory for Flask app
+    log_info "Setting directory permissions for ${CURRENT_USER}..."
+    sudo chown -R "${CURRENT_USER}:${CURRENT_USER}" "${INSTALL_DIR}"
+    sudo chmod -R 755 "${INSTALL_DIR}"
+    log_info "Directory permissions fixed"
 
     log_info "Python virtual environment setup complete!"
 }

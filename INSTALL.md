@@ -321,9 +321,9 @@ sudo bash install.sh <command>
 If Python dependencies fail, manually install:
 
 ```bash
-cd /srv/tvargenta
+cd /srv/tv-cbia
 source venv/bin/activate
-pip install flask nfcpy
+pip install flask nfcpy ffmpeg-python
 ```
 
 ### Services Won't Start
@@ -337,8 +337,21 @@ journalctl -u tvargenta.service -n 50
 Check application logs:
 
 ```bash
-tail -f /srv/tvargenta/content/logs/app.log
+tail -f /srv/tv-cbia/content/logs/app.log
 ```
+
+**Common Issues:**
+
+**Service exits with "Unable to locate executable" error:**
+- The Python virtual environment may not have been created properly
+- Run: `sudo bash install.sh setup_venv`
+- Then restart: `sudo systemctl restart tvargenta.service`
+
+**Permission denied errors:**
+- Directory permissions may not be set correctly
+- Run: `sudo chown -R $(whoami):$(whoami) /srv/tv-cbia`
+- Then: `sudo chmod -R 755 /srv/tv-cbia`
+- Restart: `sudo systemctl restart tvargenta.service`
 
 ### Audio Not Working
 
