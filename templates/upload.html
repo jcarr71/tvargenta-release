@@ -10,130 +10,331 @@
   <meta charset="UTF-8">
   <title>{{ tr("upload.page_title") }}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='tailwind.css') }}">
   <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
     body {
-      background: linear-gradient(to bottom, #0a0a0a, #1a0000);
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #e0e0e0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 2px solid rgba(76, 175, 80, 0.3);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #4caf50 0%, #81c784 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: inline-block;
+      font-size: 0.875rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4caf50 0%, #81c784 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(76, 175, 80, 0.2);
+      color: #81c784;
+      border: 1px solid #81c784;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(76, 175, 80, 0.3);
+    }
+
+    .btn-patches {
+      background: rgba(255, 107, 107, 0.3);
+      color: #ff6b6b;
+      border: 1px solid rgba(255, 107, 107, 0.6);
+    }
+
+    .btn-patches:hover {
+      background: rgba(255, 107, 107, 0.5);
+      border-color: #ff6b6b;
+    }
+
+    .btn-mods {
+      background: rgba(0, 212, 255, 0.3);
+      color: #00d4ff;
+      border: 1px solid rgba(0, 212, 255, 0.6);
+    }
+
+    .btn-mods:hover {
+      background: rgba(0, 212, 255, 0.5);
+      border-color: #00d4ff;
+    }
+
+    .btn-channels {
+      background: rgba(255, 193, 7, 0.3);
+      color: #ffc107;
+      border: 1px solid rgba(255, 193, 7, 0.6);
+    }
+
+    .btn-channels:hover {
+      background: rgba(255, 193, 7, 0.5);
+      border-color: #ffc107;
+    }
+
+    .main-content {
+      display: grid;
+      gap: 2rem;
+    }
+
+    .card {
+      background: rgba(22, 33, 62, 0.6);
+      border: 1px solid rgba(76, 175, 80, 0.2);
+      border-radius: 0.75rem;
+      padding: 2rem;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    .card h2 {
+      font-size: 1.5rem;
+      margin-bottom: 1.5rem;
+      color: #4caf50;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 1rem;
+      color: #4caf50;
+    }
+
+    .upload-drop-zone {
+      border: 2px dashed rgba(76, 175, 80, 0.5);
+      border-radius: 0.75rem;
+      padding: 3rem;
+      text-align: center;
+      background: rgba(76, 175, 80, 0.05);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .upload-drop-zone:hover {
+      border-color: rgba(76, 175, 80, 0.8);
+      background: rgba(76, 175, 80, 0.1);
+    }
+
+    .upload-drop-zone.drag-over {
+      border-color: #4caf50;
+      background: rgba(76, 175, 80, 0.15);
+    }
+
+    .upload-drop-zone p {
+      color: #a0a0a0;
+      font-size: 0.95rem;
+    }
+
+    #fileList {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(76, 175, 80, 0.05);
+      border-radius: 0.5rem;
+      border-left: 3px solid #4caf50;
+      color: #81c784;
+    }
+
+    #uploadStatusBox {
+      margin-top: 1rem;
+      padding: 1rem;
+      background: rgba(76, 175, 80, 0.1);
+      border-left: 3px solid #4caf50;
+      color: #81c784;
+      border-radius: 0.5rem;
     }
 
     .marquee-bar {
-      height: 8px;
-      background: repeating-linear-gradient(
-        45deg,
-        #facc15,
-        #facc15 10px,
-        #000 10px,
-        #000 20px
-      );
-      background-size: 40px 100%;
-      animation: marquee 0.5s linear infinite;
+      height: 4px;
+      background: linear-gradient(90deg, #4caf50, #81c784, #4caf50);
+      background-size: 200% 100%;
+      animation: shimmer 2s infinite;
+      border-radius: 0.25rem;
+      margin-top: 1rem;
     }
 
-    @keyframes marquee {
-      from { background-position: 0 0; }
-      to { background-position: 40px 0; }
+    @keyframes shimmer {
+      0%, 100% { background-position: 0% center; }
+      50% { background-position: 100% center; }
     }
 
-    .input {
-      background: #111827;
-      color: #fff;
-      border: 1px solid #4b5563;
+    .btn-upload {
+      background: linear-gradient(135deg, #4caf50 0%, #81c784 100%);
+      color: white;
+      padding: 1rem;
+      font-weight: 700;
+      border: none;
       border-radius: 0.5rem;
-      padding: 0.5rem 0.75rem;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.3s ease;
+      margin-top: 1.5rem;
     }
 
-    .input:focus {
-      outline: none;
-      border-color: #f59e0b;
+    .btn-upload:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(76, 175, 80, 0.3);
     }
 
-    .section {
-      border: 1px solid rgba(234, 179, 8, 0.3);
-      background: rgba(17, 24, 39, 0.5);
+    .status-ok {
+      background: rgba(76, 175, 80, 0.2);
+      border-left-color: #4caf50;
+      color: #81c784;
+    }
+
+    .status-error {
+      background: rgba(255, 107, 107, 0.2);
+      border-left-color: #ff6b6b;
+      color: #ff8e72;
+    }
+
+    input[type="file"] {
+      display: none;
     }
   </style>
 </head>
-<body class="bg-black text-white font-mono min-h-screen">
-  <div class="max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-6">
-    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 sm:mb-8">
-      <!-- Title -->
-      <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">
-        {{ tr("upload.header") }}
-      </h1>
-
-      <!-- Navigation -->
-      <div class="flex items-center gap-3 flex-wrap">
-        <a href="{{ url_for('library') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Library</a>
-        <a href="{{ url_for('watch') }}" class="text-green-400 underline text-sm sm:text-base">📺 Watch TV</a>
-        <a href="{{ url_for('channels') }}" class="text-purple-400 underline text-sm sm:text-base">🎯 Channels</a>
-        <a href="/mod_manager" class="text-cyan-400 underline text-sm sm:text-base">📦 Mods</a>
-        <a href="/patches" class="text-red-400 underline text-sm sm:text-base">🔧 Patches</a>
-      </div>
+<body>
+  <div class="container">
+    <header>
+      <h1>{{ tr("upload.header") }}</h1>
+      <nav class="nav-buttons">
+        <a href="{{ url_for('library') }}" class="btn btn-secondary">← Library</a>
+        <a href="{{ url_for('watch') }}" class="btn btn-secondary">📺 Watch TV</a>
+        <a href="{{ url_for('channels') }}" class="btn btn-channels">🎯 Channels</a>
+        <a href="/mod_manager" class="btn btn-mods">📦 Mods</a>
+        <a href="/patches" class="btn btn-patches">📋 Patches</a>
+      </nav>
     </header>
-    <!-- Status Messages -->
-    {% if request.args.get("ok") %}
-    <div class="bg-green-600 text-white text-center font-bold py-2 mb-4 rounded">
-      {{ tr("upload.status.ok") }}
-    </div>
-    {% elif request.args.get("error") == "hevc" %}
-    <div class="bg-red-600 text-white text-center font-bold py-2 mb-4 rounded">
-       {{ tr("upload.status.error_hevc") }}
-    </div>
-    {% elif request.args.get("error") %}
-    <div class="bg-red-600 text-white text-center font-bold py-2 mb-4 rounded">
-      ⚠️ {{ request.args.get("error") }}
-    </div>
-    {% endif %}
 
-    <!-- Upload Form -->
-    <form id="uploadForm" method="POST" action="/upload" enctype="multipart/form-data"
-          class="section rounded-lg p-6 mb-6"
-          ondrop="handleDrop(event)" ondragover="event.preventDefault()">
-
-      <div class="text-center mb-6">
-        <div class="text-4xl mb-3">📹</div>
-        <label for="fileInput" class="block cursor-pointer text-yellow-300 font-bold mb-2">
-          {{ tr("upload.form.label") }}
-        </label>
-        <p class="text-sm text-gray-400">{{ tr("upload.form.description") or "Drag & drop files or click to browse" }}</p>
+    <div class="main-content">
+      <!-- Status Messages -->
+      {% if request.args.get("ok") %}
+      <div class="card status-ok">
+        <p class="font-bold">✓ {{ tr("upload.status.ok") }}</p>
       </div>
+      {% elif request.args.get("error") == "hevc" %}
+      <div class="card status-error">
+        <p class="font-bold">⚠️ {{ tr("upload.status.error_hevc") }}</p>
+      </div>
+      {% elif request.args.get("error") %}
+      <div class="card status-error">
+        <p class="font-bold">⚠️ {{ request.args.get("error") }}</p>
+      </div>
+      {% endif %}
 
-      <input type="file" id="fileInput" name="videos[]" accept=".mp4" multiple class="hidden"
-             onchange="updateFileList(this.files)">
+      <!-- Upload Card -->
+      <div class="card">
+        <h2>📹 {{ tr("upload.header") }}</h2>
 
-      <!-- File List -->
-      <div id="fileList" class="text-sm text-gray-400 mb-4 italic text-center">{{ tr("upload.form.no_files") }}</div>
+        <form id="uploadForm" method="POST" action="/upload" enctype="multipart/form-data"
+              ondrop="handleDrop(event)" ondragover="event.preventDefault()">
 
-      <!-- Loading Bar -->
-      <div id="loadingBar" class="hidden mb-4 marquee-bar rounded overflow-hidden"></div>
+          <div class="upload-drop-zone" id="dropZone">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">📤</div>
+            <p style="font-size: 1.1rem; font-weight: 600; color: #81c784; margin-bottom: 0.5rem;">
+              {{ tr("upload.form.label") }}
+            </p>
+            <p>{{ tr("upload.form.description") or "Drag & drop files or click to browse" }}</p>
+            <input type="file" id="fileInput" name="videos[]" accept=".mp4,.mkv,.webm,.mov" multiple
+                   onchange="updateFileList(this.files)">
+          </div>
 
-      <!-- Status Box -->
-      <div id="uploadStatusBox" class="bg-gray-700 text-yellow-300 font-bold py-2 px-4 rounded mb-4 hidden"></div>
+          <!-- File List -->
+          <div id="fileList" class="hidden">
+            <strong>{{ tr("upload.form.selected") or "Selected files:" }}</strong>
+            <ul style="margin-top: 0.5rem; list-style: none;"></ul>
+          </div>
 
-      <!-- Submit Button -->
-      <button type="submit"
-              class="w-full bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded font-bold transition">
-        {{ tr("upload.form.button") or "Upload Videos" }}
-      </button>
-    </form>
+          <!-- Loading Bar -->
+          <div id="loadingBar" class="marquee-bar hidden"></div>
+
+          <!-- Status Box -->
+          <div id="uploadStatusBox" class="hidden"></div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn-upload">
+            {{ tr("upload.form.button") or "Upload Videos" }}
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 
   <script>
     const fileInput = document.getElementById("fileInput");
     const fileList = document.getElementById("fileList");
     const form = document.getElementById("uploadForm");
+    const dropZone = document.getElementById("dropZone");
     const loadingBar = document.getElementById("loadingBar");
     const statusBox = document.getElementById("uploadStatusBox");
 
     let polling = false;
 
-    form.addEventListener("click", (e) => {
-      if (fileInput.files.length === 0) {
-        fileInput.click();
-      }
+    dropZone.addEventListener("click", () => {
+      fileInput.click();
     });
 
-    form.addEventListener("submit", () => {
+    dropZone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dropZone.classList.add("drag-over");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("drag-over");
+    });
+
+    form.addEventListener("submit", (e) => {
+      dropZone.classList.remove("drag-over");
       loadingBar.classList.remove("hidden");
       statusBox.classList.remove("hidden");
       startStatusPolling();
@@ -141,17 +342,19 @@
 
     function updateFileList(files) {
       if (files.length === 0) {
-        fileList.textContent = "{{ tr('upload.form.no_files') }}";
+        fileList.classList.add("hidden");
         return;
       }
-      let list = Array.from(files)
-        .map(file => `• ${file.name}`)
-        .join("<br>");
-      fileList.innerHTML = list;
+      const list = fileList.querySelector("ul");
+      list.innerHTML = Array.from(files)
+        .map(file => `<li>• ${file.name}</li>`)
+        .join("");
+      fileList.classList.remove("hidden");
     }
 
     function handleDrop(e) {
       e.preventDefault();
+      dropZone.classList.remove("drag-over");
       fileInput.files = e.dataTransfer.files;
       updateFileList(e.dataTransfer.files);
     }
@@ -174,32 +377,31 @@
 
     window.addEventListener("dragover", e => e.preventDefault());
     window.addEventListener("drop", e => e.preventDefault());
-	
-	document.addEventListener("DOMContentLoaded", () => {
-	  const currentLang = "{{ lang }}";
-	  const sel = document.getElementById("upload-lang-select");
-	  if (sel && currentLang) {
-		sel.value = currentLang;
-	  }
 
-	  if (sel) {
-		sel.addEventListener("change", async (e) => {
-		  const newLang = e.target.value;
-		  if (!newLang || newLang === currentLang) return;
-		  try {
-			await fetch("/api/language", {
-			  method: "POST",
-			  headers: { "Content-Type": "application/json" },
-			  body: JSON.stringify({ lang: newLang })
-			});
-		  } catch (err) {
-			console.error("Error cambiando idioma:", err);
-		  }
-		  location.reload();
-		});
-	  }
-	});
-	
+    document.addEventListener("DOMContentLoaded", () => {
+      const currentLang = "{{ lang }}";
+      const sel = document.getElementById("upload-lang-select");
+      if (sel && currentLang) {
+        sel.value = currentLang;
+      }
+
+      if (sel) {
+        sel.addEventListener("change", async (e) => {
+          const newLang = e.target.value;
+          if (!newLang || newLang === currentLang) return;
+          try {
+            await fetch("/api/language", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ lang: newLang })
+            });
+          } catch (err) {
+            console.error("Error cambiando idioma:", err);
+          }
+          location.reload();
+        });
+      }
+    });
   </script>
 </body>
 </html>
