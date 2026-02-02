@@ -3416,43 +3416,6 @@ def api_power():
     return jsonify({"ok": False, "error": "unsupported action"}), 400
 
  
-@app.route("/api/gaming", methods=["POST"])
-def api_gaming():
-    """
-    Cambiar entre TVArgenta y modo juegos (RetroPie).
-
-    action:
-      - "enter" -> apaga TVArgenta y arranca EmulationStation (via enter-gaming.service)
-      - "exit"  -> mata EmulationStation y vuelve a TVArgenta (via return-tvargenta.service)
-    """
-    data = request.get_json(force=True) or {}
-    action = (data.get("action") or "").lower()
-
-    try:
-        if action == "enter":
-            subprocess.Popen([
-                "/usr/bin/sudo",
-                "/bin/systemctl",
-                "start",
-                "enter-gaming.service"
-            ])
-            return jsonify({"ok": True, "switched": "to_gaming"})
-
-        elif action == "exit":
-            subprocess.Popen([
-                "/usr/bin/sudo",
-                "/bin/systemctl",
-                "start",
-                "return-tvargenta.service"
-            ])
-            return jsonify({"ok": True, "switched": "to_tv"})
-
-        else:
-            return jsonify({"ok": False, "error": "unsupported action"}), 400
-
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
 @app.route("/api/bt/ensure", methods=["POST"])
 def api_bt_ensure():
     """
@@ -4482,12 +4445,26 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"[APP] Aviso: no pude matar encoders previos: {e}")
 
-    # Lanzar encoder limpio
-    try:
-        encoder_proc = subprocess.Popen(["python3", encoder_path], start_new_session=True)
-    except Exception as e:
-        print(f"[APP] No se pudo lanzar el encoder: {e}")
-        encoder_proc = None
+    # Lanzar encoder limpio (only if encoder_mod is enabled)
+    encoder_proc = None
+    if mod_registry and mod_registry.get_mod('encoder_mod'):
+        encoder_mod = mod_registry.get_mod('encoder_mod')
+        if encoder_mod and encoder_mod.manifest and encoder_mod.manifest.enabled:
+            try:
+                encoder_proc = subprocess.Popen(["python3", encoder_path], start_new_session=True)
+                print("[APP] Encoder launched (encoder_mod enabled)")
+            except Exception as e:
+                print(f"[APP] No se pudo lanzar el encoder: {e}")
+                encoder_proc = None
+        else:
+            print("[APP] Encoder not started (encoder_mod disabled)")
+    else:
+        try:
+            encoder_proc = subprocess.Popen(["python3", encoder_path], start_new_session=True)
+            print("[APP] Encoder launched (mod not found, using default)")
+        except Exception as e:
+            print(f"[APP] No se pudo lanzar el encoder: {e}")
+            encoder_proc = None
 
     # Lanzar NFC reader daemon for VCR (only if vcr_mod is enabled)
     nfc_reader_path = str(Path(APP_DIR, "nfc_reader.py"))

@@ -1,0 +1,11 @@
+{
+  "id": "encoder_mod",
+  "name": "Encoder & Gaming",
+  "version": "1.0.0",
+  "enabled": true,
+  "description": "NES controller encoder input and gaming mode (RetroPie) integration. Enable to use controller input and switch to gaming mode.",
+  "entry_point": "encoder_mod.handlers",
+  "author": "TVArgenta",
+  "dependencies": [],
+  "settings": {}
+}
