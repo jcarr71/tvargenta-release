@@ -518,6 +518,14 @@ setup_venv() {
     log_info "Setting directory permissions for ${CURRENT_USER}..."
     sudo chown -R "${CURRENT_USER}:${CURRENT_USER}" "${INSTALL_DIR}"
     sudo chmod -R 755 "${INSTALL_DIR}"
+    
+    # Explicitly fix content directory (created with sudo, may be root-owned)
+    if [[ -d "${INSTALL_DIR}/content" ]]; then
+        sudo chown -R "${CURRENT_USER}:${CURRENT_USER}" "${INSTALL_DIR}/content"
+        sudo chmod -R 755 "${INSTALL_DIR}/content"
+        log_info "Content directory permissions explicitly fixed"
+    fi
+    
     log_info "Directory permissions fixed"
 
     log_info "Python virtual environment setup complete!"
