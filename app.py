@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
+﻿# SPDX-License-Identifier: LicenseRef-TVArgenta-NC-Attribution-Consult-First
 # Project: TVArgenta â€” Retro TV
 # Author: Ricardo Sappia contact:rsflightronics@gmail.com
 # (c) 2025 Ricardo Sappia. All rights reserved.
@@ -12,6 +12,8 @@ import os
 import json
 import subprocess
 import fcntl
+import msvcrt
+import sys
 from contextlib import contextmanager
 from werkzeug.utils import secure_filename
 import tempfile
@@ -321,15 +323,26 @@ def metadata_lock(timeout=30):
         start = time.time()
         while True:
             try:
-                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if sys.platform == 'win32':
+                    # Windows: use msvcrt locking
+                    msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    # Unix/Linux: use fcntl locking
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break  # Lock acquired
-            except BlockingIOError:
+            except (BlockingIOError, OSError):
                 if time.time() - start > timeout:
                     raise TimeoutError(f"Could not acquire metadata lock within {timeout}s")
                 time.sleep(0.1)
         yield
     finally:
-        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        try:
+            if sys.platform == 'win32':
+                msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        except Exception:
+            pass
         lock_fd.close()
 
 
@@ -846,11 +859,11 @@ def get_video_url(video_id=None, series_path=None):
         return f"/videos/{video_id}.mp4"  # Fallback
     return None
 
-def escribir_estado(status):
+def write_status(status):
     with open(UPLOAD_STATUS, "w", encoding="utf-8") as f:
         f.write(status)
 
-def eliminar_estado():
+def delete_status():
     if UPLOAD_STATUS.exists(): UPLOAD_STATUS.unlink()
 
 def sincronizar_videos():
@@ -1046,20 +1059,39 @@ def load_ui_prefs():
         "timezone": cfg.get("timezone", "America/New_York")
     }
 
-def save_ui_prefs(prefs):
+def save_ui_prefs(prefs: dict) -> None:
     cfg = load_config()
+    # Ensure cfg has the expected structure and proper type
+    if not isinstance(cfg, dict):
+        cfg: dict = {}
+    else:
+        cfg: dict = cfg  # Type cast to dict
+    
+    # Initialize lists if not present
+    if "tags_prioridad" not in cfg:
+        cfg["tags_prioridad"] = []
+    if "tags_incluidos" not in cfg:
+        cfg["tags_incluidos"] = []
+    if "show_channel_name" not in cfg:
+        cfg["show_channel_name"] = True
+    if "timezone" not in cfg:
+        cfg["timezone"] = "America/New_York"
+    
+    # Update only the keys present in prefs
     if "show_channel_name" in prefs:
         cfg["show_channel_name"] = bool(prefs.get("show_channel_name", True))
     if "timezone" in prefs:
-        cfg["timezone"] = prefs.get("timezone", "America/New_York")
-        # Trigger timezone reload in settings module
+        cfg["timezone"] = str(prefs.get("timezone", "America/New_York"))
+    
+    # Trigger timezone reload in settings module
+    if "timezone" in prefs:
         try:
             from settings import reload_timezone
             reload_timezone()
         except Exception as e:
             logger.warning(f"[UI_PREFS] Could not reload timezone: {e}")
-    with open(config_FILE, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, indent=2, ensure_ascii=False)
+    
+    _write_json_atomic(config_FILE, cfg)
         
 
 
@@ -1165,7 +1197,7 @@ def _advance_splash_rotation():
     _save_splash_state({"index": idx})
     logger.info(f"[SPLASH] advanced -> idx={idx}")
 
-def _touch_frontend_ping(stage: str = None):
+def _touch_frontend_ping(stage: str | None = None) -> None:
     """Marca ultimo ping del frontend y, opcionalmente, la etapa."""
     global _last_frontend_ping, _last_frontend_stage
     _last_frontend_ping = time.monotonic()
@@ -1402,11 +1434,17 @@ def upload():
     print(f"ðŸ“¥ Archivos recibidos: {[f.filename for f in files]}")
 
     for file in files:
-        if not file.filename.lower().endswith(".mp4"):
-            escribir_estado(f"âŒ Archivo no permitido: {file.filename}")
+        if not file or not file.filename:
+            continue
+        
+        filename = secure_filename(file.filename)
+        # Extract file extension
+        file_ext = os.path.splitext(filename)[1].lower()
+        if file_ext not in SUPPORTED_VIDEO_FORMATS:
+            write_status(f"âŒ Archivo no permitido: {file.filename}")
             continue
 
-        escribir_estado("ðŸ“¥ Recibiendo archivo...")
+        write_status("ðŸ“¥ Recibiendo archivo...")
 
         filename = secure_filename(file.filename)
         video_id = os.path.splitext(filename)[0]
@@ -1418,7 +1456,7 @@ def upload():
 
         print(f"ðŸ”„ Procesando: {filename}")
         try:
-            escribir_estado("ðŸ“ Comprobando resoluciÃ³n...")
+            write_status("ðŸ“ Comprobando resoluciÃ³n...")
             width, height = get_video_resolution(temp_path)
             duracion = get_video_duration(temp_path)
             metadata[video_id] = metadata.get(video_id, {})
@@ -1426,10 +1464,10 @@ def upload():
             metadata[video_id]["extension"] = file_ext[1:]  # Store without the dot
             if width == 800 and height == 480:
                 shutil.copy(temp_path, final_path)
-                escribir_estado("âœ… Video ya estaba en 800x480. Copiado directo")
+                write_status("âœ… Video ya estaba en 800x480. Copiado directo")
                 print(f"âœ… Video ya estaba en 800x480. Copiado directo: {final_path}")
             else:
-                escribir_estado("âœ‚ï¸ Redimensionando video...")
+                write_status("âœ‚ï¸ Redimensionando video...")
                 subprocess.run([
                     "ffmpeg", "-i", temp_path,
                     "-vf", "scale=800:480:force_original_aspect_ratio=decrease,pad=800:480:(ow-iw)/2:(oh-ih)/2",
@@ -1438,16 +1476,16 @@ def upload():
                 ], check=True)
                 print(f"ðŸŽ› Video procesado con resize y crop: {final_path}")
         except Exception as e:
-            escribir_estado(f"âš ï¸ Error while procesar {filename}")
+            write_status(f"âš ï¸ Error while procesar {filename}")
             print(f"âš ï¸ Error while procesar {filename}: {e}")
         finally:
             os.remove(temp_path)
 
-        escribir_estado("ðŸ–¼ Generando thumbnail...")
+        write_status("ðŸ–¼ Generando thumbnail...")
         sanity_check_thumbnails(video_id)
-        escribir_estado("âœ… Â¡Listo che! ðŸ§‰")
+        write_status("âœ… Â¡Listo che! ðŸ§‰")
 
-    eliminar_estado()
+    delete_status()
     return redirect(url_for("index"))
 
 @app.route("/upload_status")
@@ -1518,7 +1556,8 @@ def update_group_color():
     
 @app.route("/add_group", methods=["POST"])
 def add_group():
-    group = request.form.get("group").strip()
+    group_input = request.form.get("group") or ""
+    group = group_input.strip()
     color = request.form.get("color") or "#cccccc"
     tags_data = load_tags()
 
@@ -1621,8 +1660,8 @@ def configuracion():
 
 
 
-@app.route("/guardar_configuracion", methods=["POST"])
-def guardar_configuracion():
+@app.route("/save_configuration", methods=["POST"])
+def save_configuration():
     prioridad = request.form.get("tags_prioridad", "")
     incluidos = request.form.getlist("tags_incluidos")
 
@@ -1855,7 +1894,11 @@ def api_next_video():
 
     # ====== NUEVO: Anti-repeticion por tiempo minimo global ======
     # Podes configurar por canal en canales.json: {"min_gap_minutes": 60}
-    MIN_GAP_MIN = int(config.get("min_gap_minutes", 60))  # default 60 min si no se define
+    min_gap_val = config.get("min_gap_minutes", 60)
+    if isinstance(min_gap_val, (list, tuple)):
+        MIN_GAP_MIN = 60
+    else:
+        MIN_GAP_MIN = int(min_gap_val) if min_gap_val else 60
     MIN_GAP_SEC = max(0, MIN_GAP_MIN) * 60
 
     plays_map = load_plays()  # << movido arriba for usarlo en el filtro
@@ -2680,7 +2723,7 @@ def channels():
 
     return render_template("channels.html", channels=channels_data, all_series=all_series, active_page='channels')
 
-@app.route("/guardar_channel", methods=["POST"])
+@app.route("/save_channel", methods=["POST"])
 def save_channel():
     channel_id = request.form.get("channel_id")
     nombre = request.form.get("nombre", "").strip()
@@ -2716,7 +2759,7 @@ def save_channel():
     return redirect(url_for("channels"))
 
 
-@app.route("/eliminar_channel/<channel_id>", methods=["POST"])
+@app.route("/delete_channel/<channel_id>", methods=["POST"])
 def delete_channel(channel_id):
     channels = load_channels()
     if channel_id in channels:
@@ -2724,12 +2767,12 @@ def delete_channel(channel_id):
         save_channels(channels)
     return redirect(url_for("channels"))
 
-@app.route("/editar_channel/<channel_id>")
+@app.route("/edit_channel/<channel_id>")
 def edit_channel(channel_id):
     # Editing is now inline, redirect to main channels page
     return redirect(url_for("channels"))
 
-@app.route("/api/set_canal_activo", methods=["POST"])
+@app.route("/api/set_channel_active", methods=["POST"])
 def api_set_channel_active():
     data = request.get_json()
     channel_id = data.get("channel_id")
@@ -2737,16 +2780,16 @@ def api_set_channel_active():
         return jsonify({"error": "Canal no especificado"}), 400
 
     channels = load_channels()
-    if channel_id != "base" and channel_id not in canales:
-        return jsonify({"error": "Canal no vÃ¡lido"}), 404
+    if channel_id != "base" and channel_id not in channels:
+        return jsonify({"error": "Canal no válido"}), 404
 
-    set_canal_activo(channel_id)
+    set_channel_active(channel_id)
     return jsonify({"ok": True, "channel_id": channel_id})
 
 @app.route("/api/channels")
 def api_channels():
     channels_data = load_channels()
-    channel_active = get_canal_activo()
+    channel_active = get_channel_active()
 
     channels_list = []
     for channel_id, canal_info in channels_data.items():
@@ -2769,11 +2812,11 @@ def api_rebuild_schedule(channel_id):
     logger.info(f"[API] Rebuild schedule requested for channel: {channel_id}")
 
     channels = load_channels()
-    if channel_id not in canales:
+    if channel_id not in channels:
         return jsonify({"ok": False, "error": "Channel not found"}), 404
 
     channel = channels[channel_id]
-    if not canal.get("series_filter"):
+    if not channel.get("series_filter"):
         return jsonify({"ok": False, "error": "Channel has no series filter (not a broadcast channel)"}), 400
 
     try:
@@ -2785,7 +2828,7 @@ def api_rebuild_schedule(channel_id):
         scheduler.generate_daily_schedule(channel_id=channel_id)
         logger.info(f"[API] Daily schedule rebuilt for channel: {channel_id}")
 
-        return jsonify({"ok": True, "message": f"Schedule rebuilt successfully for {canal['nombre']}"})
+        return jsonify({"ok": True, "message": f"Schedule rebuilt successfully for {channel['nombre']}"})
     except Exception as e:
         logger.error(f"[API] Error rebuilding schedule for {channel_id}: {e}")
         return jsonify({"ok": False, "error": str(e)}), 500
@@ -3778,7 +3821,8 @@ def api_vcr_tapes_register():
         return jsonify({"ok": False, "error": "missing_video_id"}), 400
 
     try:
-        tape = vcr_manager.register_tape(uid, video_id, title)
+        title_str = title or ""
+        tape = vcr_manager.register_tape(uid, video_id, title_str)
         logger.info(f"[API][VCR] tape registered: uid={uid} video={video_id}")
 
         # Check if this tape is currently inserted (unknown_tape_uid matches)
@@ -4146,10 +4190,18 @@ def api_vcr_record_upload():
         return jsonify({"ok": False, "error": "no_file"}), 400
 
     file = request.files["video"]
-    if not file.filename:
+    if not file or not file.filename:
+        _vcr_recording_state_write({
+            "recording": False,
+            "status": "failed",
+            "error": "empty_filename",
+        })
         return jsonify({"ok": False, "error": "empty_filename"}), 400
 
-    if not file.filename.lower().endswith(".mp4"):
+    filename = secure_filename(file.filename)
+    # Extract file extension
+    file_ext = os.path.splitext(filename)[1].lower()
+    if file_ext not in SUPPORTED_VIDEO_FORMATS:
         _vcr_recording_state_write({
             "recording": False,
             "status": "failed",
@@ -4302,7 +4354,7 @@ def _i18n_before_request():
     # Mapear endpoints Flask -> nombre base de JSON de pagina
     endpoint_to_page = {
         # Dashboard / gestion
-        "library": "index",
+        "gestion": "index",
         "index": "index",
 
         # Tags
@@ -4321,7 +4373,7 @@ def _i18n_before_request():
         "eliminar_canal": "canales",
         
          # modo tele
-        "watch": "watch",
+        "vertele": "vertele",
         
         "wifi_setup": "wifi_setup"
 
@@ -4332,7 +4384,7 @@ def _i18n_before_request():
         # etc.
     }
 
-    page = endpoint_to_page.get(request.endpoint)
+    page = endpoint_to_page.get(request.endpoint or "")
 
     if page:
         page_trans = load_page_translations(lang, page)
@@ -4439,7 +4491,7 @@ if __name__ == "__main__":
     nfc_proc = None
     if mod_registry and mod_registry.get_mod('vcr_mod'):
         vcr_mod = mod_registry.get_mod('vcr_mod')
-        if vcr_mod.manifest.enabled:
+        if vcr_mod and vcr_mod.manifest and vcr_mod.manifest.enabled:
             try:
                 # Kill any existing NFC reader process
                 subprocess.run(["pkill", "-f", "nfc_reader.py"], check=False)
@@ -4475,7 +4527,7 @@ if __name__ == "__main__":
     try:
         if mod_registry and mod_registry.get_mod('scheduler_mod'):
             scheduler_mod = mod_registry.get_mod('scheduler_mod')
-            if scheduler_mod.manifest.enabled:
+            if scheduler_mod and scheduler_mod.manifest and scheduler_mod.manifest.enabled:
                 scheduler.initialize_scheduler()
                 print("[APP] Broadcast TV scheduler initialized (scheduler_mod enabled)")
             else:
@@ -4545,3 +4597,4 @@ if __name__ == "__main__":
     threading.Thread(target=kiosk_watchdog, daemon=True).start()
 
     app.run(debug=False, host="0.0.0.0")
+
