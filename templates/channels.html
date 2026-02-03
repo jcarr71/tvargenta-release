@@ -477,7 +477,7 @@
                                         <input type="checkbox" id="series-{{ key }}-{{ loop.index0 }}" name="series_filter" 
                                                value="{{ series.folder_name }}"
                                                {% if series.folder_name in (channel.series_filter or []) %}checked{% endif %}>
-                                        <label for="series-{{ key }}-{{ loop.index0 }}">{{ series.nombre }}</label>
+                                        <label for="series-{{ key }}-{{ loop.index0 }}">{{ series.display_name }}</label>
                                     </div>
                                     {% endfor %}
                                 </div>
@@ -532,7 +532,7 @@
                             {% for series in all_series %}
                             <div class="checkbox-item">
                                 <input type="checkbox" id="series-new-{{ loop.index0 }}" name="series_filter" value="{{ series.folder_name }}">
-                                <label for="series-new-{{ loop.index0 }}">{{ series.nombre }}</label>
+                                <label for="series-new-{{ loop.index0 }}">{{ series.display_name }}</label>
                             </div>
                             {% endfor %}
                         </div>
