@@ -118,7 +118,7 @@
   <div class="mt-4 text-center">
     <h2 id="channel-name" class="text-lg text-green-400 font-bold">📡 Select Channel</h2>
   </div>
-	<!-- SELECCIÓN DE CANAL -->
+	<!-- CHANNEL SELECTION -->
   <div id="canales-container" class="mb-6 text-center">
     <div id="canales-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4 justify-center"></div>
     <p id="canal-activo" class="text-sm text-gray-400 mt-2"></p>
@@ -234,29 +234,33 @@
 	  i18nInit().then(() => {
 		loadNextVideo();
 	  });
-        if (!res.ok) throw new Error("{{ tr('vertele.channel.error') }}");
-        return res.json();
-      })
-      .then(data => {
-        if (!data || !data.canales) return;
 
-        data.canales.forEach(canal => {
-          if (!canal.id) return;
+	  // Load channels
+	  fetch("/api/channels")
+		.then(res => {
+		  if (!res.ok) throw new Error("{{ tr('vertele.channel.error') }}");
+		  return res.json();
+		})
+		.then(data => {
+		  if (!data || !data.channels) return;
 
-          const btn = document.createElement("button");
-          btn.textContent = `${canal.icono || "📺"} ${canal.nombre}`;
-          btn.setAttribute("aria-label", `Seleccionar canal ${canal.nombre}`);
-          btn.className = "bg-gray-800 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-bold";
-          btn.onclick = () => setCanalActivo(canal.id);
-          canalesGrid.appendChild(btn);
-        });
+		  data.channels.forEach(channel => {
+			if (!channel.id) return;
 
-        canalActivoLabel.textContent = `📡 Current channel: ${data.canal_activo_nombre}`;
-        channelNameEl.textContent = `📡 ${data.canal_activo_nombre}`;
-      })
-      .catch(err => {
-        console.error("Error al cargar canales:", err);
-      });
+			const btn = document.createElement("button");
+			btn.textContent = `${channel.icono || "📺"} ${channel.nombre}`;
+			btn.setAttribute("aria-label", `Select channel ${channel.nombre}`);
+			btn.className = "bg-gray-800 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-bold";
+			btn.onclick = () => setCanalActivo(channel.id);
+			canalesGrid.appendChild(btn);
+		  });
+
+		  canalActivoLabel.textContent = `📡 Current channel: ${data.active_channel_name}`;
+		  channelNameEl.textContent = `📡 ${data.active_channel_name}`;
+		})
+		.catch(err => {
+		  console.error("Error loading channels:", err);
+		});
 
     function setCanalActivo(id) {
       fetch("/api/set_channel_active", {
