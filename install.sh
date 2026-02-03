@@ -797,6 +797,33 @@ build_encoder() {
 }
 
 # =============================================================================
+# FINALIZE PERMISSIONS
+# Ensures all application directories are owned by the correct user
+# Uses SUDO_USER (who ran sudo) or falls back to jason for root installs
+# =============================================================================
+finalize_permissions() {
+    log_info "Finalizing directory permissions..."
+    
+    local INSTALL_DIR="/srv/tv-cbia"
+    local APP_USER="${SUDO_USER:-jason}"
+    
+    # Ensure all directories in /srv/tv-cbia are owned by the app user
+    if [[ -d "$INSTALL_DIR" ]]; then
+        sudo chown -R "${APP_USER}:${APP_USER}" "$INSTALL_DIR"
+        sudo chmod -R 755 "$INSTALL_DIR"
+        log_info "Set ownership of ${INSTALL_DIR} to ${APP_USER}"
+    fi
+    
+    # Ensure venv is executable
+    if [[ -d "${INSTALL_DIR}/venv" ]]; then
+        sudo chmod -R u+x "${INSTALL_DIR}/venv/bin"
+        log_info "Made venv binaries executable"
+    fi
+    
+    log_info "Permission finalization complete!"
+}
+
+# =============================================================================
 # MAIN
 # =============================================================================
 main() {
@@ -854,6 +881,7 @@ main() {
             setup_audio
             generate_test_pattern
             setup_display
+            finalize_permissions
             ;;
         *)
             echo "Usage: $0 {command}"
