@@ -34,9 +34,9 @@ import socket
 from pathlib import Path
 from settings import (
     ROOT_DIR, APP_DIR, CONTENT_DIR, VIDEO_DIR, THUMB_DIR,
-    METADATA_FILE, TAGS_FILE, config_FILE, CHANNELS_FILE, CHANNEL_ACTIVE_FILE,
+    METADATA_FILE, TAGS_FILE, CONFIG_FILE, CHANNELS_FILE, CHANNEL_ACTIVE_FILE,
     SPLASH_DIR, SPLASH_STATE_FILE, INTRO_PATH, CHROME_PROFILE, CHROME_CACHE,
-    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, config_PATH, LOG_DIR, I18N_DIR,
+    PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
     SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR,
 )
@@ -85,7 +85,7 @@ except Exception as e:
     mod_registry = None
 
 def _hdr(name):
-    # mini helper to log origen de las requests
+    # mini helper to log origin of the requests
     ref = request.headers.get("Referer", "-")
     ua  = request.headers.get("User-Agent", "-")
     ip  = request.headers.get("X-Forwarded-For") or request.remote_addr
@@ -122,7 +122,7 @@ DEFAULT_CHANNEL_ACTIVE = {"channel_id": "1"}
 SUPPORTED_VIDEO_FORMATS = ('.mp4', '.mkv', '.webm', '.mov')
 
 _ap_auto_stop_timer = None
-_AP_AUTO_STOP_SECONDS = 120  # ajustar si queres (2 minutos by default)
+_AP_AUTO_STOP_SECONDS = 120  # adjust if you want (2 minutes by default)
 
 # Ensure AP mode is not active when Flask starts
 try:
@@ -146,7 +146,7 @@ def _start_ap_auto_stop_timer():
             # if still in AP mode, force stop
             if st.get("mode") == "ap":
                 wifi_manager.stop_ap_mode()
-                logger.info("[WiFi][Timer] stop_ap_mode() ejecutado por timer")
+                logger.info("[WiFi][Timer] stop_ap_mode() executed by timer")
         except Exception as e:
             logger.warning(f"[WiFi][Timer] Error during auto-stop: {e}")
 
@@ -155,27 +155,27 @@ def _start_ap_auto_stop_timer():
     _ap_auto_stop_timer.start()
 
 
-DEFAULT_VOL = 25  # % volumen by default
+DEFAULT_VOL = 25  # % volume by default
 
 def init_volumen_por_defecto():
-    """If volume file does not exist, lo crea con DEFAULT_VOL y notifica al front."""
+    """If volume file does not exist, create it with DEFAULT_VOL and notify the front."""
     try:
         if not os.path.exists(VOLUMEN_PATH):
             with open(VOLUMEN_PATH, "w") as f:
                 json.dump({"valor": DEFAULT_VOL}, f)
-            # notify frontend for que levante el valor inicial
+            # notify frontend to pick up the initial value
             with open("/tmp/trigger_volumen.json", "w") as f:
                 json.dump({"timestamp": time.time()}, f)
-            logger.info(f"[VOLUMEN] Default inicializado en {DEFAULT_VOL}%")
+            logger.info(f"[VOLUME] Default initialized at {DEFAULT_VOL}%")
     except Exception as e:
-        logger.warning(f"[VOLUMEN] No pude inicializar default: {e}")
+        logger.warning(f"[VOLUME] Could not initialize default: {e}")
 
 
 
 def get_next_splash_path():
     """
-    Elige el splash *for este arranque* sin avanzar todavÃ­a el Ã­ndice persistente.
-    Escribe la elecciÃ³n en /tmp for que /splash la use.
+    Choose the splash *for this boot* without advancing the persistent index yet.
+    Write the choice in /tmp for /splash to use.
     """
     try:
         files = sorted(
@@ -183,11 +183,11 @@ def get_next_splash_path():
             if f.lower().endswith(".mp4") and f.startswith("splash_")
         )
     except Exception as e:
-        logger.error(f"[SPLASH] no puedo listar {SPLASH_DIR}: {e}")
+        logger.error(f"[SPLASH] cannot list {SPLASH_DIR}: {e}")
         files = []
 
     if not files:
-        # fallback al que ya usabas
+        # fallback to the one you were already using
         path = INTRO_PATH if os.path.isfile(INTRO_PATH) else None
         logger.info(f"[SPLASH] fallback path={path}")
     else:
@@ -196,12 +196,12 @@ def get_next_splash_path():
         path = os.path.join(SPLASH_DIR, files[idx])
         logger.info(f"[SPLASH] choose idx={idx} file={files[idx]}")
 
-    # guardo la selecciÃ³n de este run
+    # save the selection for this run
     try:
         with open(CURRENT_SPLASH_FILE, "w", encoding="utf-8") as f:
             json.dump({"path": path}, f)
     except Exception as e:
-        logger.warning(f"[SPLASH] no pude escribir CURRENT_SPLASH_FILE: {e}")
+        logger.warning(f"[SPLASH] could not write CURRENT_SPLASH_FILE: {e}")
 
     return path
 
@@ -220,9 +220,9 @@ except Exception:
 
 os.makedirs(os.path.dirname(PLAYS_FILE), exist_ok=True)
 
-# Tags y grupos by default
+# Tags and groups by default
 DEFAULT_TAGS = {
-    "Personajes": {
+    "Characters": {
         "color": "#facc15",
         "tags": ["Mirtha", "Franchella", "Menem", "Cristina", "Milei"]
     },
@@ -238,9 +238,9 @@ DEFAULT_TAGS = {
 
 # Canales predefinidos (Channel 03 is a system channel, not stored here)
 DEFAULT_CHANNELS = {
-    "Canal de Prueba": {
+    "Test Channel": {
         "nombre": "Test",
-        "descripcion": "Canal de prueba",
+        "descripcion": "Test channel",
         "tags_prioridad": ["test"],
         "tags_excluidos": [],
         "icono": "mate.png",
@@ -251,29 +251,29 @@ DEFAULT_CHANNELS = {
 shown_videos_per_channel = {}
 
 # --- Anti-bounce / cooldown ---
-last_next_call = {}   # channel_id -> timestamp del ultimo /api/next_video servido
-NEXT_COOLDOWN = 0.5   # segundos de ventana anti-encadenados (reduced for responsiveness)
-STICKY_WINDOW = 1.0   # segundos (reduced for responsiveness)
+last_next_call = {}   # channel_id -> timestamp of last /api/next_video served
+NEXT_COOLDOWN = 0.5   # seconds of anti-chaining window (reduced for responsiveness)
+STICKY_WINDOW = 1.0   # seconds (reduced for responsiveness)
 last_choice_per_channel = {}  # channel_id -> {"video_id": str, "ts": float}
 
 # --- De-dupe primer NEXT por channel ---
 pending_pick = {}  # channel_id -> {"video_id": str, "ts": float}
-PENDING_TTL = 12.0  # segundos; reusar el mismo pick dentro de este tiempo
+PENDING_TTL = 12.0  # seconds; reuse the same pick within this time
 
 _last_trigger_mtime_served = 0.0  # for /api/should_reload (one-shot)
 _last_menu_mtime_served = 0.0
 _last_nav_mtime_served = 0.0
 _last_sel_mtime_served = 0.0
-# --- for distinguir el origen del trigger (p. ej. BTN_NEXT) ---
+# --- to distinguish the origin of the trigger (e.g. BTN_NEXT) ---
 _last_trigger_reason = ""
 _last_trigger_mtime  = 0.0
-_force_next_once     = False  # si True, el proximo /api/next_video ignora sticky/cooldown
+_force_next_once     = False  # if True, the next /api/next_video ignores sticky/cooldown
 
 # --- Boot / Frontend probes -------------------------------------------------
-_last_frontend_ping = 0.0  # epoch de Ãºltimo ping recibido
+_last_frontend_ping = 0.0  # epoch of last ping received
 _last_frontend_stage = "boot"
-PING_GRACE = 25.0  # segundos de gracia despuÃ©s de lanzar Chromium
-_watchdog_already_retry = False # evita relanzar Chromium mÃ¡s de 1 vez
+PING_GRACE = 25.0  # seconds of grace after launching Chromium
+_watchdog_already_retry = False # avoids relaunching Chromium more than 1 time
 
 if os.path.exists(TRIGGER_PATH):
     try:
@@ -282,15 +282,15 @@ if os.path.exists(TRIGGER_PATH):
         _last_trigger_mtime_served = 0.0
         
 def _write_json_atomic(path, data):
-    path = Path(path)  # acepta str o Path
+    path = Path(path)  # accepts str or Path
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    tmp = path.with_suffix(path.suffix + ".tmp")  # p.ej. plays.json.tmp
+    tmp = path.with_suffix(path.suffix + ".tmp")  # e.g. plays.json.tmp
     with tmp.open("w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.flush()
         os.fsync(f.fileno())
-    os.replace(tmp, path)  # atÃ³mico en el mismo fs
+    os.replace(tmp, path)  # atomic in the same fs
 
 def _ensure_json(path, data):
     path = Path(path)
@@ -358,32 +358,32 @@ def save_metadata(data):
 def _all_tags_from_tagsfile():
     """Returns the set of all tags defined in tags.json."""
     try:
-        tags_data = load_tags()  # ya la tenÃ©s definida mÃ¡s abajo
+        tags_data = load_tags()  # you already have it defined below
         return {t for grupo in tags_data.values() for t in grupo.get("tags", [])}
     except Exception:
         return set()
         
 def _bootstrap_config_from_tags_if_empty():
     """
-    If configuracion.json does not have 'tags_incluidos', populate it with ALL tags
-    de tags.json. Y si 'tags_prioridad' estÃ¡ vacÃ­o, lo iniciamos con el mismo orden.
+    If configuration.json does not have 'tags_incluidos', populate it with ALL tags
+    from tags.json. And if 'tags_prioridad' is empty, initialize it with the same order.
     """
     try:
-        cfg = load_config()  # <- esta funciÃ³n ya debe estar definida al momento de llamar
+        cfg = load_config()  # <- this function must already be defined at the time of calling
         if not cfg.get("tags_incluidos"):
             todos = sorted(_all_tags_from_tagsfile())
             if todos:
                 cfg["tags_incluidos"] = todos
                 if not cfg.get("tags_prioridad"):
                     cfg["tags_prioridad"] = todos[:]
-                _write_json_atomic(config_FILE, cfg)  # ATÃ“MICO
-                logger.info(f"[BOOT] Config inicial poblada con {len(todos)} tags from tags.json")
+                _write_json_atomic(CONFIG_FILE, cfg)  # ATOMIC
+                logger.info(f"[BOOT] Initial config populated with {len(todos)} tags from tags.json")
     except Exception as e:
-        logger.warning(f"[BOOT] No pude poblar configuracion from tags.json: {e}")
+        logger.warning(f"[BOOT] Could not populate configuration from tags.json: {e}")
 
-# Semillas de JSONs (no pisan si ya existen)
+# JSON seeds (do not overwrite if they already exist)
 _ensure_json(TAGS_FILE,       DEFAULT_TAGS)
-_ensure_json(config_FILE,     DEFAULT_CONFIG)
+_ensure_json(CONFIG_FILE,     DEFAULT_CONFIG)
 _ensure_json(CHANNELS_FILE,    DEFAULT_CHANNELS)
 _ensure_json(METADATA_FILE,   {})
 _ensure_json(CHANNEL_ACTIVE_FILE, DEFAULT_CHANNEL_ACTIVE)
@@ -393,7 +393,7 @@ _ensure_json(SERIES_FILE,     {})
 SERIES_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
 # Note: Channel 03 is a system channel (AV input) - it's injected at runtime
-# by the encoder and handled specially by /api/next_video. It's not stored in canales.json.
+# by the encoder and handled specially by /api/next_video. It's not stored in channels.json.
 
 # ============================================================================
 # SERIES HELPER FUNCTIONS
@@ -493,10 +493,10 @@ def scan_series_directories():
                     "season": existing.get("season") or season,
                     "episode": existing.get("episode") or episode,
                     "tags": existing.get("tags", []),
-                    "personaje": existing.get("personaje", ""),
-                    "fecha": existing.get("fecha", ""),
-                    "modo": existing.get("modo", []),
-                    "duracion": existing.get("duracion"),
+                    "character": existing.get("personaje", ""),
+                    "date": existing.get("fecha", ""),
+                    "mode": existing.get("modo", []),
+                    "duration": existing.get("duracion"),
                     "extension": video_file.suffix[1:]  # Store without the dot
                 }
                 logger.info(f"[SERIES] Added/updated metadata for {series_path}")
@@ -530,82 +530,82 @@ def generate_thumbnail(video_path, thumb_path):
 
 def load_config_i18n():
     """
-    Lee menu_configuracion.json y garantiza:
-    - Que exista el archivo.
-    - Que tenga la clave 'language'.
-    - Que los logs indiquen que se esta cargando.
+    Read menu_configuration.json and ensure:
+    - That the file exists.
+    - That it has the 'language' key.
+    - That the logs indicate that it is loading.
     """
     try:
-        if config_PATH.exists():
-            with open(config_PATH, "r", encoding="utf-8") as f:
+        if CONFIG_PATH.exists():
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
                 cfg = json.load(f) or {}
             if "language" not in cfg:
                 cfg["language"] = "en"
                 save_config_i18n(cfg)
                 logger.warning(
-                    f"[I18N] Falta 'language' en {config_PATH}, agregado 'en'."
+                    f"[I18N] Missing 'language' in {CONFIG_PATH}, added 'en'."
                 )
             #logger.info(
-            #    f"[I18N] Cargado config de {config_PATH} -> language={cfg.get('language')!r}"
+            #    f"[I18N] Loaded config from {CONFIG_PATH} -> language={cfg.get('language')!r}"
             #)
             return cfg
         else:
             cfg = {"language": "en"}
             save_config_i18n(cfg)
-            logger.warning(f"[I18N] {config_PATH} no existia. Creado con language='en'.")
+            logger.warning(f"[I18N] {CONFIG_PATH} did not exist. Created with language='en'.")
             return cfg
     except Exception as e:
-        logger.error(f"[I18N] Error leyendo {config_PATH}: {e}")
+        logger.error(f"[I18N] Error reading {CONFIG_PATH}: {e}")
         return {"language": "en"}
 
 
 def save_config_i18n(cfg):
     """
-    Persiste menu_configuracion.json y deja trazas claras en el journal.
+    Persist menu_configuration.json and leave clear traces in the journal.
     """
     try:
-        config_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(config_PATH, "w", encoding="utf-8") as f:
+        CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2, ensure_ascii=False)
         logger.info(
-            f"[I18N] Guardado OK -> {config_PATH} | language={cfg.get('language')} "
-            f"| claves={list(cfg.keys())}"
+            f"[I18N] Saved OK -> {CONFIG_PATH} | language={cfg.get('language')} "
+            f"| keys={list(cfg.keys())}"
         )
     except Exception as e:
-        logger.error(f"[I18N] Error guardando {config_PATH}: {e}")
+        logger.error(f"[I18N] Error saving {CONFIG_PATH}: {e}")
 
 def load_translations(lang):
     path = I18N_DIR / f"{lang}.json"
     if not path.exists():
-        logger.warning(f"[I18N] Base {lang}.json no existe, usando es.json")
+        logger.warning(f"[I18N] Base {lang}.json does not exist, using es.json")
         path = I18N_DIR / "es.json"
 
     try:
         with path.open("r", encoding="utf-8") as f:
             data = json.load(f) or {}
-        #logger.info(f"[I18N] Base {path.name} cargada con {len(data)} claves")
+        #logger.info(f"[I18N] Base {path.name} loaded with {len(data)} keys")
         return data
     except Exception as e:
-        logger.error(f"[I18N] Error leyendo {path}: {e}")
+        logger.error(f"[I18N] Error reading {path}: {e}")
         return {}
 
         
 def load_page_translations(lang: str, page: str) -> dict:
     """
-    Carga traducciones especificas de una pagina, p.ej. index_es.json.
+    Load specific translations for a page, e.g. index_es.json.
     """
     page_file = I18N_DIR / f"{page}_{lang}.json"
     if not page_file.exists():
-        logger.info(f"[I18N] No existe i18n de pagina: {page_file.name}")
+        logger.info(f"[I18N] Page i18n does not exist: {page_file.name}")
         return {}
 
     try:
         with page_file.open("r", encoding="utf-8") as f:
             data = json.load(f) or {}
-        logger.info(f"[I18N] Pagina {page_file.name} cargada con {len(data)} claves")
+        logger.info(f"[I18N] Page {page_file.name} loaded with {len(data)} keys")
         return data
     except Exception as e:
-        logger.error(f"[I18N] Error leyendo {page_file}: {e}")
+        logger.error(f"[I18N] Error reading {page_file}: {e}")
         return {}
 
  
@@ -618,19 +618,19 @@ def restart_kiosk(url="http://localhost:5000/tv"):
     chromium_log = "/tmp/chromium_kiosk.log"
 
     try:
-        # Cerrar sÃ³lo lo visible del browser
+        # Close only the visible browser
         subprocess.run(["pkill", "-f", "chromium"], check=False)
 
-        # Esperar X (:0) until ~12s
+        # Wait for X (:0) until ~12s
         for i in range(60):
             if os.path.exists("/tmp/.X11-unix/X0"):
                 break
             time.sleep(0.2)
         else:
-            logger.error("[KIOSK] DISPLAY :0 no disponible. Aborto lanzamiento.")
+            logger.error("[KIOSK] DISPLAY :0 not available. Abort launch.")
             return
 
-        # Esperar que Flask estÃ© sirviendo la URL raÃ­z (o /) before de lanzar
+        # Wait for Flask to be serving the root URL (or /) before launching
         import urllib.request
         for _ in range(30):
             try:
@@ -646,18 +646,18 @@ def restart_kiosk(url="http://localhost:5000/tv"):
                 os.makedirs(d, exist_ok=True)
                 os.chmod(d, 0o755)
             except Exception as e:
-                logger.warning(f"[KIOSK] No pude preforr {d}: {e}")
+                logger.warning(f"[KIOSK] Could not prepare {d}: {e}")
 
         chromium_bin = "/usr/bin/chromium-browser" if os.path.exists("/usr/bin/chromium-browser") else "/usr/bin/chromium"
         
-        # Limpieza de locks del perfil (when hay apagados bruscos quedan "Singleton*" y bloquea primer boot)
+        # Cleanup of profile locks (when there are sudden shutdowns, "Singleton*" files remain and block first boot)
         try:
             for fn in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
                 p = os.path.join(user_data_dir, fn)
                 if os.path.exists(p):
                     os.remove(p)
         except Exception as e:
-            print("[KIOSK] No pude limpiar locks de perfil:", e)
+            print("[KIOSK] Could not clean profile locks:", e)
 
         cmd = [
             chromium_bin,
@@ -672,28 +672,28 @@ def restart_kiosk(url="http://localhost:5000/tv"):
             "--disable-features=VaapiVideoDecoder",
             f"--user-data-dir={user_data_dir}",
             f"--disk-cache-dir={cache_dir}",
-            # logging de Chromium for primer boot:
+            # Chromium logging for first boot:
             "--enable-logging=stderr", 
             "--no-first-run",
             "--no-default-browser-check",
             "--log-level=2",
             
         ]
-        logger.info(f"[KIOSK] Lanzando: {' '.join(cmd)} DISPLAY={env.get('DISPLAY')} X0={'ok' if os.path.exists('/tmp/.X11-unix/X0') else 'NO'} bin={chromium_bin}")
+        logger.info(f"[KIOSK] Launching: {' '.join(cmd)} DISPLAY={env.get('DISPLAY')} X0={'ok' if os.path.exists('/tmp/.X11-unix/X0') else 'NO'} bin={chromium_bin}")
 
-        # Redirigimos stdout/stderr a archivo for diagnÃ³sticos post-boot
+        # Redirect stdout/stderr to file for post-boot diagnostics
         with open(chromium_log, "ab", buffering=0) as logf:
             subprocess.Popen(cmd, env=env, stdout=logf, stderr=logf)
             logger.info(f"[KIOSK] Chromium log -> {chromium_log}")
 
     except Exception as e:
-        logger.error(f"[KIOSK] Error lanzando Chromium: {e}")
+        logger.error(f"[KIOSK] Error launching Chromium: {e}")
 
     
 def launch_kiosk_once():
     try:
         if not os.path.exists(LAUNCH_FLAG):
-            # si existe intro flag, arrancamos mostrando la imagen de espera (pre-loader local)
+            # if intro flag exists, we start showing the waiting image (local pre-loader)
             if os.path.exists(INTRO_FLAG):
                 url = Path(APP_DIR, "templates", "kiosk_boot.html").as_uri()
             else:
@@ -702,7 +702,7 @@ def launch_kiosk_once():
             with open(LAUNCH_FLAG, "w") as f:
                 f.write("1")
     except Exception as e:
-        print("[KIOSK] Error lanzando Chromium:", e)
+        print("[KIOSK] Error launching Chromium:", e)
 
 
    
@@ -719,12 +719,12 @@ def save_channels(data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def load_config():
-    if os.path.exists(config_FILE):
-        with open(config_FILE, "r", encoding="utf-8") as f:
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {"tags_prioridad": [], "tags_incluidos": []}
     
-# Ruta for ver y gestionar tags
+# Route to view and manage tags
 def load_tags():
     with open(TAGS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -798,9 +798,9 @@ def sanity_check_thumbnails(video_id=None):
                     "-q:v", "4",
                     thumbnail_path
                 ], check=True)
-                print(f"âœ… Thumbnail generado: {thumbnail_path}")
+                print(f"✅ Thumbnail generated: {thumbnail_path}")
             except Exception as e:
-                print(f"âš ï¸ No se pudo generar thumbnail for {vid}. Se usarÃ¡ el by default. Error: {e}")
+                print(f"❌ Could not generate thumbnail for {vid}. Will use the default. Error: {e}")
 
 def get_video_resolution(filepath):
     try:
@@ -815,7 +815,7 @@ def get_video_resolution(filepath):
         width, height = map(int, result.stdout.strip().split("\n"))
         return width, height
     except Exception as e:
-        print(f"âš ï¸ Error while obtener resoluciÃ³n de {filepath}: {e}")
+        print(f"❌ Error while getting resolution of {filepath}: {e}")
         return None, None
 
 def get_video_file_with_extension(video_id_or_path, base_dir=None):
@@ -914,11 +914,11 @@ def sincronizar_videos():
             # Regular video - check in VIDEO_DIR
             return video_id in files_video
 
-    videos_validos = {k: v for k, v in metadata.items() if video_exists(k, v)}
-    videos_fantasmas = {k: v for k, v in metadata.items() if not video_exists(k, v)}
-    videos_nuevos = sorted(files_video - entradas_metadata)
+    valid_videos = {k: v for k, v in metadata.items() if video_exists(k, v)}
+    ghost_videos = {k: v for k, v in metadata.items() if not video_exists(k, v)}
+    new_videos = sorted(files_video - entradas_metadata)
 
-    return videos_validos, videos_fantasmas, videos_nuevos
+    return valid_videos, ghost_videos, new_videos
 
 
 def backup_tags():
@@ -926,14 +926,14 @@ def backup_tags():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_file = os.path.join(CONTENT_DIR, f"tags_backup_{timestamp}.json")
         shutil.copy(TAGS_FILE, backup_file)
-        print(f"ðŸ§¾ Backup creado: {backup_file}")
+        print(f"🗂️ Backup created: {backup_file}")
 
 
 def clean_config_tags(tags_data, config_data):
-    # Lista completa de tags vÃ¡lidos (los que existen actualmente)
+    # Complete list of valid tags (those that currently exist)
     valid_tags = {tag for info in tags_data.values() for tag in info["tags"]}
 
-    # Filtrar configuraciÃ³n y eliminar fantasmas
+    # Filter configuration and remove ghosts
     config_data["tags_prioridad"] = [t for t in config_data.get("tags_prioridad", []) if t in valid_tags]
     config_data["tags_incluidos"] = [t for t in config_data.get("tags_incluidos", []) if t in valid_tags]
 
@@ -949,7 +949,7 @@ def get_video_duration(filepath):
         ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         return float(result.stdout.strip())
     except Exception as e:
-        print(f"âš ï¸ No se pudo obtener duraciÃ³n de {filepath}: {e}")
+        print(f"❌ Could not get duration of {filepath}: {e}")
         return 0
 
 
@@ -1029,7 +1029,7 @@ def analyze_loudness(filepath):
 def ensure_durations():
     updated = False
     for video_id, info in metadata.items():
-        if "duracion" not in info:
+        if "duration" not in info:
             # Check series_path first, then fall back to VIDEO_DIR
             series_path = info.get("series_path")
             if series_path:
@@ -1038,14 +1038,14 @@ def ensure_durations():
                 filepath = os.path.join(VIDEO_DIR, f"{video_id}.mp4")
             if os.path.exists(filepath):
                 dur = get_video_duration(str(filepath))
-                metadata[video_id]["duracion"] = dur
+                metadata[video_id]["duration"] = dur
                 updated = True
     if updated:
         save_metadata(metadata)
-        print("ðŸ•' Duraciones actualizadas en metadata")
+        print("⏱️ Durations updated in metadata")
 
-def get_total_recuerdos():
-    total_sec = sum(v.get("duracion") or 0 for v in metadata.values())
+def get_total_memories():
+    total_sec = sum(v.get("duration") or 0 for v in metadata.values())
     horas = int(total_sec // 3600)
     minutos = int((total_sec % 3600) // 60)
 
@@ -1094,19 +1094,19 @@ def save_ui_prefs(prefs: dict) -> None:
         except Exception as e:
             logger.warning(f"[UI_PREFS] Could not reload timezone: {e}")
     
-    _write_json_atomic(config_FILE, cfg)
+    _write_json_atomic(CONFIG_FILE, cfg)
         
 
 
 def _read_json(path, default):
-    path = Path(path)  # acepta str o Path
+    path = Path(path)  # accepts str or Path
     try:
         with path.open("r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         return default
     except Exception:
-        # si estÃ¡ corrupto, devolvÃ© default
+        # if corrupted, return default
         return default
 
 
@@ -1140,7 +1140,7 @@ def _iso_to_ts(iso_str):
 
 def score_for_video(video_id, metadata, plays_map):
     md = metadata.get(video_id, {})
-    dur = float(md.get("duracion", 0.0))  # segundos
+    dur = float(md.get("duration", 0.0))  # seconds
     minutes = max(1, math.ceil(dur / 60.0))
 
     pinfo = plays_map.get(video_id, {"plays": 0, "last_played": None})
@@ -1148,15 +1148,15 @@ def score_for_video(video_id, metadata, plays_map):
     last_ts = _iso_to_ts(pinfo.get("last_played")) if pinfo.get("last_played") else 0.0
 
     plays_norm = plays / minutes
-    # jitter muy pequeÃ±o for no ser determinista total
+    # very small jitter to not be totally deterministic
     jitter = random.random() * 0.01
 
-    # Orden principal: menor plays_norm primero (mÃ¡s justo),
-    # then menos reciente (last_ts chico), then jitter
+    # Main order: lower plays_norm first (fairer),
+    # then less recent (small last_ts), then jitter
     return (plays_norm, last_ts, jitter)
 
 def _load_splash_state():
-    """Lee /srv/tv-cbia/Splash/splash_state.json -> {"index": int}"""
+    """Read /srv/tv-cbia/Splash/splash_state.json -> {"index": int}"""
     try:
         if os.path.exists(SPLASH_STATE_FILE):
             with open(SPLASH_STATE_FILE, "r", encoding="utf-8") as f:
@@ -1170,7 +1170,7 @@ def _load_splash_state():
 
 
 def _save_splash_state(state: dict):
-    """Escribe de forma atÃ³mica el estado de rotaciÃ³n."""
+    """Write the rotation state atomically."""
     try:
         path = Path(SPLASH_STATE_FILE)
         tmp = path.with_suffix(path.suffix + ".tmp")
@@ -1188,11 +1188,11 @@ def _advance_splash_rotation():
             if f.lower().endswith(".mp4") and f.startswith("splash_")
         )
     except Exception as e:
-        logger.error(f"[SPLASH] listar p/advance fallÃ³: {e}")
+        logger.error(f"[SPLASH] list for advance failed: {e}")
         files = []
 
     if not files:
-        logger.info("[SPLASH] sin archivos, no avanzo")
+        logger.info("[SPLASH] no files, not advancing")
         return
 
     st = _load_splash_state()
@@ -1201,29 +1201,29 @@ def _advance_splash_rotation():
     logger.info(f"[SPLASH] advanced -> idx={idx}")
 
 def _touch_frontend_ping(stage: str | None = None) -> None:
-    """Marca ultimo ping del frontend y, opcionalmente, la etapa."""
+    """Mark last ping from frontend and, optionally, the stage."""
     global _last_frontend_ping, _last_frontend_stage
     _last_frontend_ping = time.monotonic()
     if stage:
         _last_frontend_stage = stage
 
 
-# --- GestiÃ³n: /gestion -------------------------------------------------
+# --- Management: /management -------------------------------------------------
 
 def _ctx_library():
-    # Carga y saneos mÃ­nimos for que el dashboard estÃ© al dÃ­a
+    # Load and minimal sanity checks so the dashboard is up to date
     global metadata
     metadata = load_metadata()
     ensure_durations()
     sanity_check_thumbnails()
-    vids_ok, vids_fantasmas, vids_nuevos = sincronizar_videos()
+    vids_ok, ghost_vids, new_vids = sincronizar_videos()
     return dict(
         videos=vids_ok,
-        fantasmas=vids_fantasmas,
-        nuevos=vids_nuevos,
+        ghosts=ghost_vids,
+        new=new_vids,
         tags=load_tags(),
         config=load_config(),
-        recuerdos=get_total_recuerdos(),
+        memories=get_total_memories(),
         channels=load_channels(),
         active_page='library'
     )
@@ -1233,15 +1233,15 @@ def _ctx_library():
 def root():
     logger.info(_hdr("HIT /"))
     if os.path.exists(INTRO_FLAG):
-        # ElegÃ­ una sola vez el splash y dejÃ¡ registro for este run
+        # Choose the splash once and leave record for this run
         path = get_next_splash_path()
         if path and os.path.isfile(path):
-            logger.info("Intro flag presente -> /splash")
+            logger.info("Intro flag present -> /splash")
             return redirect(url_for("splash"))
         else:
-            logger.info("Intro flag presente, but sin splash vÃ¡lido -> /tv")
+            logger.info("Intro flag present, but no valid splash -> /tv")
             return redirect(url_for("tv"))
-    logger.info("Sin intro -> /tv")
+    logger.info("No intro -> /tv")
     return redirect(url_for("tv"))
 
 
@@ -1249,7 +1249,7 @@ def root():
 def video_detail(video_id):
     video = metadata.get(video_id)
     if not video:
-        return "Video no encontrado", 404
+        return "Video not found", 404
 
     # Determine video URL based on whether it's a series video
     series_path = video.get("series_path")
@@ -1273,9 +1273,9 @@ def edit_video(video_id):
             video_data = {
                 "title": form.get("title"),
                 "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
-                "personaje": form.get("personaje"),
-                "fecha": form.get("fecha"),
-                "modo": form.getlist("modo"),
+                "character": form.get("character"),
+                "date": form.get("date"),
+                "mode": form.getlist("mode"),
                 "category": "tv_episode",
                 "series": existing_video.get("series"),
                 "series_path": existing_video.get("series_path"),
@@ -1290,9 +1290,9 @@ def edit_video(video_id):
             video_data = {
                 "title": form.get("title"),
                 "tags": [tag.strip() for tag in tags.split(",") if tag.strip()],
-                "personaje": form.get("personaje"),
-                "fecha": form.get("fecha"),
-                "modo": form.getlist("modo"),
+                "character": form.get("character"),
+                "date": form.get("date"),
+                "mode": form.getlist("mode"),
                 "category": category
             }
             # Non-series videos don't have TV Episode fields
@@ -1300,26 +1300,29 @@ def edit_video(video_id):
             video_data["season"] = None
             video_data["episode"] = None
 
-        # Preserve existing fields like duracion
+        # Preserve existing fields like duration
         if video_id in metadata:
-            for key in ["duracion"]:
+            for key in ["duration"]:
                 if key in metadata[video_id]:
                     video_data[key] = metadata[video_id][key]
+                # Also check for old "duracion" key for backward compatibility
+                elif "duracion" in metadata[video_id]:
+                    video_data[key] = metadata[video_id]["duracion"]
 
         metadata[video_id] = video_data
         save_metadata(metadata)
         return redirect(url_for("index"))
 
-    # Cargar video y tags
+    # Load video and tags
     if video_id in metadata:
         video = metadata[video_id]
     else:
         video = {
             "title": video_id.replace("_", " "),
             "tags": [],
-            "personaje": "",
-            "fecha": "",
-            "modo": [],
+            "character": "",
+            "date": "",
+            "mode": [],
             "category": "vhs_tape",
             "series": None,
             "season": None,
@@ -1328,7 +1331,7 @@ def edit_video(video_id):
 
     selected_tags = video.get("tags", [])
     tags_data = load_tags()
-    tag_categoria = {tag: grupo for grupo, info in tags_data.items() for tag in info["tags"]}
+    tag_category = {tag: group for group, info in tags_data.items() for tag in info["tags"]}
 
     # For series videos, get display name
     series_name = video.get("series", "")
@@ -1338,7 +1341,7 @@ def edit_video(video_id):
                        video_id=video_id,
                        video=video,
                        selected_tags=selected_tags,
-                       tag_categoria=tag_categoria,
+                       tag_category=tag_category,
                        tags=tags_data,
                        is_series_video=is_series_video,
                        series_display=series_display)
@@ -1386,19 +1389,19 @@ def delete_full_video(video_id):
         video_path = os.path.join(VIDEO_DIR, video_id + ".mp4")
     if os.path.exists(video_path):
         os.remove(video_path)
-        print(f"ðŸ§¨ Video eliminado: {video_path}")
+        print(f"🗑️ Video deleted: {video_path}")
     else:
-        print(f"âš ï¸ Video no encontrado for: {video_id}")
+        print(f"❌ Video not found for: {video_id}")
 
     thumbnail_path = os.path.join(CONTENT_DIR, "thumbnails", video_id + ".jpg")
     if os.path.exists(thumbnail_path):
         os.remove(thumbnail_path)
-        print(f"ðŸ§¹ Thumbnail eliminado: {thumbnail_path}")
+        print(f"🗑️ Thumbnail deleted: {thumbnail_path}")
 
     if video_id in metadata:
         del metadata[video_id]
         save_metadata(metadata)
-        print(f"âœ… Metadata eliminada: {video_id}")
+        print(f"✅ Metadata deleted: {video_id}")
 
     return redirect(url_for("index"))
 
@@ -1408,10 +1411,10 @@ def delete_video_metadata(video_id):
     if video_id in metadata:
         del metadata[video_id]
         save_metadata(metadata)
-        print(f"âœ… Metadata eliminada for: {video_id}")
+        print(f"✅ Metadata deleted for: {video_id}")
         removed_any = True
     else:
-        print(f"â„¹ï¸ No hay metadata for: {video_id}")
+        print(f"ℹ️ No metadata for: {video_id}")
 
     thumbnail_path = os.path.join(CONTENT_DIR, "thumbnails", video_id + ".jpg")
     if os.path.exists(thumbnail_path):
@@ -1419,10 +1422,10 @@ def delete_video_metadata(video_id):
         print(f"ðŸ§¹ Thumbnail eliminado: {thumbnail_path}")
         removed_any = True
     else:
-        print(f"â„¹ï¸ No se encontrÃ³ thumbnail for: {video_id}")
+        print(f"ℹ️ No thumbnail found for: {video_id}")
 
     if not removed_any:
-        print(f"âš ï¸ Nada que borrar for: {video_id}")
+        print(f"❌ Nothing to delete for: {video_id}")
 
     return redirect(url_for("index"))
 
@@ -1434,7 +1437,7 @@ def upload():
     files = request.files.getlist("videos[]")
     os.makedirs(VIDEO_DIR, exist_ok=True)
 
-    print(f"ðŸ“¥ Archivos recibidos: {[f.filename for f in files]}")
+    print(f"📥 Files received: {[f.filename for f in files]}")
 
     for file in files:
         if not file or not file.filename:
@@ -1444,10 +1447,10 @@ def upload():
         # Extract file extension
         file_ext = os.path.splitext(filename)[1].lower()
         if file_ext not in SUPPORTED_VIDEO_FORMATS:
-            write_status(f"âŒ Archivo no permitido: {file.filename}")
+            write_status(f"❌ File not allowed: {file.filename}")
             continue
 
-        write_status("ðŸ“¥ Recibiendo archivo...")
+        write_status("📥 Receiving file...")
 
         filename = secure_filename(file.filename)
         video_id = os.path.splitext(filename)[0]
@@ -1457,36 +1460,36 @@ def upload():
             temp_path = tmp.name
             file.save(temp_path)
 
-        print(f"ðŸ”„ Procesando: {filename}")
+        print(f"🔄 Processing: {filename}")
         try:
-            write_status("ðŸ“ Comprobando resoluciÃ³n...")
+            write_status("🔍 Checking resolution...")
             width, height = get_video_resolution(temp_path)
             duracion = get_video_duration(temp_path)
             metadata[video_id] = metadata.get(video_id, {})
-            metadata[video_id]["duracion"] = duracion
+            metadata[video_id]["duration"] = duracion
             metadata[video_id]["extension"] = file_ext[1:]  # Store without the dot
             if width == 800 and height == 480:
                 shutil.copy(temp_path, final_path)
-                write_status("âœ… Video ya estaba en 800x480. Copiado directo")
-                print(f"âœ… Video ya estaba en 800x480. Copiado directo: {final_path}")
+                write_status("✅ Video was already at 800x480. Copied directly")
+                print(f"✅ Video was already at 800x480. Copied directly: {final_path}")
             else:
-                write_status("âœ‚ï¸ Redimensionando video...")
+                write_status("🔄 Resizing video...")
                 subprocess.run([
                     "ffmpeg", "-i", temp_path,
                     "-vf", "scale=800:480:force_original_aspect_ratio=decrease,pad=800:480:(ow-iw)/2:(oh-ih)/2",
                     "-c:a", "copy",
                     "-y", final_path
                 ], check=True)
-                print(f"ðŸŽ› Video procesado con resize y crop: {final_path}")
+                print(f"🎥 Video processed with resize and crop: {final_path}")
         except Exception as e:
-            write_status(f"âš ï¸ Error while procesar {filename}")
-            print(f"âš ï¸ Error while procesar {filename}: {e}")
+            write_status(f"❌ Error while processing {filename}")
+            print(f"❌ Error while processing {filename}: {e}")
         finally:
             os.remove(temp_path)
 
-        write_status("ðŸ–¼ Generando thumbnail...")
+        write_status("🖼️ Generating thumbnail...")
         sanity_check_thumbnails(video_id)
-        write_status("âœ… Â¡Listo che! ðŸ§‰")
+        write_status("✅ Done! 👍")
 
     delete_status()
     return redirect(url_for("index"))
@@ -1497,7 +1500,7 @@ def upload_status():
         with open(UPLOAD_STATUS, "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
-        return "Sin actividad"
+        return "No activity"
         
 @app.route("/tags")
 def tags():
@@ -1524,10 +1527,9 @@ def add_tag():
 
     save_tags(tags_data)
 
-    # Agregar a configuracion.json si no existe
-    config_path = os.path.join(CONTENT_DIR, "configuracion.json")
-    if os.path.exists(config_path):
-        with open(config_path, "r", encoding="utf-8") as f:
+    # Add to configuration.json if it doesn't exist
+    if CONFIG_FILE.exists():
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             config = json.load(f)
     else:
         config = {"tags_prioridad": [], "tags_incluidos": []}
@@ -1537,7 +1539,7 @@ def add_tag():
     if tag not in config["tags_incluidos"]:
         config["tags_incluidos"].append(tag)
 
-    with open(config_path, "w", encoding="utf-8") as f:
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
 
     return redirect(url_for("tags", from_edit=return_to))
@@ -1574,7 +1576,7 @@ def add_group():
 def delete_tag():
     tag = request.form.get("tag")
     group = request.form.get("group")
-    return_to = request.form.get("from_edit")  # for redirigir correctamente
+    return_to = request.form.get("from_edit")  # to redirect correctly
 
     if not tag or not group:
         return redirect(url_for("tags", from_edit=return_to))
@@ -1589,20 +1591,19 @@ def delete_tag():
             if tag in video.get("tags", []):
                 video["tags"].remove(tag)
 
-        # Guardar ambos archivos
+        # Save both files
         save_tags(tags_data)
         save_metadata(metadata)
 
-        # Eliminar de configuracion.json tambiÃ©n
-        config_path = os.path.join(CONTENT_DIR, "configuracion.json")
-        if os.path.exists(config_path):
-            with open(config_path, "r", encoding="utf-8") as f:
+        # Also remove from configuration.json
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
             config["tags_prioridad"] = [t for t in config.get("tags_prioridad", []) if t != tag]
             config["tags_incluidos"] = [t for t in config.get("tags_incluidos", []) if t != tag]
 
-            with open(config_path, "w", encoding="utf-8") as f:
+            with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2, ensure_ascii=False)
 
     return redirect(url_for("tags", from_edit=return_to))
@@ -1619,47 +1620,47 @@ def delete_group():
     tags_data = load_tags()
 
     if group in tags_data:
-        backup_tags()  # before de modificar nada
+        backup_tags()  # before modifying anything
 
-        # Tags del grupo a eliminar
+        # Tags of the group to delete
         tags_to_remove = tags_data[group]["tags"]
 
-        # Eliminar del metadata
+        # Remove from metadata
         for video in metadata.values():
             video["tags"] = [t for t in video.get("tags", []) if t not in tags_to_remove]
 
-        # Eliminar del tags.json
+        # Remove from tags.json
         del tags_data[group]
         save_tags(tags_data)
 
-        # Eliminar del configuracion.json
+        # Remove from configuration.json
         config = load_config()
         config["tags_prioridad"] = [t for t in config.get("tags_prioridad", []) if t not in tags_to_remove]
         config["tags_incluidos"] = [t for t in config.get("tags_incluidos", []) if t not in tags_to_remove]
-        with open(config_FILE, "w", encoding="utf-8") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
-        # Guardar metadata
+        # Save metadata
         save_metadata(metadata)
 
-        print(f"ðŸ—‘ Grupo eliminado: {group} (y sus tags)")
+        print(f"🗑️ Group deleted: {group} (and its tags)")
 
     return redirect(url_for("tags", from_edit=return_to))
 
 
-@app.route("/configuracion", methods=["GET", "POST"])
-def configuracion():
+@app.route("/configuration", methods=["GET", "POST"])
+def configuration():
     tags_data = load_tags()
     config_data = load_config()
 
-    # ðŸ’¡ Sanity check: remover tags que ya no existen
+    # 💡 Sanity check: remove tags that no longer exist
     config_data = clean_config_tags(tags_data, config_data)
 
-    # Guardar si hubo algÃºn cambio
-    with open(config_FILE, "w", encoding="utf-8") as f:
+    # Save if there was any change
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=2, ensure_ascii=False)
 
-    return render_template("configuracion.html", tags=tags_data, config=config_data)
+    return render_template("configuration.html", tags=tags_data, config=config_data)
 
 
 
@@ -1668,7 +1669,7 @@ def save_configuration():
     prioridad = request.form.get("tags_prioridad", "")
     incluidos = request.form.getlist("tags_incluidos")
 
-    # Solo mantener en prioridad los tags incluidos
+    # Only keep in priority the included tags
     orden_final = [tag.strip() for tag in prioridad.split(",") if tag.strip() and tag.strip() in incluidos]
 
     config = {
@@ -1677,13 +1678,13 @@ def save_configuration():
     }
 
     try:
-        with open(config_FILE, "w", encoding="utf-8") as f:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
-        print("âœ… ConfiguraciÃ³n guardada")
+        print("✅ Configuration saved")
     except Exception as e:
-        print(f"âŒ Error while guardar configuraciÃ³n: {e}")
+        print(f"❌ Error while saving configuration: {e}")
 
-    return redirect(url_for("configuracion"))
+    return redirect(url_for("configuration"))
 
 @app.route("/watch")
 def watch():
@@ -1693,7 +1694,7 @@ def watch():
     channel_active = None
 
     if not os.path.exists(channel_active_path):
-        # Elegí un id real: primero el de DEFAULT_CHANNEL_ACTIVE si existe, si no, el primer channel disponible
+        # Choose a real id: first the one from DEFAULT_CHANNEL_ACTIVE if it exists, otherwise the first available channel
         preferido = DEFAULT_CHANNEL_ACTIVE.get("channel_id", "1")
         if preferido not in channels:
             preferido = next(iter(channels.keys()), "1")
@@ -1706,7 +1707,7 @@ def watch():
             channel_active = activo_data.get("channel_id") or DEFAULT_CHANNEL_ACTIVE.get("channel_id", "1")
             if channel_active not in channels and channels:
                 channel_active = next(iter(channels.keys()))
-                set_channel_active(channel_active)  # persisti la migracion
+                set_channel_active(channel_active)  # persist the migration
 
     return render_template("watch.html",
                            channels=channels,
@@ -1788,7 +1789,7 @@ def api_next_video():
                 channel_id = activo["channel_id"]
                 config = channels[channel_id]
     
-    # --- De-dupe: si hay pick pendiente "fresco", reusalo ---
+    # --- De-dupe: if there's a fresh pending pick, reuse it ---
     now = time.time()
     pp = pending_pick.get(channel_id)
     if (not force_next) and pp and (now - pp.get("ts", 0.0)) < PENDING_TTL:
@@ -1796,7 +1797,7 @@ def api_next_video():
         info = metadata.get(vid, {})
         series_path = info.get("series_path")
         video_url = get_video_url(video_id=vid, series_path=series_path)
-        logger.info(f"[NEXT-DUPE] Reuso pick pendiente channel={channel_id} video={vid}")
+        logger.info(f"[NEXT-DUPE] Reuse pending pick channel={channel_id} video={vid}")
         return jsonify({
             "video_id": vid,
             "video_url": video_url,
@@ -1832,12 +1833,12 @@ def api_next_video():
                 "sticky": True
             })
 
-    # --- Cooldown por channel ---
+    # --- Cooldown per channel ---
     now = time.time()
     ultimo = last_next_call.get(channel_id, 0.0)
     sticky = last_choice_per_channel.get(channel_id)
     if (not force_next) and (now - ultimo) < NEXT_COOLDOWN and sticky and (now - sticky["ts"]) >= STICKY_WINDOW:
-        logger.info(f"[NEXT] cooldown channel={channel_id} dt={now-ultimo:.2f}s -> bloqueo")
+        logger.info(f"[NEXT] cooldown channel={channel_id} dt={now-ultimo:.2f}s -> blocked")
         return jsonify({"cooldown": True, "channel_id": channel_id}), 200
 
     # --- Series filter: if channel has series_filter, only show TV Episodes from those series ---
@@ -1849,11 +1850,11 @@ def api_next_video():
 
     # Only require tags_incluidos for non-series channels
     if not incluidos and not series_filter_set:
-        return jsonify({"error": "No hay tags incluidos definidos en la configuracion."}), 400
+        return jsonify({"error": "No included tags defined in the configuration."}), 400
 
     channel_shown = shown_videos_per_channel.get(channel_id, [])
 
-    # ====== (ya lo tenias) tags del ultimo video del channel ======
+    # ====== (you already had it) tags from the last video of the channel ======
     prev = last_choice_per_channel.get(channel_id)
     last_tags = set()
     if prev:
@@ -1867,7 +1868,7 @@ def api_next_video():
         for vid, ser in tv_episodes[:5]:  # Log first 5
             logger.info(f"[NEXT]   - {vid}: series={ser}, match={ser in series_filter_set if ser else False}")
 
-    # --- Candidatos por tags e ineditos en el channel ---
+    # --- Candidates by tags and unseen in the channel ---
     candidatos = []
     for video_id, data in metadata.items():
         if video_id in channel_shown:
@@ -1895,8 +1896,8 @@ def api_next_video():
         overlap = len(video_tags & last_tags)
         candidatos.append((video_id, data, tag_score, video_tags, overlap))
 
-    # ====== NUEVO: Anti-repeticion por tiempo minimo global ======
-    # Podes configurar por canal en canales.json: {"min_gap_minutes": 60}
+    # ====== NEW: Anti-repetition by minimum global time ======
+    # You can configure per channel in channels.json: {"min_gap_minutes": 60}
     min_gap_val = config.get("min_gap_minutes", 60)
     if isinstance(min_gap_val, (list, tuple)):
         MIN_GAP_MIN = 60
@@ -1904,7 +1905,7 @@ def api_next_video():
         MIN_GAP_MIN = int(min_gap_val) if min_gap_val else 60
     MIN_GAP_SEC = max(0, MIN_GAP_MIN) * 60
 
-    plays_map = load_plays()  # << movido arriba for usarlo en el filtro
+    plays_map = load_plays()  # << moved up to use it in the filter
     now_ts = time.time()
 
     def _age_seconds(vid):
@@ -1914,23 +1915,23 @@ def api_next_video():
 
     # 1) Filtrado estricto: excluir todo lo “demasiado fresco”
     candidata_ok = [t for t in candidatos if _age_seconds(t[0]) >= MIN_GAP_SEC]
-    # Guardamos tambien los rechazados for fallback
+    # We also save the rejected ones for fallback
     candidata_frescos = [t for t in candidatos if _age_seconds(t[0]) <  MIN_GAP_SEC]
 
     # Si te quedaste sin nada por el gap, relajamos: usamos los “menos frescos” primero
     if not candidata_ok and candidata_frescos:
-        logger.info(f"[NEXT] Relax gap: no candidates >= {MIN_GAP_MIN} min; usando los mas antiguos entre los frescos")
+        logger.info(f"[NEXT] Relax gap: no candidates >= {MIN_GAP_MIN} min; using the oldest among the fresh ones")
         # Ordenar frescos por mayor edad primero (los que estan mas cerca de cumplir el gap)
         candidata_ok = sorted(
             candidata_frescos,
             key=lambda t: (_age_seconds(t[0]) * -1)  # mayor edad -> primero
         )
 
-    # Reemplazamos la lista original por la filtrada/relajada
+    # We replace the original list with the filtered/relaxed one
     candidatos = candidata_ok
     # ============================================================
 
-    # Si no quedan, limpia "ya vistos" y reintenta
+    # If none left, clean "already seen" and retry
     if not candidatos:
         if channel_shown:
             shown_videos_per_channel[channel_id] = []
@@ -1943,7 +1944,7 @@ def api_next_video():
     def sort_key(t):
         video_id, data, tag_score, video_tags, overlap = t
         plays_norm, last_ts, jitter = score_for_video(video_id, metadata, plays_map)
-        # ascendente: plays_norm, menos reciente, menos overlap, mas prioridad, jitter
+        # ascending: plays_norm, less recent, less overlap, more priority, jitter
         return (plays_norm, last_ts, overlap, -tag_score, jitter)
 
     candidatos.sort(key=sort_key)
@@ -1958,9 +1959,9 @@ def api_next_video():
 
     fair_plays_norm, fair_last_ts, _ = score_for_video(elegido_id, metadata, plays_map)
     edad_s = _age_seconds(elegido_id)  # for debug
-    logger.info(f"[NEXT] channel={channel_id} elegido={elegido_id} tagscore={tag_score} plays_norm={fair_plays_norm:.3f} overlap_prev={elegido_overlap} age={edad_s:.0f}s gap={MIN_GAP_MIN}m")
+    logger.info(f"[NEXT] channel={channel_id} chosen={elegido_id} tagscore={tag_score} plays_norm={fair_plays_norm:.3f} overlap_prev={elegido_overlap} age={edad_s:.0f}s gap={MIN_GAP_MIN}m")
 
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Reproduciendo video: {elegido_id} del channel {channel_id}")
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}] [API] Playing video: {elegido_id} from channel {channel_id}")
     last_choice_per_channel[channel_id] = {"video_id": elegido_id, "ts": time.time()}
 
     # Determine video path - series videos use series_path, regular videos use video_id
@@ -2122,7 +2123,7 @@ def api_series():
                     "title": v.get("title", video_id),
                     "season": v.get("season") or 1,
                     "episode": v.get("episode") or 0,
-                    "duration": v.get("duracion", 0)
+                    "duration": v.get("duration", 0)
                 })
 
         # Group episodes by season
@@ -2332,10 +2333,10 @@ def upload_series_post():
                 "season": season,
                 "episode": episode,
                 "tags": [],
-                "personaje": "",
-                "fecha": "",
-                "modo": [],
-                "duracion": duracion
+                "character": "",
+                "date": "",
+                "mode": [],
+                "duration": duracion
             }
 
             # Generate thumbnail
@@ -2383,9 +2384,9 @@ def get_commercials_list():
             commercials.append({
                 "video_id": video_id,
                 "title": data.get("title", video_id),
-                "duration": data.get("duracion", 0),
+                "duration": data.get("duration", 0),
                 "tags": data.get("tags", []),
-                "fecha": data.get("fecha", ""),
+                "date": data.get("fecha", ""),
             })
     # Sort by title
     commercials.sort(key=lambda x: x["title"].lower())
@@ -2495,10 +2496,10 @@ def upload_commercials_post():
                 "category": "commercial",
                 "commercials_path": commercials_path,
                 "tags": [],
-                "personaje": "",
-                "fecha": "",
-                "modo": [],
-                "duracion": duracion
+                "character": "",
+                "date": "",
+                "mode": [],
+                "duration": duracion
             }
 
             # Generate thumbnail
@@ -2581,7 +2582,7 @@ def api_commercials():
             commercials.append({
                 "video_id": video_id,
                 "title": data.get("title", video_id),
-                "duration": data.get("duracion", 0),
+                "duration": data.get("duration", 0),
                 "tags": data.get("tags", [])
             })
 
@@ -2604,7 +2605,7 @@ def api_movies():
             movies.append({
                 "video_id": video_id,
                 "title": data.get("title", video_id),
-                "duration": data.get("duracion", 0)
+                "duration": data.get("duration", 0)
             })
 
     movies.sort(key=lambda x: x["title"].lower())
@@ -2694,11 +2695,11 @@ def upload_movies_post():
             metadata[video_id] = {
                 "title": title,
                 "category": "movie",
-                "duracion": duration,
-                "fecha": datetime.now().strftime("%Y-%m-%d"),
+                "duration": duration,
+                "date": datetime.now().strftime("%Y-%m-%d"),
                 "tags": [],
-                "personaje": "",
-                "modo": []
+                "character": "",
+                "mode": []
             }
 
             results.append({"filename": file.filename, "ok": True, "video_id": video_id})
@@ -2741,7 +2742,7 @@ def save_channel():
 
     channels = load_channels()
 
-    # Si es nuevo, generar ID automÃ¡ticamente
+    # If it's new, generate ID automatically
     if not channel_id:
         existing_ids = [int(k) for k in channels.keys() if k.isdigit()]
         channel_id = str(max(existing_ids, default=0) + 1)
@@ -2780,11 +2781,11 @@ def api_set_channel_active():
     data = request.get_json()
     channel_id = data.get("channel_id")
     if not channel_id:
-        return jsonify({"error": "Canal no especificado"}), 400
+        return jsonify({"error": "Channel not specified"}), 400
 
     channels = load_channels()
     if channel_id != "base" and channel_id not in channels:
-        return jsonify({"error": "Canal no válido"}), 404
+        return jsonify({"error": "Invalid channel"}), 404
 
     set_channel_active(channel_id)
     return jsonify({"ok": True, "channel_id": channel_id})
@@ -2795,18 +2796,18 @@ def api_channels():
     channel_active = get_channel_active()
 
     channels_list = []
-    for channel_id, canal_info in channels_data.items():
+    for channel_id, channel_info in channels_data.items():
         channels_list.append({
             "id": channel_id,
-            "nombre": canal_info.get("nombre", channel_id),
-            "icono": canal_info.get("icono", "ðŸ“º")
+            "nombre": channel_info.get("nombre", channel_id),
+            "icono": channel_info.get("icono", "ðŸ“º")
         })
 
-    nombre_activo = channels_data.get(channel_active, {}).get("nombre", "Canal Base")
+    nombre_activo = channels_data.get(channel_active, {}).get("nombre", "Base Channel")
 
     return jsonify({
-        "canales": channels_list,
-        "canal_activo_nombre": nombre_activo
+        "channels": channels_list,
+        "active_channel_name": nombre_activo
     })
 
 @app.route("/api/rebuild_schedule/<channel_id>", methods=["POST"])
@@ -2847,17 +2848,16 @@ def tv():
     else:
         metadata = {}
 
-    # Tus funciones existentes
+    # Your existing functions
     ensure_durations()
-    sanity_check_thumbnails()
-    videos_validos, videos_fantasmas, videos_nuevos = sincronizar_videos()
+    videos_validos, ghost_vids, new_vids = sincronizar_videos()
 
     return render_template(
         "player.html",   
         videos=videos_validos,
-        fantasmas=videos_fantasmas,
-        nuevos=videos_nuevos,
-        recuerdos=get_total_recuerdos()
+        ghosts=ghost_vids,
+        new=new_vids,
+        memories=get_total_memories()
     )
 
     
@@ -2870,9 +2870,9 @@ def api_should_reload():
 
     mtime = os.path.getmtime(TRIGGER_PATH)
 
-    # Disforr SOLO si hay un mtime nuevo que no se sirvio aun
+    # Trigger ONLY if there's a new mtime that hasn't been served yet
     if mtime > _last_trigger_mtime_served:
-        # Leer la razon del trigger (si esta)
+        # Read the reason for the trigger (if present)
         try:
             with open(TRIGGER_PATH, "r") as f:
                 data = json.load(f)
@@ -2882,7 +2882,7 @@ def api_should_reload():
 
         _last_trigger_mtime = mtime
 
-        # Si viene del boton fisico, forzamos el proximo NEXT
+        # If it comes from the physical button, we force the next NEXT
         if _last_trigger_reason == "BTN_NEXT":
             _force_next_once = True
 
@@ -2897,7 +2897,7 @@ def api_should_reload():
 def api_volumen():
     if request.method == "POST":
         data = request.get_json()
-        nuevo_valor = max(0, min(100, data.get("valor", 50)))  # rango 0â€“100
+        nuevo_valor = max(0, min(100, data.get("valor", 50)))  # range 0-100
         with open(VOLUMEN_PATH, "w") as f:
             json.dump({"valor": nuevo_valor}, f)
         return jsonify({"ok": True, "valor": nuevo_valor})
@@ -2923,9 +2923,9 @@ def api_volumen_ping():
 @app.route("/api/menu_ping")
 def api_menu_ping():
     """
-    Devuelve True si hubo un 'touch' reciente del encoder for abrir/confirmar menÃº.
-    Recomendado: el proceso del encoder escribe/actualiza MENU_TRIGGER_PATH
-    al detectar flanco de bajada SIN giro previo.
+    Returns True if there was a recent 'touch' from the encoder to open/confirm menu.
+    Recommended: the encoder process writes/updates MENU_TRIGGER_PATH
+    when detecting falling edge WITHOUT previous rotation.
     """
     global _last_menu_mtime_served
     path = "/tmp/trigger_menu.json"
@@ -2934,7 +2934,7 @@ def api_menu_ping():
 
     mtime = os.path.getmtime(path)
 
-    # Sirve una sola vez por cada nuevo mtime (borde ascendente)
+    # Serves once for each new mtime (rising edge)
     if mtime > _last_menu_mtime_served:
         _last_menu_mtime_served = mtime
         return jsonify({"ping": True, "ts": mtime})
@@ -2957,7 +2957,7 @@ def api_menu_state():
     
 @app.route("/api/menu_nav")
 def api_menu_nav():
-    """One-shot: devuelve delta (+1/-1) una sola vez por trigger"""
+    """One-shot: returns delta (+1/-1) only once per trigger"""
     global _last_nav_mtime_served
     if not os.path.exists(MENU_NAV_PATH):
         return jsonify({"ping": False})
@@ -2971,7 +2971,7 @@ def api_menu_nav():
     
 @app.route("/api/menu_select")
 def api_menu_select():
-    """One-shot: confirma selecciÃ³n actual"""
+    """One-shot: confirms current selection"""
     global _last_sel_mtime_served
     if not os.path.exists(MENU_SELECT_PATH):
         return jsonify({"ping": False})
@@ -2999,9 +2999,9 @@ def api_played():
         for cid, pp in list(pending_pick.items()):
             if pp.get("video_id") == video_id:
                 pending_pick.pop(cid, None)
-                logger.info(f"[PLAYED] confirm canal={cid} video={video_id} -> limpio pending_pick")
+                logger.info(f"[PLAYED] confirm channel={cid} video={video_id} -> clean pending_pick")
     except Exception as e:
-        logger.warning(f"[PLAYED] limpiar pending_pick: {e}")
+        logger.warning(f"[PLAYED] clean pending_pick: {e}")
 
     if not video_id:
         return jsonify({"ok": False, "error": "missing video_id"}), 400
@@ -3025,13 +3025,13 @@ from pathlib import Path
 def splash():
     logger.info(_hdr("HIT /splash"))
 
-    # 1) Intentar usar la elecciÃ³n guardada (si existe)
+    # 1) Try to use the saved choice (if exists)
     splash_path = None
     try:
         cur = Path(CURRENT_SPLASH_FILE)  # CURRENT_SPLASH_FILE viene de settings (str o Path)
         if cur.exists():
             d = json.loads(cur.read_text(encoding="utf-8"))
-            # Puede venir como str; normalizamos a Path
+            # It can come as str; we normalize to Path
             p = d.get("path")
             if p:
                 candidate = Path(p)
@@ -3040,26 +3040,26 @@ def splash():
     except Exception as e:
         logger.warning(f"[SPLASH] no pude leer CURRENT_SPLASH_FILE: {e}")
 
-    # 2) Fallback: pedir el siguiente splash
+    # 2) Fallback: request the next splash
     if splash_path is None or not splash_path.is_file():
         nxt = get_next_splash_path()
-        # get_next_splash_path puede devolver str o None
+        # get_next_splash_path can return str or None
         if nxt:
             nxtp = Path(nxt)
             splash_path = nxtp if nxtp.is_file() else None
 
-    # 3) Si seguimos sin splash vÃ¡lido, no romper la vista
+    # 3) If we still don't have a valid splash, don't break the view
     if splash_path is None:
-        logger.info("[SPLASH] No hay splash disponible; omitiendo pantalla de splash.")
-        # OpciÃ³n A: devolver 204 (sin contenido) y que el front avance
+        logger.info("[SPLASH] No splash available; skipping splash screen.")
+        # Option A: return 204 (no content) and let the front advance
         return "", 204
-        # OpciÃ³n B (alternativa): redirigir directo a la TV
+        # Option B (alternative): redirect directly to TV
         # return redirect(url_for("tv"))
 
-    logger.info(f"[SPLASH] Usando video: {splash_path}")
+    logger.info(f"[SPLASH] Using video: {splash_path}")
 
-    # 4) Construir URL del archivo asegurando que tenemos un nombre vÃ¡lido
-    filename = splash_path.name  # equivalente a os.path.basename(...)
+    # 4) Build file URL ensuring we have a valid name
+    filename = splash_path.name  # equivalent to os.path.basename(...)
     return render_template(
         "splash.html",
         video_url=url_for("serve_splash_video", filename=filename),
@@ -3070,7 +3070,7 @@ def splash():
 
 @app.route("/api/clear_intro", methods=["POST"])
 def api_clear_intro():
-    logger.info(_hdr("POST /api/clear_intro -> borro INTRO_FLAG y avanzo rotaciÃ³n"))
+    logger.info(_hdr("POST /api/clear_intro -> delete INTRO_FLAG and advance rotation"))
     try:
         _advance_splash_rotation()
     except Exception as e:
@@ -3356,7 +3356,7 @@ def intro_video():
 
 @app.route("/api/boot_probe", methods=["POST", "GET"])
 def api_boot_probe():
-    # Primer latido apenas carga splash.html (o player.html)
+    # First heartbeat as soon as splash.html (or player.html) loads
     stage = request.args.get("stage") or "boot"
     _touch_frontend_ping(stage)
     #logger.info(f"[PING] boot_probe stage={stage}")
@@ -3377,10 +3377,10 @@ def api_kiosk_ping():
 
 @app.route("/api/ping", methods=["POST", "GET"])
 def api_ping():
-    # Heartbeat periÃ³dico from splash/player
+    # Periodic heartbeat from splash/player
     stage = request.args.get("stage") or "unknown"
     _touch_frontend_ping(stage)
-    # DevolvÃ© algo ultra liviano for logs de Chromium si querÃ©s
+    # Return something ultra light for Chromium logs if you want
     return jsonify(ok=True, stage=stage)
     
 
@@ -3388,12 +3388,12 @@ def api_ping():
 def library():
     return render_template("index.html", **_ctx_library())
 
-# Alias de compatibilidad: si en algÃºn lado quedÃ³ url_for("index"), redirige a /gestion
+# Compatibility alias: if somewhere url_for("index") remained, redirect to /management
 @app.route("/index")
 def index():
     return redirect(url_for("library"))
 
-# (Opcional) atajo cÃ³modo
+# (Optional) convenient shortcut
 @app.route("/admin")
 def admin():
     return redirect(url_for("library"))
@@ -3406,9 +3406,9 @@ def api_power():
     action = (data.get("action") or "").lower()
     if action == "halt":
         try:
-            # Opcional: log visible
-            print("[API] Halt solicitado from UIâ€¦")
-            # Lanza el halt (no bloquea)
+            # Optional: visible log
+            print("[API] Halt requested from UI...")
+            # Launch the halt (no blocking)
             subprocess.Popen(["sudo", "/sbin/shutdown", "-h", "now"])
             return jsonify({"ok": True, "action": "halt"})
         except Exception as e:
@@ -3419,8 +3419,8 @@ def api_power():
 @app.route("/api/bt/ensure", methods=["POST"])
 def api_bt_ensure():
     """
-    Asegura que el adaptador BT este encendido y con agente.
-    Llamalo when entras al menu Bluetooth en el OSD.
+    Ensure the BT adapter is on and with agent.
+    Call it when you enter the Bluetooth menu in the OSD.
     """
     try:
         bluetooth_manager.ensure_adapter_on()
@@ -3620,21 +3620,21 @@ def api_wifi_stop_ap():
 def api_wifi_qr():
     target = request.args.get("target", "library")
 
-    # 1️⃣ QR for gestion de contenido (solo si hay IP valida)
+    # 1️⃣ QR for content management (only if valid IP)
     if target == "library":
         ip = wifi_manager._get_iface_ipv4_addr(wifi_manager.WIFI_IFACE)
         if not ip:
-            logger.warning("[WiFi][QR] sin IPv4 asignada -> offline, no genero QR")
+            logger.warning("[WiFi][QR] no IPv4 assigned -> offline, no QR generated")
             return jsonify({
                 "ok": False,
                 "offline": True,
-                "message": "TVArgenta esta funcionando offline. Conectala a WiFi o cable for gestionarla from otro dispositivo."
+                "message": "TVArgenta is working offline. Connect it to WiFi or cable to manage it from another device."
             })
         url = f"http://{ip}:5000/gestion"
         qr = wifi_manager._make_qr_data_url(url)
         return jsonify({"ok": True, "url": url, "qr_data": qr})
 
-    # 2️⃣ QR for setup when la RPi esta en modo AP
+    # 2️⃣ QR for setup when the RPi is in AP mode
     elif target == "ap_url":
         info = wifi_manager._read_json(wifi_manager.AP_STATE_FILE, {})
         ap_ip = info.get("ap_ip") or wifi_manager._get_iface_ipv4_addr(wifi_manager.WIFI_IFACE)
@@ -3642,13 +3642,13 @@ def api_wifi_qr():
             return jsonify({
                 "ok": False,
                 "offline": True,
-                "message": "El punto de acceso aun no esta listo."
+                "message": "The access point is not ready yet."
             })
         url = f"http://{ap_ip}:5000/wifi_setup"
         qr = wifi_manager._make_qr_data_url(url)
         return jsonify({"ok": True, "url": url, "qr_data": qr})
 
-    # 3️⃣ whichquier otro target literal
+    # 3️⃣ any other literal target
     else:
         qr = wifi_manager._make_qr_data_url(target)
         return jsonify({"ok": True, "url": target, "qr_data": qr})
@@ -3766,7 +3766,7 @@ def api_vcr_tapes():
             video_info = vcr_manager.get_video_info(tape.get("video_id", ""))
             if video_info:
                 tape["video_title"] = video_info.get("title", tape.get("video_id"))
-                tape["video_duration"] = video_info.get("duracion", 0)
+                tape["video_duration"] = video_info.get("duration", 0)
         return jsonify({"ok": True, "tapes": tapes})
     except Exception as e:
         logger.error(f"[API][VCR] tapes list error: {e}")
@@ -3877,7 +3877,7 @@ def api_vcr_videos():
             videos.append({
                 "video_id": video_id,
                 "title": info.get("title", video_id),
-                "duration": info.get("duracion", 0),
+                "duration": info.get("duration", 0),
             })
             seen_ids.add(video_id)
 
@@ -4216,7 +4216,7 @@ def api_vcr_record_upload():
         metadata = vcr_manager._read_json(METADATA_FILE, {})
         metadata[video_id] = {
             "title": video_id,
-            "duracion": duration,
+            "duration": duration,
         }
         vcr_manager._write_json_atomic(METADATA_FILE, metadata)
 
@@ -4311,41 +4311,41 @@ def _i18n_before_request():
     cfg = load_config_i18n()
     lang = cfg.get("language", "es")
 
-    # Override por querystring (?lang=en) for pruebas
+    # Override by querystring (?lang=en) for testing
     lang = request.args.get("lang", lang)
 
-    # Base global (es.json, en.json, de.json)
+    # Global base (es.json, en.json, de.json)
     translations = load_translations(lang)
 
-    # Mapear endpoints Flask -> nombre base de JSON de pagina
+    # Map Flask endpoints -> base name of page JSON
     endpoint_to_page = {
-        # Dashboard / gestion
+        # Dashboard / management
         "gestion": "index",
         "index": "index",
 
         # Tags
         "tags": "tags",
         
-         # Configuracion
-        "configuracion": "configuracion",
+         # Configuration
+        "configuration": "configuration",
         
          # Upload
         "upload": "upload",
         
-         # Canales
-        "canales": "canales",
-        "editar_canal": "canales",
-        "guardar_canal": "canales",
-        "eliminar_canal": "canales",
+         # Channels
+        "channels": "channels",
+        "editar_canal": "channels",
+        "guardar_canal": "channels",
+        "eliminar_canal": "channels",
         
-         # modo tele
+         # TV mode
         "vertele": "vertele",
         
         "wifi_setup": "wifi_setup"
 
-        # Si despues queres i18n por pagina:
-        # "canales": "canales",
-        # "configuracion": "configuracion",
+        # If later you want i18n per page:
+        # "channels": "channels",
+        # "configuration": "configuration",
         # "upload": "upload",
         # etc.
     }
@@ -4369,7 +4369,7 @@ def _i18n_before_request():
 
 
 def tr(key: str):
-    """Traduccion directa from el diccionario cargado."""
+    """Direct translation from the loaded dictionary."""
     return g.translations.get(key, key)
 
 @app.context_processor
@@ -4379,14 +4379,14 @@ def inject_i18n():
  
 @app.get("/api/lang")
 def api_lang():
-    """Devuelve el idioma actual (for JS en player.html)"""
+    """Returns the current language (for JS in player.html)"""
     return jsonify({"lang": g.lang})
     
 @app.get("/i18n/<page>_<lang>.json")
 def serve_page_i18n(page, lang):
     """
-    Devuelve el JSON especifico de una pagina, p.ej. /i18n/index_es.json.
-    Útil for frontends que cargan textos via fetch.
+    Returns the specific JSON of a page, e.g. /i18n/index_es.json.
+    Useful for frontends that load texts via fetch.
     """
     page_file = I18N_DIR / f"{page}_{lang}.json"
     if not page_file.exists():
@@ -4402,12 +4402,12 @@ def serve_page_i18n(page, lang):
 
 @app.get("/i18n/<lang>.json")
 def serve_i18n(lang):
-    """Devuelve el diccionario de traducciones (for fallback JS)"""
+    """Returns the translation dictionary (for fallback JS)"""
     return jsonify(load_translations(lang))
 
 @app.post("/api/language")
 def api_language_set():
-    """Cambia el idioma actual from la UI de la tele"""
+    """Changes the current language from the TV UI"""
     data = request.get_json(force=True) or {}
     lang = data.get("lang")
     logger.info(f"[I18N] POST /api/language recibido con lang={lang!r}")
@@ -4420,7 +4420,7 @@ def api_language_set():
     cfg["language"] = lang
     save_config_i18n(cfg)
     logger.info(
-        f"[I18N] Idioma actualizado {prev!r} → {lang!r} en {config_PATH}"
+        f"[I18N] Idioma actualizado {prev!r} → {lang!r} en {CONFIG_PATH}"
     )
     return jsonify({"ok": True, "lang": lang})
 
@@ -4429,7 +4429,7 @@ def api_language_set():
 if __name__ == "__main__":
     encoder_path = str(Path(APP_DIR, "tvargenta_encoder.py"))
     
-    # Asegurarse de que no quede flag viejo de kiosk
+    # Make sure no old kiosk flag remains
     try:
         os.remove("/tmp/tvargenta_kiosk_launched")
     except FileNotFoundError:
@@ -4438,14 +4438,14 @@ if __name__ == "__main__":
     # Clear any stale VCR state from previous session
     vcr_manager.clear_stale_vcr_state()
 
-    #  Asegurarse de que NO quede ningÃºn encoder viejo corriendo
+    # Make sure NO old encoder is left running
     try:
         subprocess.run(["pkill", "-f", "encoder_reader"], check=False)
         time.sleep(0.2)
     except Exception as e:
-        print(f"[APP] Aviso: no pude matar encoders previos: {e}")
+        print(f"[APP] Warning: could not kill previous encoders: {e}")
 
-    # Lanzar encoder limpio (only if encoder_mod is enabled)
+    # Launch clean encoder (only if encoder_mod is enabled)
     encoder_proc = None
     if mod_registry and mod_registry.get_mod('encoder_mod'):
         encoder_mod = mod_registry.get_mod('encoder_mod')
@@ -4454,7 +4454,7 @@ if __name__ == "__main__":
                 encoder_proc = subprocess.Popen(["python3", encoder_path], start_new_session=True)
                 print("[APP] Encoder launched (encoder_mod enabled)")
             except Exception as e:
-                print(f"[APP] No se pudo lanzar el encoder: {e}")
+                print(f"[APP] Could not launch the encoder: {e}")
                 encoder_proc = None
         else:
             print("[APP] Encoder not started (encoder_mod disabled)")
@@ -4463,10 +4463,10 @@ if __name__ == "__main__":
             encoder_proc = subprocess.Popen(["python3", encoder_path], start_new_session=True)
             print("[APP] Encoder launched (mod not found, using default)")
         except Exception as e:
-            print(f"[APP] No se pudo lanzar el encoder: {e}")
+            print(f"[APP] Could not launch the encoder: {e}")
             encoder_proc = None
 
-    # Lanzar NFC reader daemon for VCR (only if vcr_mod is enabled)
+    # Launch NFC reader daemon for VCR (only if vcr_mod is enabled)
     nfc_reader_path = str(Path(APP_DIR, "nfc_reader.py"))
     nfc_proc = None
     if mod_registry and mod_registry.get_mod('vcr_mod'):
@@ -4479,7 +4479,7 @@ if __name__ == "__main__":
                 nfc_proc = subprocess.Popen(["python3", nfc_reader_path], start_new_session=True)
                 print("[APP] NFC reader daemon launched (vcr_mod enabled)")
             except Exception as e:
-                print(f"[APP] No se pudo lanzar el NFC reader: {e}")
+                print(f"[APP] Could not launch the NFC reader: {e}")
         else:
             # Kill NFC reader if vcr_mod is disabled
             subprocess.run(["pkill", "-f", "nfc_reader.py"], check=False)
@@ -4487,7 +4487,7 @@ if __name__ == "__main__":
     else:
         print("[APP] Warning: vcr_mod not found, skipping NFC reader")
 
-    # Lanzar metadata daemon for analisis de fondo
+    # Launch metadata daemon for background analysis
     metadata_daemon_path = str(Path(APP_DIR, "metadata_daemon.py"))
     metadata_proc = None
     try:
@@ -4497,7 +4497,7 @@ if __name__ == "__main__":
         metadata_proc = subprocess.Popen(["python3", metadata_daemon_path], start_new_session=True)
         print("[APP] Metadata daemon launched")
     except Exception as e:
-        print(f"[APP] No se pudo lanzar el metadata daemon: {e}")
+        print(f"[APP] Could not launch the metadata daemon: {e}")
 
     # Start VCR position tracker thread
     _start_vcr_tracker()
@@ -4520,13 +4520,13 @@ if __name__ == "__main__":
 
     def cleanup():
         if encoder_proc:
-            print("[APP] Terminando proceso del encoder...")
+            print("[APP] Terminating encoder process...")
             encoder_proc.terminate()
         if nfc_proc:
-            print("[APP] Terminando proceso del NFC reader...")
+            print("[APP] Terminating NFC reader process...")
             nfc_proc.terminate()
         if metadata_proc:
-            print("[APP] Terminando proceso del metadata daemon...")
+            print("[APP] Terminating metadata daemon process...")
             metadata_proc.terminate()
 
     atexit.register(cleanup)
@@ -4536,7 +4536,7 @@ if __name__ == "__main__":
     
     init_volumen_por_defecto()
 
-    # Lanzar Chromium una sola vez en background
+    # Launch Chromium once in background
     threading.Thread(target=launch_kiosk_once, daemon=True).start()
     
     def _read_ping():
@@ -4552,18 +4552,18 @@ if __name__ == "__main__":
         global _last_frontend_ping, _last_frontend_stage, _watchdog_already_retry
         start = time.monotonic()
 
-        # Espera ping real del frontend
+        # Wait for real ping from frontend
         while (time.monotonic() - start) < timeout_first:
             if _last_frontend_ping and (time.monotonic() - _last_frontend_ping) < timeout_first:
-                logger.info(f"[WD] Frontend OK (stage={_last_frontend_stage}) en {(time.monotonic()-start):.1f}s")
+                logger.info(f"[WD] Frontend OK (stage={_last_frontend_stage}) in {(time.monotonic()-start):.1f}s")
                 return
             time.sleep(0.5)
 
         if _watchdog_already_retry:
-            logger.warning("[WD] Sin ping y ya se reintentÃ³ before. No relanzo mÃ¡s.")
+            logger.warning("[WD] No ping and already retried before. Don't relaunch anymore.")
             return
 
-        logger.warning("[WD] No hubo ping de splash/player a tiempo. Reintentando Chromium una vez...")
+        logger.warning("[WD] No ping from splash/player on time. Retrying Chromium once...")
         try:
             subprocess.run(["pkill", "-f", "chromium"], check=False)
             time.sleep(0.7)

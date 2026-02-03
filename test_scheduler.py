@@ -30,7 +30,7 @@ settings.CONTENT_DIR = TEST_CONTENT_DIR
 settings.VIDEO_DIR = TEST_VIDEO_DIR
 settings.SERIES_VIDEO_DIR = TEST_SERIES_DIR
 settings.METADATA_FILE = TEST_CONTENT_DIR / "metadata.json"
-settings.CHANNELS_FILE = TEST_CONTENT_DIR / "canales.json"
+settings.CHANNELS_FILE = TEST_CONTENT_DIR / "channels.json"
 settings.SERIES_FILE = TEST_CONTENT_DIR / "series.json"
 
 # Now import scheduler with patched settings
@@ -41,7 +41,7 @@ scheduler.CONTENT_DIR = TEST_CONTENT_DIR
 scheduler.VIDEO_DIR = TEST_VIDEO_DIR
 scheduler.SERIES_VIDEO_DIR = TEST_SERIES_DIR
 scheduler.METADATA_FILE = TEST_CONTENT_DIR / "metadata.json"
-scheduler.CHANNELS_FILE = TEST_CONTENT_DIR / "canales.json"
+scheduler.CHANNELS_FILE = TEST_CONTENT_DIR / "channels.json"
 scheduler.SERIES_FILE = TEST_CONTENT_DIR / "series.json"
 scheduler.WEEKLY_SCHEDULE_FILE = TEST_CONTENT_DIR / "weekly_schedule.json"
 scheduler.DAILY_SCHEDULE_FILE = TEST_CONTENT_DIR / "daily_schedule.json"
@@ -150,8 +150,8 @@ def setup_test_data():
     with open(TEST_CONTENT_DIR / "metadata.json", "w") as f:
         json.dump(metadata, f)
 
-    # Create canales.json
-    canales = {
+    # Create channels.json
+    channels = {
         "channel_1": {
             "nombre": "Test Channel 1",
             "series_filter": ["Test_Series_A", "Test_Series_B"],
@@ -170,8 +170,8 @@ def setup_test_data():
             "tags_incluidos": ["tag1"]
         }
     }
-    with open(TEST_CONTENT_DIR / "canales.json", "w") as f:
-        json.dump(canales, f)
+    with open(TEST_CONTENT_DIR / "channels.json", "w") as f:
+        json.dump(channels, f)
 
 
 def cleanup_test_data():

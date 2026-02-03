@@ -152,14 +152,14 @@ def save_series(data: dict) -> None:
     _write_json_atomic(SERIES_FILE, data)
 
 
-def load_canales() -> dict:
-    """Load channel configurations from canales.json."""
+def load_channels() -> dict:
+    """Load channel configurations from channels.json."""
     try:
         if CHANNELS_FILE.exists():
             with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
     except Exception as e:
-        logger.error(f"[SCHEDULER] Error loading canales.json: {e}")
+        logger.error(f"[SCHEDULER] Error loading channels.json: {e}")
     return {}
 
 
@@ -576,7 +576,7 @@ def generate_weekly_schedule(channel_id: str = None) -> dict:
     else:
         logger.info("[SCHEDULER] Generating weekly schedule for all channels...")
 
-    canales = load_canales()
+    channels = load_channels()
     series_data = load_series()
 
     now = app_now()
@@ -598,14 +598,14 @@ def generate_weekly_schedule(channel_id: str = None) -> dict:
         # Update timestamp
         schedule["generated_at"] = now.isoformat()
         schedule["week_start"] = str(week_start)
-        channels_to_process = {channel_id: canales.get(channel_id, {})}
+        channels_to_process = {channel_id: channels.get(channel_id, {})}
     else:
         schedule = {
             "generated_at": now.isoformat(),
             "week_start": str(week_start),
             "channels": {}
         }
-        channels_to_process = canales
+        channels_to_process = channels
 
     for cid, config in channels_to_process.items():
         series_filter = config.get("series_filter", [])
@@ -911,7 +911,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
 
     ensure_system_videos_exist()
 
-    canales = load_canales()
+    channels = load_channels()
     weekly_schedule = load_weekly_schedule()
     metadata = load_metadata()
     cursors = load_episode_cursors()
@@ -943,7 +943,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
         schedule["schedule_date"] = str(schedule_date)
         schedule["valid_from"] = valid_from.isoformat()
         schedule["valid_until"] = valid_until.isoformat()
-        channels_to_process = {channel_id: canales.get(channel_id, {})}
+        channels_to_process = {channel_id: channels.get(channel_id, {})}
     else:
         schedule = {
             "generated_at": now.isoformat(),
@@ -952,7 +952,7 @@ def generate_daily_schedule(channel_id: str = None) -> dict:
             "valid_until": valid_until.isoformat(),
             "channels": {}
         }
-        channels_to_process = canales
+        channels_to_process = channels
 
     for cid, config in channels_to_process.items():
         series_filter = config.get("series_filter", [])
@@ -1191,8 +1191,8 @@ def get_scheduled_content(channel_id: str, timestamp: datetime = None) -> Option
 
 def is_broadcast_channel(channel_id: str) -> bool:
     """Check if a channel is configured for broadcast scheduling."""
-    canales = load_canales()
-    config = canales.get(channel_id, {})
+    channels = load_channels()
+    config = channels.get(channel_id, {})
     return bool(config.get("series_filter"))
 
 

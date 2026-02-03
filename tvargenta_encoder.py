@@ -4,10 +4,10 @@ import subprocess
 import time
 import json
 from pathlib import Path
-from player_utils import cambiar_canal
+from player_utils import change_channel
 
-CANAL_JSON_PATH = "/srv/tvargenta/content/canales.json"
-CANAL_ACTIVO_PATH = "/srv/tvargenta/content/canal_activo.json"
+CHANNEL_JSON_PATH = "/srv/tvargenta/content/channels.json"
+CANAL_ACTIVO_PATH = "/srv/tvargenta/content/active_channel.json"
 
 # --- Nuevo: trigger for menu (front hace polling de mtime) ---
 MENU_TRIGGER_PATH = "/tmp/trigger_menu.json"
@@ -43,12 +43,12 @@ def get_canal_actual():
     if Path(CANAL_ACTIVO_PATH).exists():
         with open(CANAL_ACTIVO_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-            return data.get("canal_id", "default")
+            return data.get("channel_id", "default")
     return "default"
 
-def get_lista_canales():
+def get_channel_list():
     """Get list of channels with system channel 03 always at the beginning."""
-    with open(CANAL_JSON_PATH, "r", encoding="utf-8") as f:
+    with open(CHANNEL_JSON_PATH, "r", encoding="utf-8") as f:
         user_channels = list(json.load(f).keys())
     # Remove 03 if it somehow exists in user channels (shouldn't, but safety)
     user_channels = [c for c in user_channels if c != "03"]
@@ -56,18 +56,18 @@ def get_lista_canales():
     return ["03"] + user_channels
 
 def cambiar_al_siguiente(delta):
-    canales = get_lista_canales()
+    channels = get_channel_list()
     actual = get_canal_actual()
     try:
-        idx = canales.index(actual)
+        idx = channels.index(actual)
     except ValueError:
         idx = 0
-    nuevo_idx = (idx + delta) % len(canales)
-    nuevo_id = canales[nuevo_idx]
+    nuevo_idx = (idx + delta) % len(channels)
+    nuevo_id = channels[nuevo_idx]
 
     if nuevo_id != actual:
         print(f"[{ts()}] [ENCODER] Canal cambiado a: {nuevo_id}")
-        cambiar_canal(nuevo_id, resetear_cola=True)
+        change_channel(nuevo_id, resetear_cola=True)
 
         # Notificar al frontend for que recargue
         with open("/tmp/trigger_reload.json", "w") as f:
@@ -286,7 +286,7 @@ if __name__ == "__main__":
                         delta = +1 if line == "ROTARY_CW" else -1
                         trigger_menu_nav(delta)
                     else:
-                        # Giro sin apretar: zapping de canales
+                        # Giro sin apretar: zapping de channels
                         print(f"[{ts()}] [ENCODER] Gesto = cambio de canal")
                         delta = +1 if line == "ROTARY_CW" else -1
                         cambiar_al_siguiente(delta)

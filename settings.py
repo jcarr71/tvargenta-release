@@ -42,10 +42,10 @@ CHROME_CACHE    = SYSTEM_DATA_DIR / ".chromium-cache"
 # Archivos JSON
 METADATA_FILE       = CONTENT_DIR / "metadata.json"
 TAGS_FILE           = CONTENT_DIR / "tags.json"
-config_FILE         = CONTENT_DIR / "configuracion.json"
+CONFIG_FILE         = CONTENT_DIR / "configuration.json"
 CHANNELS_FILE       = CONTENT_DIR / "channels.json"
 CHANNEL_ACTIVE_FILE = CONTENT_DIR / "channel_active.json"
-config_PATH         = CONTENT_DIR / "menu_configuracion.json"
+CONFIG_PATH         = CONTENT_DIR / "menu_configuration.json"
 SERIES_FILE         = CONTENT_DIR / "series.json"
 PLAYS_FILE          = SYSTEM_DATA_DIR / "content" / "plays.json"  # persiste fuera del repo si corres en /srv
 
@@ -79,7 +79,7 @@ TAPES_FILE = CONTENT_DIR / "tapes.json"
 # All user-facing time operations should use app_now() instead of datetime.now().
 #
 # Timezone is configurable via:
-#   1. On-screen menu (stored in configuracion.json)
+#   1. On-screen menu (stored in configuration.json)
 #   2. Environment variable TVARGENTA_TIMEZONE (fallback)
 #   3. Default: America/New_York
 #
@@ -97,12 +97,12 @@ _app_timezone = None
 _app_timezone_name = None
 
 def _load_timezone_from_config() -> str:
-    """Load timezone from configuracion.json, falling back to env var or default."""
+    """Load timezone from configuration.json, falling back to env var or default."""
     # Try to load from config file first
     try:
-        if config_FILE.exists():
+        if CONFIG_FILE.exists():
             import json
-            with open(config_FILE, "r", encoding="utf-8") as f:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
                 tz = cfg.get("timezone")
                 if tz:

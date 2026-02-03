@@ -7,7 +7,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Editar video</title>
+  <title>Edit video</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -42,7 +42,7 @@
 <body class="bg-black text-white min-h-screen font-mono">
   <div class="max-w-screen-lg mx-auto py-6 sm:py-8 px-3 sm:px-6">
     <header class="flex items-center justify-between mb-4 sm:mb-6">
-      <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">✏️ Editar video</h1>
+      <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">✏️ Edit video</h1>
       <div class="flex items-center gap-3 flex-wrap">
         <a href="{{ url_for('library') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Library</a>
         <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">🛠 Tags</a>
@@ -68,19 +68,19 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4">
           <div>
-            <label class="block text-xs sm:text-sm mb-1">Personaje principal</label>
-            <input type="text" name="personaje" value="{{ video.get('personaje', '') }}" class="input w-full">
+            <label class="block text-xs sm:text-sm mb-1">Main character</label>
+            <input type="text" name="character" value="{{ video.get('character', '') }}" class="input w-full">
           </div>
           <div>
-            <label class="block text-xs sm:text-sm mb-1">Fecha</label>
-            <input type="date" name="fecha" value="{{ video.get('fecha', '') }}" class="input w-full">
+            <label class="block text-xs sm:text-sm mb-1">Date</label>
+            <input type="date" name="date" value="{{ video.get('date', '') }}" class="input w-full">
           </div>
         </div>
       </section>
 
       <!-- Category -->
       <section class="section rounded-lg p-3 sm:p-4">
-        <h2 class="text-lg sm:text-xl font-bold text-purple-300 mb-3">📁 Categoría</h2>
+        <h2 class="text-lg sm:text-xl font-bold text-purple-300 mb-3">📁 Category</h2>
 
         {% if is_series_video %}
         <!-- Series video: locked category and series -->
@@ -117,7 +117,7 @@
         {% else %}
         <!-- Non-series video: editable category (no TV Episode option) -->
         <div class="mb-3">
-          <label class="block text-xs sm:text-sm mb-1">Tipo de contenido <span class="text-red-400">*</span></label>
+          <label class="block text-xs sm:text-sm mb-1">Content Type <span class="text-red-400">*</span></label>
           <select name="category" id="category-select" class="input w-full" required>
             <option value="vhs_tape" {% if video.get('category', 'vhs_tape') == 'vhs_tape' %}selected{% endif %}>📼 VHS Tape</option>
             <option value="movie" {% if video.get('category') == 'movie' %}selected{% endif %}>🎬 Movie</option>
@@ -134,7 +134,7 @@
           <h2 class="text-lg sm:text-xl font-bold text-yellow-300">🏷 Tags</h2>
           <div class="flex items-center gap-2">
             <button type="button" class="collapse-btn text-xs bg-gray-800 border border-gray-600 hover:border-yellow-500 rounded px-3 py-1.5"
-                    data-target="#tagsBody">Mostrar/Ocultar</button>
+                    data-target="#tagsBody">Show/Hide</button>
           </div>
         </div>
 
@@ -157,7 +157,7 @@
             </div>
             <div class="flex items-center gap-2">
               <button type="button" id="expandir" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Expandir grupos</button>
-              <button type="button" id="colapsar" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Colapsar grupos</button>
+              <button type="button" id="colapsar" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Collapse groups</button>
             </div>
           </div>
 
@@ -198,15 +198,15 @@
         <div class="flex items-center justify-between">
           <h2 class="text-lg sm:text-xl font-bold text-blue-300">🎛 Modos de reproducción</h2>
           <div class="flex items-center gap-2">
-            <button type="button" id="modosTodos" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Todos</button>
-            <button type="button" id="modosNinguno" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">Ninguno</button>
+            <button type="button" id="modosTodos" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">All</button>
+            <button type="button" id="modosNinguno" class="text-[11px] sm:text-xs bg-gray-800 border border-gray-600 px-2 py-1.5 rounded hover:border-yellow-500">None</button>
           </div>
         </div>
         <div class="mt-2 space-y-1 text-sm">
           {% for option in ['random', 'cronologico', 'tags', 'sorprendeme', 'contextual'] %}
           <label class="inline-flex items-center mr-3">
-            <input type="checkbox" name="modo" value="{{ option }}"
-                   {% if option in video.get('modo', []) %}checked{% endif %}
+            <input type="checkbox" name="mode" value="{{ option }}"
+                   {% if option in video.get('mode', []) %}checked{% endif %}
                    class="accent-yellow-400 mr-2">
             {{ option }}
           </label>
@@ -214,13 +214,13 @@
         </div>
       </section>
 
-      <!-- Acciones -->
+      <!-- Actions -->
       <div class="flex justify-between items-center mt-2 flex-wrap gap-3">
         <a href="{{ url_for('library') }}" class="text-sm text-blue-400 hover:underline">⬅ Back to Library</a>
         <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-sm text-blue-400 hover:underline">🛠 Edit Tags</a>
         <a href="{{ url_for('watch') }}" class="text-sm text-green-400 hover:underline">📺 Watch TV</a>
         <button type="submit" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold">
-          💾 Guardar
+          💾 Save
         </button>
       </div>
     </form>

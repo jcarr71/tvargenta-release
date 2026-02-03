@@ -432,7 +432,7 @@
 
                     <!-- Edit Form (Hidden by default) -->
                     <div class="form-section" id="form-{{ key }}">
-                        <form action="/guardar_canal" method="post">
+                        <form action="/save_channel" method="post">
                             <input type="hidden" name="channel_id" value="{{ key }}">
 
                             <div class="form-grid">
@@ -491,7 +491,7 @@
             <!-- Create Channel Form -->
             <div class="form-section" id="create-form">
                 <h3 style="color: #ffb74d; margin-bottom: 1rem;">Create New Channel</h3>
-                <form action="/guardar_canal" method="post">
+                <form action="/save_channel" method="post">
                     <div class="form-grid">
                         <div class="form-group">
                             <label class="form-label">Channel Name</label>
