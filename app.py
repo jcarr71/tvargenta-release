@@ -2846,6 +2846,177 @@ def tv():
     )
 
     
+@app.route("/api/next_video")
+def api_next_video():
+    """Get the next video in the schedule for the active channel."""
+    try:
+        import time
+        import math
+        
+        # Get active channel
+        channel_active = get_channel_active()
+        channels = load_channels()
+        
+        if not channels or channel_active not in channels:
+            return jsonify({"no_videos": True, "modo": "base"}), 200
+        
+        # Load the daily schedule
+        daily_schedule = scheduler.load_daily_schedule()
+        if not daily_schedule or channel_active not in daily_schedule:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        channel_schedule = daily_schedule[channel_active]
+        if not channel_schedule or "schedule" not in channel_schedule:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        # Get current time in seconds (start of today)
+        now = time.time()
+        midnight = math.floor(now / 86400) * 86400  # Start of today
+        current_seconds = int(now - midnight)  # Seconds since midnight
+        
+        # Find the current entry in the schedule
+        schedule_entries = channel_schedule.get("schedule", [])
+        current_entry = None
+        
+        for entry in schedule_entries:
+            if entry.get("start") <= current_seconds < entry.get("end"):
+                current_entry = entry
+                break
+        
+        if not current_entry:
+            # No current entry - get the first entry
+            current_entry = schedule_entries[0] if schedule_entries else None
+        
+        if not current_entry:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        # Get video metadata
+        video_id = current_entry.get("video_id")
+        metadata = load_metadata()
+        
+        if not video_id or video_id not in metadata:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        video_info = metadata[video_id]
+        
+        # Determine if this is a broadcast channel (has series_filter)
+        channel_info = channels.get(channel_active, {})
+        is_broadcast = bool(channel_info.get("series_filter"))
+        
+        # For broadcast channels, calculate where to seek based on current time
+        seek_to = 0
+        if is_broadcast:
+            entry_start = current_entry.get("start", 0)
+            entry_duration = current_entry.get("end", 0) - entry_start
+            elapsed_in_entry = current_seconds - entry_start
+            base_timestamp = current_entry.get("base_timestamp", 0)
+            seek_to = max(0, base_timestamp + elapsed_in_entry)
+        
+        return jsonify({
+            "video_id": video_id,
+            "video_url": get_video_url(video_id, video_info),
+            "title": video_info.get("title", video_id),
+            "tags": video_info.get("tags", []),
+            "score": video_info.get("score"),
+            "modo": channel_active,
+            "is_broadcast": is_broadcast,
+            "seek_to": seek_to,
+            "broadcast_type": current_entry.get("type")
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"[API] Error in next_video: {e}", exc_info=True)
+        return jsonify({"no_videos": True, "error": str(e)}), 200
+
+
+@app.route("/api/previous_video")
+def api_previous_video():
+    """Get the previous video in the schedule for the active channel."""
+    try:
+        import time
+        import math
+        
+        # Get active channel
+        channel_active = get_channel_active()
+        channels = load_channels()
+        
+        if not channels or channel_active not in channels:
+            return jsonify({"no_videos": True, "modo": "base"}), 200
+        
+        # Load the daily schedule
+        daily_schedule = scheduler.load_daily_schedule()
+        if not daily_schedule or channel_active not in daily_schedule:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        channel_schedule = daily_schedule[channel_active]
+        if not channel_schedule or "schedule" not in channel_schedule:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        # Get current time in seconds (start of today)
+        now = time.time()
+        midnight = math.floor(now / 86400) * 86400  # Start of today
+        current_seconds = int(now - midnight)  # Seconds since midnight
+        
+        # Find the previous entry in the schedule
+        schedule_entries = channel_schedule.get("schedule", [])
+        if not schedule_entries:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        previous_entry = None
+        
+        for i, entry in enumerate(schedule_entries):
+            if entry.get("start") <= current_seconds < entry.get("end"):
+                # Found current entry, get the previous one
+                if i > 0:
+                    previous_entry = schedule_entries[i - 1]
+                else:
+                    # We're at the first entry, wrap to the last entry
+                    previous_entry = schedule_entries[-1]
+                break
+        
+        if not previous_entry:
+            # No current entry found, get the last entry
+            previous_entry = schedule_entries[-1] if schedule_entries else None
+        
+        if not previous_entry:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        # Get video metadata
+        video_id = previous_entry.get("video_id")
+        metadata = load_metadata()
+        
+        if not video_id or video_id not in metadata:
+            return jsonify({"no_videos": True, "modo": channel_active}), 200
+        
+        video_info = metadata[video_id]
+        
+        # Determine if this is a broadcast channel
+        channel_info = channels.get(channel_active, {})
+        is_broadcast = bool(channel_info.get("series_filter"))
+        
+        # For broadcast channels, calculate seek position
+        seek_to = 0
+        if is_broadcast:
+            base_timestamp = previous_entry.get("base_timestamp", 0)
+            seek_to = max(0, base_timestamp)
+        
+        return jsonify({
+            "video_id": video_id,
+            "video_url": get_video_url(video_id, video_info),
+            "title": video_info.get("title", video_id),
+            "tags": video_info.get("tags", []),
+            "score": video_info.get("score"),
+            "modo": channel_active,
+            "is_broadcast": is_broadcast,
+            "seek_to": seek_to,
+            "broadcast_type": previous_entry.get("type")
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"[API] Error in previous_video: {e}", exc_info=True)
+        return jsonify({"no_videos": True, "error": str(e)}), 200
+
+
 @app.route("/api/should_reload")
 def api_should_reload():
     global _last_trigger_mtime_served, _last_trigger_reason, _last_trigger_mtime, _force_next_once
