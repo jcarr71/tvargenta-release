@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}System Logs{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-6">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">System Logs</h1>
+        <div class="flex gap-3">
+            <button onclick="toggleAutoRefresh()" class="action-btn" id="refresh-toggle">
+                🔄 Auto-Refresh: ON
+            </button>
+            <button onclick="clearLogs()" class="action-btn" style="background-color: #666;">
+                Clear View
+            </button>
+            <select id="line-count" onchange="updateLineCount()" class="px-3 py-2 border rounded" style="min-width: 100px;">
+                <option value="50">Last 50 lines</option>
+                <option value="100" selected>Last 100 lines</option>
+                <option value="200">Last 200 lines</option>
+                <option value="500">Last 500 lines</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Info panel -->
+    <div style="background: #222; border: 1px solid #444; border-radius: 4px; padding: 12px; margin-bottom: 12px; font-size: 12px;">
+        <span id="status-text" style="color: #aaa;">Loading logs...</span>
+        <span id="last-update" style="color: #666; margin-left: 10px;"></span>
+    </div>
+
+    <!-- Log viewer -->
+    <div id="log-container" style="
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 12px;
+        font-family: 'Monaco', 'Courier New', monospace;
+        font-size: 12px;
+        max-height: 600px;
+        overflow-y: auto;
+        color: #0f0;
+        line-height: 1.4;
+        white-space: pre-wrap;
+        word-wrap: break-word;">
+    </div>
+
+    <!-- Info panel -->
+    <div style="margin-top: 12px; padding: 12px; background: #222; border-radius: 4px; font-size: 12px; color: #888;">
+        <p><strong>Notes:</strong></p>
+        <ul style="margin-left: 20px; margin-top: 8px;">
+            <li>Logs are auto-refreshed every 3 seconds</li>
+            <li>Shows the last N lines from the tvargenta service journal</li>
+            <li>Use browser developer tools (F12) for more detailed inspection</li>
+            <li>Check logs when experiencing errors like "Error rebuilding schedule"</li>
+        </ul>
+    </div>
+</div>
+
+<style>
+    .action-btn {
+        padding: 8px 16px;
+        background-color: #0066cc;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: background-color 0.2s;
+    }
+
+    .action-btn:hover {
+        background-color: #0052a3;
+    }
+
+    .action-btn:active {
+        transform: scale(0.98);
+    }
+
+    #log-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    #log-container::-webkit-scrollbar-track {
+        background: #222;
+    }
+
+    #log-container::-webkit-scrollbar-thumb {
+        background: #444;
+        border-radius: 4px;
+    }
+
+    #log-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* Syntax highlighting for log lines */
+    .log-error {
+        color: #ff6b6b;
+    }
+
+    .log-warn {
+        color: #ffd93d;
+    }
+
+    .log-info {
+        color: #51cf66;
+    }
+
+    .log-debug {
+        color: #74c0fc;
+    }
+</style>
+
+<script>
+    let autoRefresh = true;
+    let refreshInterval = null;
+    const REFRESH_RATE = 3000; // 3 seconds
+
+    async function loadLogs() {
+        try {
+            const lineCount = document.getElementById('line-count').value;
+            const response = await fetch(`/api/logs?lines=${lineCount}`);
+            const data = await response.json();
+
+            const container = document.getElementById('log-container');
+            const statusText = document.getElementById('status-text');
+
+            if (data.ok) {
+                // Format logs with syntax highlighting
+                const formattedLogs = data.logs.map(line => {
+                    let className = '';
+                    if (line.includes('[ERROR]') || line.toLowerCase().includes('error')) {
+                        className = 'log-error';
+                    } else if (line.includes('[WARN]') || line.toLowerCase().includes('warning')) {
+                        className = 'log-warn';
+                    } else if (line.includes('[INFO]')) {
+                        className = 'log-info';
+                    } else if (line.includes('[DEBUG]')) {
+                        className = 'log-debug';
+                    }
+                    
+                    return className ? `<span class="${className}">${escapeHtml(line)}</span>` : escapeHtml(line);
+                }).join('\n');
+
+                container.innerHTML = formattedLogs;
+                container.scrollTop = container.scrollHeight; // Auto-scroll to bottom
+                
+                statusText.textContent = `✓ Loaded ${data.count} log lines`;
+                document.getElementById('last-update').textContent = `Last update: ${new Date().toLocaleTimeString()}`;
+            } else {
+                statusText.textContent = `✗ Error: ${data.error}`;
+                statusText.style.color = '#ff6b6b';
+            }
+        } catch (error) {
+            const statusText = document.getElementById('status-text');
+            statusText.textContent = `✗ Failed to load logs: ${error.message}`;
+            statusText.style.color = '#ff6b6b';
+        }
+    }
+
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    function toggleAutoRefresh() {
+        autoRefresh = !autoRefresh;
+        const btn = document.getElementById('refresh-toggle');
+        
+        if (autoRefresh) {
+            btn.textContent = '🔄 Auto-Refresh: ON';
+            btn.style.opacity = '1';
+            refreshInterval = setInterval(loadLogs, REFRESH_RATE);
+            loadLogs(); // Load immediately
+        } else {
+            btn.textContent = '🔄 Auto-Refresh: OFF';
+            btn.style.opacity = '0.6';
+            clearInterval(refreshInterval);
+        }
+    }
+
+    function clearLogs() {
+        const container = document.getElementById('log-container');
+        container.innerHTML = '';
+        const statusText = document.getElementById('status-text');
+        statusText.textContent = 'View cleared. Logs still available on server.';
+        statusText.style.color = '#aaa';
+    }
+
+    function updateLineCount() {
+        if (autoRefresh) {
+            loadLogs();
+        }
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        loadLogs();
+        refreshInterval = setInterval(loadLogs, REFRESH_RATE);
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        if (refreshInterval) clearInterval(refreshInterval);
+    });
+</script>
+{% endblock %}
