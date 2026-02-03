@@ -2796,26 +2796,30 @@ def api_rebuild_schedule(channel_id):
     """Rebuild both weekly and daily schedules for a specific channel."""
     logger.info(f"[API] Rebuild schedule requested for channel: {channel_id}")
 
-    channels = load_channels()
-    if channel_id not in channels:
-        return jsonify({"ok": False, "error": "Channel not found"}), 404
-
-    channel = channels[channel_id]
-    if not channel.get("series_filter"):
-        return jsonify({"ok": False, "error": "Channel has no series filter (not a broadcast channel)"}), 400
-
     try:
+        channels = load_channels()
+        if channel_id not in channels:
+            logger.warning(f"[API] Channel not found: {channel_id}")
+            return jsonify({"ok": False, "error": "Channel not found"}), 404
+
+        channel = channels[channel_id]
+        if not channel.get("series_filter"):
+            logger.warning(f"[API] Channel {channel_id} has no series filter")
+            return jsonify({"ok": False, "error": "Channel has no series filter (not a broadcast channel)"}), 400
+
         # Rebuild weekly schedule for this channel only
+        logger.info(f"[API] Generating weekly schedule for channel: {channel_id}")
         scheduler.generate_weekly_schedule(channel_id=channel_id)
         logger.info(f"[API] Weekly schedule rebuilt for channel: {channel_id}")
 
         # Rebuild daily schedule for this channel only
+        logger.info(f"[API] Generating daily schedule for channel: {channel_id}")
         scheduler.generate_daily_schedule(channel_id=channel_id)
         logger.info(f"[API] Daily schedule rebuilt for channel: {channel_id}")
 
-        return jsonify({"ok": True, "message": f"Schedule rebuilt successfully for {channel['nombre']}"})
+        return jsonify({"ok": True, "message": f"Schedule rebuilt successfully for {channel.get('nombre', channel_id)}"})
     except Exception as e:
-        logger.error(f"[API] Error rebuilding schedule for {channel_id}: {e}")
+        logger.error(f"[API] Error rebuilding schedule for {channel_id}: {e}", exc_info=True)
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/tv")
