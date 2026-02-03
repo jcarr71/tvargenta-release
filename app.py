@@ -265,6 +265,10 @@ last_choice_per_channel = {}  # channel_id -> {"video_id": str, "ts": float}
 pending_pick = {}  # channel_id -> {"video_id": str, "ts": float}
 PENDING_TTL = 12.0  # seconds; reuse the same pick within this time
 
+# --- Schedule navigation for Watch TV next/previous buttons ---
+schedule_position = {}  # channel_id -> {"index": int, "video_id": str, "ts": float}
+SCHEDULE_POSITION_TTL = 300.0  # seconds; expire navigation state after 5 minutes
+
 _last_trigger_mtime_served = 0.0  # for /api/should_reload (one-shot)
 _last_menu_mtime_served = 0.0
 _last_nav_mtime_served = 0.0
@@ -1709,10 +1713,75 @@ def api_next_video():
             if channel_id and channel_id in channels:
                 config = channels[channel_id]
                 if config.get("series_filter"):
-                    # This is a broadcast TV channel - use scheduler
+                    # This is a broadcast TV channel - check if we should use schedule navigation
                     try:
+                        # Check if we have a saved schedule position (from watch.html next/previous buttons)
+                        now = time.time()
+                        saved_pos = schedule_position.get(channel_id, {})
+                        pos_ts = saved_pos.get("ts", 0)
+                        
+                        # If we have a saved position within TTL, use schedule navigation
+                        if saved_pos.get("index") is not None and (now - pos_ts) <= SCHEDULE_POSITION_TTL:
+                            # Use schedule-based navigation
+                            daily_schedule = scheduler.load_daily_schedule()
+                            if daily_schedule and channel_id in daily_schedule:
+                                channel_schedule = daily_schedule[channel_id].get("schedule", [])
+                                if channel_schedule:
+                                    # Advance to next position
+                                    current_index = saved_pos.get("index", 0)
+                                    new_index = (current_index + 1) % len(channel_schedule)
+                                    entry = channel_schedule[new_index]
+                                    
+                                    video_id = entry.get("video_id")
+                                    broadcast_metadata = load_metadata()
+                                    
+                                    if video_id and video_id in broadcast_metadata:
+                                        video_info = broadcast_metadata[video_id]
+                                        
+                                        # Update saved position
+                                        schedule_position[channel_id] = {
+                                            "index": new_index,
+                                            "video_id": video_id,
+                                            "ts": now
+                                        }
+                                        
+                                        logger.info(f"[NEXT] Schedule nav channel {channel_id}: index {current_index}->{new_index}, video={video_id}")
+                                        return jsonify({
+                                            "video_id": video_id,
+                                            "video_url": get_video_url(video_id=video_id, series_path=video_info.get("series_path")),
+                                            "seek_to": 0,
+                                            "title": video_info.get("title", video_id),
+                                            "tags": video_info.get("tags", []),
+                                            "modo": channel_id,
+                                            "channel_name": config.get("nombre", channel_id),
+                                            "channel_number": get_channel_number(channel_id, channels),
+                                            "broadcast_type": entry.get("type"),
+                                            "is_broadcast": True,
+                                            "loudness_lufs": video_info.get("loudness_lufs"),
+                                            "schedule_index": new_index,
+                                            "schedule_total": len(channel_schedule)
+                                        })
+                        
+                        # No saved position or expired - use normal scheduling
                         scheduled = scheduler.get_scheduled_content(channel_id)
                         if scheduled:
+                            # Initialize schedule position at current content
+                            daily_schedule = scheduler.load_daily_schedule()
+                            if daily_schedule and channel_id in daily_schedule:
+                                channel_schedule = daily_schedule[channel_id].get("schedule", [])
+                                current_video_id = scheduled["video_id"]
+                                current_index = 0
+                                for i, entry in enumerate(channel_schedule):
+                                    if entry.get("video_id") == current_video_id:
+                                        current_index = i
+                                        break
+                                
+                                schedule_position[channel_id] = {
+                                    "index": current_index,
+                                    "video_id": current_video_id,
+                                    "ts": now
+                                }
+                            
                             logger.info(f"[NEXT] Broadcast channel {channel_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
 
                             # Get loudness data for automatic volume adjustment
@@ -1968,10 +2037,89 @@ def api_next_video():
 
 @app.route("/api/previous_video")
 def api_previous_video():
-    """Get the previous video - currently just returns next video since 'previous' is complex."""
-    # For simplicity, previous just returns the current/next video
-    # A more sophisticated implementation would track and navigate backward through history
-    return api_next_video()
+    """Navigate to the previous video in the schedule."""
+    try:
+        import time
+        
+        # Get active channel
+        channel_active_path = str(CHANNEL_ACTIVE_FILE)
+        if not os.path.exists(channel_active_path):
+            return api_next_video()  # Fallback to next_video
+        
+        with open(channel_active_path, "r", encoding="utf-8") as f:
+            activo = json.load(f)
+            channel_id = activo.get("channel_id")
+        
+        channels = load_channels()
+        if not channel_id or channel_id not in channels:
+            return api_next_video()  # Fallback
+        
+        config = channels[channel_id]
+        if not config.get("series_filter"):
+            # Not a broadcast channel, just return current
+            return api_next_video()
+        
+        # Load the daily schedule
+        daily_schedule = scheduler.load_daily_schedule()
+        if not daily_schedule or channel_id not in daily_schedule:
+            return api_next_video()
+        
+        channel_schedule = daily_schedule[channel_id].get("schedule", [])
+        if not channel_schedule:
+            return api_next_video()
+        
+        # Get or initialize schedule position
+        now = time.time()
+        pos = schedule_position.get(channel_id, {})
+        pos_ts = pos.get("ts", 0)
+        
+        # Reset position if expired
+        if (now - pos_ts) > SCHEDULE_POSITION_TTL:
+            pos = None
+        
+        # Find current position in schedule
+        if pos and pos.get("index") is not None:
+            # We have a saved position, go one step back
+            current_index = pos.get("index", 0)
+            new_index = (current_index - 1) % len(channel_schedule)
+        else:
+            # No saved position, start from end and go back
+            new_index = len(channel_schedule) - 1
+        
+        # Get the video at the new position
+        entry = channel_schedule[new_index]
+        video_id = entry.get("video_id")
+        
+        metadata = load_metadata()
+        if not video_id or video_id not in metadata:
+            return jsonify({"no_videos": True, "modo": channel_id}), 200
+        
+        video_info = metadata[video_id]
+        
+        # Save the new position
+        schedule_position[channel_id] = {
+            "index": new_index,
+            "video_id": video_id,
+            "ts": now
+        }
+        
+        return jsonify({
+            "video_id": video_id,
+            "video_url": get_video_url(video_id=video_id, series_path=video_info.get("series_path")),
+            "title": video_info.get("title", video_id),
+            "tags": video_info.get("tags", []),
+            "score": video_info.get("score"),
+            "modo": channel_id,
+            "channel_name": config.get("nombre", channel_id),
+            "channel_number": get_channel_number(channel_id, channels),
+            "is_broadcast": True,
+            "schedule_index": new_index,
+            "schedule_total": len(channel_schedule)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"[PREV] Error: {e}", exc_info=True)
+        return api_next_video()
 
 
 def _get_all_series():
