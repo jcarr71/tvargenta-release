@@ -770,7 +770,7 @@
 	
     const overlay = document.getElementById('overlay');
     let currentVideo = null;
-	let ultimoCanal = null;
+	let lastChannel = null;
 
 	let currentFetchController = null;  // AbortController for cancelling pending requests
 	let ultimaCarga = 0;            // timestamp de última carga efectiva
@@ -1092,9 +1092,9 @@
 
 		  // Handle Channel 03 (AV input) specially
 		  if (data.channel_type === "av_input") {
-			const cambioDeCanal = data.modo !== ultimoCanal;
-			if (cambioDeCanal) {
-			  ultimoCanal = data.modo;
+			const channelChanged = data.modo !== lastChannel;
+			if (channelChanged) {
+			  lastChannel = data.modo;
 			  currentVideo = null;
 			  // Show channel indicator (VCR mode may override this)
 			  if (typeof showChannelNumber === 'function') {
@@ -1109,7 +1109,7 @@
 		  }
 
 		  // If we were on Channel 03 and now switching away, stop VCR mode
-		  if (ultimoCanal === "03" && data.modo !== "03") {
+		  if (lastChannel === "03" && data.modo !== "03") {
 			if (typeof updateVcrChannelMode === 'function') {
 			  updateVcrChannelMode(data.modo);
 			}
@@ -1131,7 +1131,7 @@
 		  document.getElementById('no-signal').style.display = 'none';
 
 		  const cambioDeVideo = data.video_id !== currentVideo;
-		  const cambioDeCanal = data.modo !== ultimoCanal;
+		  const channelChanged = data.modo !== lastChannel;
 
 		  // Track if this is a broadcast channel for special handling
 		  const isBroadcast = data.is_broadcast === true;
@@ -1214,7 +1214,7 @@
 		  }
 
 		  if (cambioDeCanal) {
-			ultimoCanal = data.modo;
+lastChannel = data.modo;
 
 			// Show channel number indicator for 2 seconds
 			if (typeof showChannelNumber === 'function') {
