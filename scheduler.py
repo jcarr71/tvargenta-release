@@ -698,20 +698,11 @@ def build_commercial_sequence(duration_needed: float, commercials: List[dict]) -
     Build a sequence of commercials to fill the specified duration.
     Loops commercials if not enough unique ones available.
     Returns list of dicts with video_id, duration, and start_offset.
+    If no commercials are available, returns empty list (skip commercial breaks).
     """
     if not commercials:
-        # No commercials available - use sponsors placeholder
-        sequence = []
-        remaining = duration_needed
-        while remaining > 0:
-            seq_entry = {
-                "type": "sponsors_placeholder",
-                "video_id": "__sponsors_placeholder__",
-                "duration": min(30, remaining),  # 30 second placeholder video
-            }
-            sequence.append(seq_entry)
-            remaining -= 30
-        return sequence
+        # No commercials available - skip commercial breaks entirely
+        return []
 
     sequence = []
     remaining = duration_needed
