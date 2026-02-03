@@ -91,6 +91,17 @@
             border-color: #ff6b6b;
         }
 
+        .btn-channels {
+            background: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.6);
+        }
+
+        .btn-channels:hover {
+            background: rgba(255, 193, 7, 0.5);
+            border-color: #ffc107;
+        }
+
         .btn-uploads {
             background: rgba(76, 175, 80, 0.3);
             color: #4caf50;
@@ -368,10 +379,10 @@
         <header>
             <h1>📦 Mod Manager</h1>
             <div class="nav-buttons">
-                <a href="{{ url_for('library') }}" class="btn btn-secondary">← Back to Library</a>
                 <a href="{{ url_for('watch') }}" class="btn btn-secondary" style="background: rgba(76, 175, 80, 0.2); color: #4caf50; border-color: #4caf50;">📺 Watch TV</a>
-                <a href="/patches" class="btn btn-patches">📋 Patches</a>
-                <a href="{{ url_for('upload') }}" class="btn btn-uploads">📤 Uploads</a>
+                <a href="{{ url_for('channels') }}" class="btn btn-channels">📡 Channels</a>
+                <a href="{{ url_for('patches_manager') }}" class="btn btn-patches">🔧 Patches</a>
+                <a href="{{ url_for('library') }}" class="btn btn-secondary">📚 Library</a>
             </div>
         </header>
 

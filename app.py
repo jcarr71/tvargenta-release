@@ -11,8 +11,13 @@ import threading
 import os
 import json
 import subprocess
-import fcntl
 import sys
+
+# Windows compatibility: fcntl is Unix-only
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 # Windows-only module for file locking
 if sys.platform == 'win32':
@@ -329,9 +334,10 @@ def metadata_lock(timeout=30):
                 if sys.platform == 'win32':
                     # Windows: use msvcrt locking
                     msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
-                else:
+                elif fcntl is not None:
                     # Unix/Linux: use fcntl locking
                     fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # If fcntl is None and not Windows, skip locking (dev environment)
                 break  # Lock acquired
             except (BlockingIOError, OSError):
                 if time.time() - start > timeout:
@@ -342,7 +348,7 @@ def metadata_lock(timeout=30):
         try:
             if sys.platform == 'win32':
                 msvcrt.locking(lock_fd.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
+            elif fcntl is not None:
                 fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
         except Exception:
             pass
@@ -789,7 +795,7 @@ def sanity_check_thumbnails(video_id=None):
 
         if os.path.exists(video_path) and not os.path.exists(thumbnail_path):
             try:
-                print(f"ðŸ–¼ Generando thumbnail for: {vid}")
+                print(f"📷 Generating thumbnail for: {vid}")
                 subprocess.run([
                     "ffmpeg",
                     "-ss", "00:00:02",
@@ -1419,7 +1425,7 @@ def delete_video_metadata(video_id):
     thumbnail_path = os.path.join(CONTENT_DIR, "thumbnails", video_id + ".jpg")
     if os.path.exists(thumbnail_path):
         os.remove(thumbnail_path)
-        print(f"ðŸ§¹ Thumbnail eliminado: {thumbnail_path}")
+        print(f"🧹 Thumbnail deleted: {thumbnail_path}")
         removed_any = True
     else:
         print(f"ℹ️ No thumbnail found for: {video_id}")
@@ -1431,68 +1437,8 @@ def delete_video_metadata(video_id):
 
 @app.route("/upload", methods=["GET", "POST"])
 def upload():
-    if request.method == "GET":
-        return render_template("upload.html")
-
-    files = request.files.getlist("videos[]")
-    os.makedirs(VIDEO_DIR, exist_ok=True)
-
-    print(f"📥 Files received: {[f.filename for f in files]}")
-
-    for file in files:
-        if not file or not file.filename:
-            continue
-        
-        filename = secure_filename(file.filename)
-        # Extract file extension
-        file_ext = os.path.splitext(filename)[1].lower()
-        if file_ext not in SUPPORTED_VIDEO_FORMATS:
-            write_status(f"❌ File not allowed: {file.filename}")
-            continue
-
-        write_status("📥 Receiving file...")
-
-        filename = secure_filename(file.filename)
-        video_id = os.path.splitext(filename)[0]
-        final_path = os.path.join(VIDEO_DIR, video_id + file_ext)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as tmp:
-            temp_path = tmp.name
-            file.save(temp_path)
-
-        print(f"🔄 Processing: {filename}")
-        try:
-            write_status("🔍 Checking resolution...")
-            width, height = get_video_resolution(temp_path)
-            duracion = get_video_duration(temp_path)
-            metadata[video_id] = metadata.get(video_id, {})
-            metadata[video_id]["duration"] = duracion
-            metadata[video_id]["extension"] = file_ext[1:]  # Store without the dot
-            if width == 800 and height == 480:
-                shutil.copy(temp_path, final_path)
-                write_status("✅ Video was already at 800x480. Copied directly")
-                print(f"✅ Video was already at 800x480. Copied directly: {final_path}")
-            else:
-                write_status("🔄 Resizing video...")
-                subprocess.run([
-                    "ffmpeg", "-i", temp_path,
-                    "-vf", "scale=800:480:force_original_aspect_ratio=decrease,pad=800:480:(ow-iw)/2:(oh-ih)/2",
-                    "-c:a", "copy",
-                    "-y", final_path
-                ], check=True)
-                print(f"🎥 Video processed with resize and crop: {final_path}")
-        except Exception as e:
-            write_status(f"❌ Error while processing {filename}")
-            print(f"❌ Error while processing {filename}: {e}")
-        finally:
-            os.remove(temp_path)
-
-        write_status("🖼️ Generating thumbnail...")
-        sanity_check_thumbnails(video_id)
-        write_status("✅ Done! 👍")
-
-    delete_status()
-    return redirect(url_for("index"))
+    """Redirect to library page (uploads handled there)"""
+    return redirect(url_for("library"))
 
 @app.route("/upload_status")
 def upload_status():
@@ -1709,9 +1655,26 @@ def watch():
                 channel_active = next(iter(channels.keys()))
                 set_channel_active(channel_active)  # persist the migration
 
+    cfg = load_config_i18n()
+    lang = cfg.get("language", "en")
+    base_trans = load_translations(lang)
+
+    def tr(key, default=None):
+        keys = key.split(".")
+        val = base_trans
+        for k in keys:
+            if isinstance(val, dict):
+                val = val.get(k)
+            else:
+                val = None
+                break
+        return val if val is not None else (default or key)
+
     return render_template("watch.html",
                            channels=channels,
-                           channel_active=channel_active)
+                           channel_active=channel_active,
+                           tr=tr,
+                           lang=lang)
 
 
 
@@ -1938,7 +1901,21 @@ def api_next_video():
             return api_next_video()
         else:
             logger.warning(f"[NEXT] No videos found for channel={channel_id}, series_filter={series_filter}")
-            return jsonify({"no_videos": True, "channel_id": channel_id})
+            # Serve test pattern instead of error
+            test_pattern_path = VIDEO_DIR / "system" / "test_pattern.mp4"
+            if test_pattern_path.exists():
+                return jsonify({
+                    "video_id": "system_test_pattern",
+                    "video_url": "/videos/system/test_pattern.mp4",
+                    "title": "📺 Test Pattern",
+                    "tags": [],
+                    "modo": channel_id,
+                    "channel_name": channels[channel_id].get("nombre", channel_id),
+                    "channel_number": get_channel_number(channel_id, channels),
+                    "is_test_pattern": True
+                })
+            else:
+                return jsonify({"no_videos": True, "channel_id": channel_id})
 
     # --- Fairness + diversidad + prioridad + jitter ---
     def sort_key(t):
@@ -2023,7 +2000,7 @@ def series_page():
     series_list.sort(key=lambda s: s["display_name"].lower())
 
     cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
+    lang = cfg.get("language", "en")
     base_trans = load_translations(lang)
 
     def tr(key, default=None):
@@ -2203,7 +2180,7 @@ def upload_series():
     preselected = request.args.get("series", "")
 
     cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
+    lang = cfg.get("language", "en")
     base_trans = load_translations(lang)
 
     def tr(key, default=None):
@@ -2397,7 +2374,7 @@ def get_commercials_list():
 def upload_commercials():
     """Commercial upload page."""
     cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
+    lang = cfg.get("language", "en")
     base_trans = load_translations(lang)
 
     def tr(key, default=None):
@@ -4309,7 +4286,7 @@ def _start_vcr_tracker():
 @app.before_request
 def _i18n_before_request():
     cfg = load_config_i18n()
-    lang = cfg.get("language", "es")
+    lang = cfg.get("language", "en")
 
     # Override by querystring (?lang=en) for testing
     lang = request.args.get("lang", lang)

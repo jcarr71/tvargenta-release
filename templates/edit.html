@@ -44,9 +44,11 @@
     <header class="flex items-center justify-between mb-4 sm:mb-6">
       <h1 class="text-2xl sm:text-3xl font-bold text-yellow-400">✏️ Edit video</h1>
       <div class="flex items-center gap-3 flex-wrap">
-        <a href="{{ url_for('library') }}" class="text-blue-400 underline text-sm sm:text-base">⬅ Library</a>
-        <a href="{{ url_for('tags', from_edit=video_id) }}" class="text-blue-400 underline text-sm sm:text-base">🛠 Tags</a>
+        <a href="{{ url_for('library') }}" class="text-blue-400 underline text-sm sm:text-base">← Library</a>
         <a href="{{ url_for('watch') }}" class="text-green-400 underline text-sm sm:text-base">📺 Watch TV</a>
+        <a href="{{ url_for('channels') }}" class="text-yellow-400 underline text-sm sm:text-base">📡 Channels</a>
+        <a href="{{ url_for('patches_manager') }}" class="text-red-400 underline text-sm sm:text-base">🔧 Patches</a>
+        <a href="{{ url_for('mod_manager') }}" class="text-cyan-400 underline text-sm sm:text-base">📦 Mods</a>
       </div>
     </header>
 

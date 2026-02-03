@@ -39,7 +39,13 @@ import signal
 import subprocess
 import sys
 import time
-import fcntl
+
+# Windows compatibility: fcntl is Unix-only
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -114,7 +120,9 @@ def metadata_lock(timeout=30):
         start = time.time()
         while True:
             try:
-                fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if fcntl is not None:
+                    fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                # If fcntl is None, skip locking (dev environment)
                 break
             except BlockingIOError:
                 if time.time() - start > timeout:
@@ -122,7 +130,8 @@ def metadata_lock(timeout=30):
                 time.sleep(0.1)
         yield
     finally:
-        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+        if fcntl is not None:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
         lock_fd.close()
 
 

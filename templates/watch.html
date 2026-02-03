@@ -90,39 +90,15 @@
 </head>
 <body class="bg-black text-white min-h-screen flex flex-col items-center justify-center p-4">
 
-  <h1 class="text-2xl text-yellow-400 font-bold mb-4">📺 Watch TV</h1>
-  
-  <div class="nav-links">
-    <a href="/" class="btn btn-secondary">← Home</a>
-    <a href="/channels" class="btn btn-channels">📡 Channels</a>
-    <a href="/patches" class="btn btn-patches">📋 Patches</a>
-    <a href="/mod_manager" class="btn btn-mods">📦 Mods</a>
-    <a href="/upload" class="btn btn-uploads">📤 Uploads</a>
-  </div>
-  
-  <div class="flex items-center gap-4 mb-4">
-	  <a href="{{ url_for('library') }}"
-		 class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-		{{ tr("vertele.nav.back_home") }}
-	  </a>
-	  
-	  <a href="{{ url_for('channels') }}"
-		 class="text-purple-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-		🎯 Channels
-	  </a>
-	  
-	  <a href="{{ url_for('upload') }}"
-		 class="text-yellow-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-		📤 Upload
-	  </a>
-
-	  <select id="vertele-lang-select"
-			  class="bg-gray-900 border border-gray-600 text-xs sm:text-sm px-2 py-1 rounded">
-		<option value="es">🇦🇷 ES</option>
-		<option value="en">🇺🇸 EN</option>
-		<option value="de">🇩🇪 DE</option>
-	  </select>
-	</div>
+  <header style="width: 100%; margin-bottom: 2rem; text-align: center;">
+    <h1 class="text-2xl text-yellow-400 font-bold mb-4">📺 Watch TV</h1>
+    <div class="nav-links">
+      <a href="{{ url_for('channels') }}" class="btn btn-channels">📡 Channels</a>
+      <a href="{{ url_for('patches_manager') }}" class="btn btn-patches">🔧 Patches</a>
+      <a href="{{ url_for('mod_manager') }}" class="btn btn-mods">📦 Mods</a>
+      <a href="{{ url_for('library') }}" class="btn btn-secondary">📚 Library</a>
+    </div>
+  </header>
 
   <!-- CONTENEDOR DE VIDEO -->
   <div class="tv-wrapper w-full sm:w-4/5 md:w-2/3 lg:w-1/2 relative border-4 border-yellow-500 rounded-xl shadow-xl overflow-hidden">
@@ -137,28 +113,47 @@
     <p id="info-tags"></p>
     <p id="info-score" class="italic text-xs text-gray-400"></p>
   </div>
+  <!-- CHANNEL NAME -->
+  <div class="mt-4 text-center">
+    <h2 id="channel-name" class="text-lg text-green-400 font-bold">📡 Select Channel</h2>
+  </div>
 	<!-- SELECCIÓN DE CANAL -->
   <div id="canales-container" class="mb-6 text-center">
-    <h2 class="text-lg text-green-400 font-bold mb-2">{{ tr("vertele.channel.title") }}</h2>
     <div id="canales-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-4 justify-center"></div>
     <p id="canal-activo" class="text-sm text-gray-400 mt-2"></p>
   </div>
-  <div class="flex gap-4 mt-6">
-    <button onclick="loadNextVideo()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold shadow">
-      {{ tr("vertele.channel.btn_next") }}
+  <div class="flex gap-4 mt-6 justify-center flex-wrap">
+    <button onclick="loadPreviousVideo()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-bold shadow">
+      ⬅ Previous Channel
     </button>
-    <a href="{{ url_for('library') }}" class="text-blue-400 hover:underline text-sm">{{ tr("vertele.nav.back_home") }}</a>
-    <a href="{{ url_for('channels') }}" class="text-purple-400 hover:underline text-sm">🎯 Channels</a>
-    <a href="{{ url_for('upload') }}" class="text-yellow-400 hover:underline text-sm">📤 Upload</a>
+    <button onclick="loadNextVideo()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold shadow">
+      Next Channel ⏭
+    </button>
   </div>
 
   <script>
+	  // ---- I18N CORE ----
+	  let I18N = { lang: "en", dict: {} };
+
+	  async function i18nInit(){
+		try {
+		  const d = await fetch("/api/lang").then(r => r.json()).catch(() => ({}));
+		  if (d && d.lang) I18N.lang = d.lang;
+		  const t = await fetch(`/i18n/${I18N.lang}.json`);
+		  if (t.ok) I18N.dict = await t.json();
+		} catch(e) { I18N.dict = {}; }
+		document.documentElement.lang = I18N.lang;
+	  }
+
+	  function tr(key){ return I18N.dict[key] || key; }
+
 	  const videoEl = document.getElementById("tv-video");
 	  const infoTitle = document.getElementById("info-title");
 	  const infoTags = document.getElementById("info-tags");
 	  const infoScore = document.getElementById("info-score");
 	  const canalActivoLabel = document.getElementById("canal-activo");
 	  const canalesGrid = document.getElementById("canales-grid");
+	  const channelNameEl = document.getElementById("channel-name");
 
 	  function loadNextVideo() {
 		fetch("/api/next_video")
@@ -190,7 +185,42 @@
 			  : "";
 		  })
 		  .catch(err => {
-			alert("No se pudo cargar el siguiente video.");
+			alert(tr('vertele.video.unsupported'));
+			console.error(err);
+		  });
+	  }
+
+	  function loadPreviousVideo() {
+		fetch("/api/previous_video")
+		  .then(res => {
+			if (!res.ok) throw new Error("Error al buscar video anterior");
+			return res.json();
+		  })
+		  .then(data => {
+			if (data.no_videos) {
+			  videoEl.src = "";
+			  infoTitle.textContent = "{{ tr('vertele.video.unsupported') }}";
+			  infoTags.textContent = "{{ tr('vertele.video.try_other') }}";
+			  infoScore.textContent = "";
+			  return;
+			}
+
+			const videoUrl = data.video_url || `/videos/${data.video_id}.mp4`;
+			videoEl.src = videoUrl;
+			videoEl.load();
+			videoEl.volume = 0.5;
+			videoEl.play();
+
+			infoTitle.textContent = data.title || data.video_id.replace(/_/g, " ");
+			infoTags.textContent = data.tags && data.tags.length
+			  ? `🏷️ Tags: ${data.tags.join(", ")}`
+			  : "🏷️ Sin tags";
+			infoScore.textContent = data.score !== undefined
+			  ? `🔢 Score: ${data.score}`
+			  : "";
+		  })
+		  .catch(err => {
+			alert(tr('vertele.video.unsupported'));
 			console.error(err);
 		  });
 	  }
@@ -199,11 +229,10 @@
 		setTimeout(loadNextVideo, 500);
 	  });
 
-	  loadNextVideo();
-
-    // Cargar grilla de canales
-    fetch("/api/channels")
-      .then(res => {
+	  // Initialize i18n before loading content
+	  i18nInit().then(() => {
+		loadNextVideo();
+	  });
         if (!res.ok) throw new Error("{{ tr('vertele.channel.error') }}");
         return res.json();
       })
@@ -221,7 +250,8 @@
           canalesGrid.appendChild(btn);
         });
 
-        canalActivoLabel.textContent = `📡 Canal actual: ${data.canal_activo_nombre}`;
+        canalActivoLabel.textContent = `📡 Current channel: ${data.canal_activo_nombre}`;
+        channelNameEl.textContent = `📡 ${data.canal_activo_nombre}`;
       })
       .catch(err => {
         console.error("Error al cargar canales:", err);

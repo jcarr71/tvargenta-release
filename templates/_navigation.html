@@ -1,0 +1,13 @@
+<!-- Navigation Header - used on all pages -->
+<header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid rgba(255, 107, 107, 0.3);">
+  <h1 style="font-size: 2rem; font-weight: 700; background: linear-gradient(135deg, #ff6b6b 0%, #ff8e72 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+    📺 TVArgenta
+  </h1>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <a href="{{ url_for('library') }}" class="btn" style="padding: 0.5rem 1rem; background: rgba(100, 116, 139, 0.5); color: #94a3b8; border: 1px solid #64748b; border-radius: 0.375rem; text-decoration: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">📚 Library</a>
+    <a href="{{ url_for('watch') }}" class="btn" style="padding: 0.5rem 1rem; background: rgba(76, 175, 80, 0.2); color: #4caf50; border: 1px solid #4caf50; border-radius: 0.375rem; text-decoration: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">📺 Watch TV</a>
+    <a href="{{ url_for('channels') }}" class="btn" style="padding: 0.5rem 1rem; background: rgba(255, 193, 7, 0.2); color: #ffc107; border: 1px solid #ffc107; border-radius: 0.375rem; text-decoration: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">📡 Channels</a>
+    <a href="{{ url_for('patches') }}" class="btn" style="padding: 0.5rem 1rem; background: rgba(255, 107, 107, 0.2); color: #ff8e72; border: 1px solid #ff8e72; border-radius: 0.375rem; text-decoration: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">🔧 Patches</a>
+    <a href="/mod_manager" class="btn" style="padding: 0.5rem 1rem; background: rgba(0, 212, 255, 0.3); color: #00d4ff; border: 1px solid rgba(0, 212, 255, 0.6); border-radius: 0.375rem; text-decoration: none; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">📦 Mods</a>
+  </div>
+</header>

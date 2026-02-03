@@ -38,4 +38,4 @@ def change_channel(nuevo_canal_id, resetear_cola=True):
         for i, vid in enumerate(videos_in_queue):
             print(f"  {i+1}. {vid}")
     else:
-        print(f"[CANAL] No hay videos validos for el canal {nuevo_canal_id}")
+        print(f"[CHANNEL] No valid videos for channel {nuevo_canal_id}")

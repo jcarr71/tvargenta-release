@@ -1,0 +1,10 @@
+Flask
+Werkzeug
+Jinja2
+websockets
+Pillow
+qrcode
+av
+python-dotenv
+psutil
+ffmpeg-python

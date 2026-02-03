@@ -91,17 +91,25 @@
       </h1>
 
       <div class="flex items-center gap-4 flex-wrap">
-        <a href="{{ url_for('gestion') }}"
+        <a href="{{ url_for('library') }}"
            class="text-blue-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          ⬅ Back to Gestión
+          ← Library
         </a>
-        <a href="{{ url_for('series_page') }}"
-           class="text-purple-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          📺 Series Management
-        </a>
-        <a href="{{ url_for('vertele') }}"
+        <a href="{{ url_for('watch') }}"
            class="text-green-400 hover:underline text-sm sm:text-base whitespace-nowrap">
-          📺 Ver TV
+          📺 Watch TV
+        </a>
+        <a href="{{ url_for('channels') }}"
+           class="text-yellow-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          📡 Channels
+        </a>
+        <a href="{{ url_for('patches_manager') }}"
+           class="text-red-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          🔧 Patches
+        </a>
+        <a href="{{ url_for('mod_manager') }}"
+           class="text-cyan-400 hover:underline text-sm sm:text-base whitespace-nowrap">
+          📦 Mods
         </a>
       </div>
     </header>

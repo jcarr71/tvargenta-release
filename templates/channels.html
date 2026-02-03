@@ -106,6 +106,17 @@
             border-color: #00d4ff;
         }
 
+        .btn-channels {
+            background: rgba(255, 193, 7, 0.3);
+            color: #ffc107;
+            border: 1px solid rgba(255, 193, 7, 0.6);
+        }
+
+        .btn-channels:hover {
+            background: rgba(255, 193, 7, 0.5);
+            border-color: #ffc107;
+        }
+
         .btn-uploads {
             background: rgba(76, 175, 80, 0.3);
             color: #4caf50;
@@ -377,12 +388,11 @@
     <div class="container">
         <header>
             <h1>📡 Channels</h1>
-            <nav class="nav-buttons">
-                <a href="/" class="btn btn-secondary">← Home</a>
-                <a href="/watch" class="btn btn-watch">📺 Watch TV</a>
-                <a href="/patches" class="btn btn-patches">📋 Patches</a>
-                <a href="/mod_manager" class="btn btn-mods">📦 Mods</a>
-                <a href="/upload" class="btn btn-uploads">📤 Uploads</a>
+            <div class="nav-buttons">
+                <a href="{{ url_for('watch') }}" class="btn btn-secondary" style="background: rgba(76, 175, 80, 0.2); color: #4caf50; border-color: #4caf50;">📺 Watch TV</a>
+                <a href="{{ url_for('patches_manager') }}" class="btn btn-patches">🔧 Patches</a>
+                <a href="{{ url_for('mod_manager') }}" class="btn btn-mods">📦 Mods</a>
+                <a href="{{ url_for('library') }}" class="btn btn-secondary">📚 Library</a>
             </nav>
         </header>
 

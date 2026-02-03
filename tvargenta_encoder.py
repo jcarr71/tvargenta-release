@@ -73,7 +73,7 @@ def cambiar_al_siguiente(delta):
         with open("/tmp/trigger_reload.json", "w") as f:
             json.dump({"timestamp": time.time()}, f)
     else:
-        print(f"[{ts()}] [ENCODER] Canal no cambiÃ³ (circular)")
+        print(f"[{ts()}] [ENCODER] Channel did not change (circular)")
 
 def ajustar_volumen(delta):
     path = "/tmp/tvargenta_volumen.json"
