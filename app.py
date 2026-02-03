@@ -3326,6 +3326,59 @@ def patches_manager():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/logs")
+def logs_page():
+    """System logs viewer page."""
+    logger.info(_hdr("GET /logs"))
+    try:
+        return render_template("logs.html")
+    except Exception as e:
+        logger.error(f"Failed to render logs: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/logs", methods=["GET"])
+def api_logs():
+    """Fetch system logs from journalctl."""
+    try:
+        lines = request.args.get("lines", "100", type=int)
+        lines = min(lines, 1000)  # Cap at 1000 lines for safety
+        
+        result = subprocess.run(
+            ["journalctl", "-u", "tvargenta.service", "-n", str(lines), "--no-pager"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        
+        if result.returncode == 0:
+            log_lines = result.stdout.strip().split('\n') if result.stdout.strip() else []
+            return jsonify({
+                "ok": True,
+                "count": len(log_lines),
+                "logs": log_lines
+            })
+        else:
+            return jsonify({
+                "ok": False,
+                "count": 0,
+                "logs": [f"Error reading logs: {result.stderr}"]
+            }), 500
+    except subprocess.TimeoutExpired:
+        return jsonify({
+            "ok": False,
+            "count": 0,
+            "logs": ["Timeout reading logs"]
+        }), 500
+    except Exception as e:
+        logger.error(f"Failed to fetch logs: {e}")
+        return jsonify({
+            "ok": False,
+            "count": 0,
+            "logs": [f"Error: {str(e)}"]
+        }), 500
+
+
 @app.route("/static-intro.mp4")
 def intro_video():
     return send_file(INTRO_PATH, mimetype="video/mp4")
