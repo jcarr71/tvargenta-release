@@ -2697,10 +2697,14 @@ def channels():
     channels_data = load_channels()
 
     # Get series with display names
+    all_series_names = _get_all_series()
     all_series = [
         {"folder_name": name, "display_name": series_display_name(name)}
-        for name in _get_all_series()
+        for name in all_series_names
     ]
+    
+    logger.info(f"[CHANNELS] Loaded {len(all_series_names)} series: {all_series_names}")
+    logger.info(f"[CHANNELS] Formatted series: {all_series}")
 
     return render_template("channels.html", channels=channels_data, all_series=all_series, active_page='channels')
 
