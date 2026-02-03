@@ -588,55 +588,82 @@ generate_test_pattern() {
         return 0
     fi
 
-    # Download SMPTE color bars image
-    log_info "Downloading SMPTE color bars reference image..."
+    # Check if ffmpeg is installed
+    if ! command -v ffmpeg &> /dev/null; then
+        log_error "ffmpeg is not installed. Installing..."
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg || {
+            log_error "Failed to install ffmpeg"
+            return 1
+        }
+    fi
+
+    # Try to download SMPTE color bars image first
+    log_info "Attempting to download SMPTE color bars reference image..."
     local smpte_url="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/SMPTE_Color_Bars.svg/960px-SMPTE_Color_Bars.svg.png"
     
-    if ! wget -q -O "$SMPTE_IMAGE" "$smpte_url" 2>/dev/null; then
-        if ! curl -s -o "$SMPTE_IMAGE" -L "$smpte_url" 2>/dev/null; then
-            log_error "Failed to download SMPTE bars image from $smpte_url"
-            log_warn "Test pattern generation skipped"
-            return 1
+    if wget -q -O "$SMPTE_IMAGE" "$smpte_url" 2>/dev/null || curl -s -o "$SMPTE_IMAGE" -L "$smpte_url" 2>/dev/null; then
+        if [[ -f "$SMPTE_IMAGE" ]]; then
+            log_info "Downloaded SMPTE image ($(du -h "$SMPTE_IMAGE" | cut -f1))"
+            
+            # Generate 10-second test pattern video with SMPTE bars + 1kHz tone
+            log_info "Generating test pattern video with SMPTE bars (this takes ~10 seconds)..."
+            
+            if ffmpeg -y \
+                -loop 1 \
+                -i "$SMPTE_IMAGE" \
+                -f lavfi \
+                -i "sine=frequency=1000:sample_rate=48000" \
+                -c:v libx264 \
+                -preset ultrafast \
+                -tune stillimage \
+                -c:a aac \
+                -b:a 128k \
+                -pix_fmt yuv420p \
+                -t 10 \
+                "$PATTERN_FILE" 2>&1 | grep -E "frame=|Duration"; then
+                
+                local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
+                log_info "Test pattern video created successfully (${file_size})"
+                log_info "Location: ${PATTERN_FILE}"
+                
+                # Clean up temporary image
+                rm -f "$SMPTE_IMAGE"
+                return 0
+            else
+                log_error "ffmpeg failed to generate test pattern with SMPTE image"
+            fi
         fi
+    else
+        log_warn "Could not download SMPTE image - will generate pattern using lavfi only"
     fi
 
-    if [[ ! -f "$SMPTE_IMAGE" ]]; then
-        log_error "SMPTE image download verification failed"
-        return 1
-    fi
-
-    log_info "Downloaded SMPTE image ($(du -h "$SMPTE_IMAGE" | cut -f1))"
-
-    # Generate 1-hour test pattern video with 1kHz tone
-    log_info "Generating 1-hour test pattern video (this will take 2-3 minutes)..."
-    log_info "Creating video from SMPTE bars + 1kHz sine tone..."
+    # Fallback: Generate pattern without external image, using lavfi smptebars directly
+    log_info "Generating test pattern video using built-in color bars (this takes ~10 seconds)..."
     
-    # Run ffmpeg with visible progress output
     if ffmpeg -y \
-        -loop 1 \
-        -i "$SMPTE_IMAGE" \
         -f lavfi \
-        -i "sine=frequency=1000:sample_rate=48000" \
+        -i "smptebars=s=640x480:d=10" \
+        -f lavfi \
+        -i "sine=f=1000:d=10" \
         -c:v libx264 \
         -preset ultrafast \
-        -tune stillimage \
         -c:a aac \
         -b:a 128k \
         -pix_fmt yuv420p \
-        -t 3600 \
-        -shortest \
-        "$PATTERN_FILE"; then
+        "$PATTERN_FILE" 2>&1 | grep -E "frame=|Duration"; then
         
         local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
         log_info "Test pattern video created successfully (${file_size})"
         log_info "Location: ${PATTERN_FILE}"
         
-        # Clean up temporary image
+        # Clean up temporary image if it exists
         rm -f "$SMPTE_IMAGE"
         return 0
     else
         log_error "ffmpeg failed to generate test pattern video"
         log_error "Ensure ffmpeg is installed: sudo apt-get install -y ffmpeg"
+        rm -f "$SMPTE_IMAGE"
         return 1
     fi
 }
