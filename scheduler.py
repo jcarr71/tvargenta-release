@@ -363,53 +363,30 @@ def ensure_system_videos_exist() -> None:
 def generate_test_pattern_video() -> bool:
     """
     Generate SMPTE color bars test pattern video with 1kHz tone.
-    Creates a 1-hour video (800x480 base, scales to display) for looping during 3am-4am.
+    Creates a 1-hour video (800x480) for looping during 3am-4am.
+    Uses FFmpeg's built-in smptebars filter to guarantee exact resolution.
     """
     try:
         SYSTEM_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Download SMPTE color bars image
-        smpte_url = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/SMPTE_Color_Bars.svg/960px-SMPTE_Color_Bars.svg.png"
-        smpte_image = SYSTEM_VIDEO_DIR / "smpte_bars.png"
-
-        # Use wget or curl to download
-        try:
-            subprocess.run([
-                "wget", "-q", "-O", str(smpte_image), smpte_url
-            ], check=True, timeout=30)
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            # Try curl as fallback
-            subprocess.run([
-                "curl", "-s", "-o", str(smpte_image), "-L", smpte_url
-            ], check=True, timeout=30)
-
-        if not smpte_image.exists():
-            logger.error("[SCHEDULER] Failed to download SMPTE bars image")
-            return False
-
-        # Generate 1-hour test pattern video with 1kHz tone
-        # Resolution: 800x480 base, scales to fit any display
-        # Using ffmpeg to create video from image + generate tone
+        # Generate 1-hour test pattern video using FFmpeg's lavfi smptebars filter
+        # This guarantees 800x480 resolution (no scaling needed)
         subprocess.run([
             "ffmpeg", "-y",
-            "-loop", "1",
-            "-i", str(smpte_image),
+            "-f", "lavfi",
+            "-i", "smptebars=s=800x480:d=3600",
             "-f", "lavfi",
             "-i", "sine=frequency=1000:sample_rate=48000",
-            "-vf", "scale=800:480:force_original_aspect_ratio=decrease",
             "-c:v", "libx264",
             "-preset", "ultrafast",
-            "-tune", "stillimage",
             "-c:a", "aac",
             "-b:a", "128k",
             "-pix_fmt", "yuv420p",
-            "-t", "3600",  # 1 hour
-            "-shortest",
             str(TEST_PATTERN_VIDEO)
         ], check=True, timeout=600)
 
         logger.info(f"[SCHEDULER] Test pattern video created: {TEST_PATTERN_VIDEO}")
-        logger.info("[SCHEDULER] Note: Video encoded at 800x480 base resolution, scales to display")
+        logger.info("[SCHEDULER] Resolution: 800x480 @ 25fps, 1 hour duration")
         return True
 
     except Exception as e:

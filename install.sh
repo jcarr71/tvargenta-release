@@ -570,12 +570,11 @@ setup_audio() {
 # Shows progress meter during generation
 # =============================================================================
 generate_test_pattern() {
-    log_info "Generating test pattern video (1 hour, 800x480 - scaled to fit display)..."
+    log_info "Generating test pattern video (1 hour, 800x480 resolution)..."
 
     local INSTALL_DIR="/srv/tv-cbia"
     local VIDEO_DIR="${INSTALL_DIR}/content/videos/system"
     local PATTERN_FILE="${VIDEO_DIR}/test_pattern.mp4"
-    local SMPTE_IMAGE="${VIDEO_DIR}/smpte_bars.png"
     local TEMP_LOG="${VIDEO_DIR}/ffmpeg_progress.log"
 
     # Create system video directory
@@ -600,55 +599,9 @@ generate_test_pattern() {
         }
     fi
 
-    # Download SMPTE color bars reference image
-    log_info "Downloading SMPTE color bars reference image..."
-    local smpte_url="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/SMPTE_Color_Bars.svg/960px-SMPTE_Color_Bars.svg.png"
-    
-    if wget -q -O "$SMPTE_IMAGE" "$smpte_url" 2>/dev/null || curl -s -o "$SMPTE_IMAGE" -L "$smpte_url" 2>/dev/null; then
-        if [[ -f "$SMPTE_IMAGE" ]]; then
-            local img_size=$(du -h "$SMPTE_IMAGE" | cut -f1)
-            log_info "Downloaded SMPTE image (${img_size})"
-            
-            # Generate 1-hour test pattern video with SMPTE bars + 1kHz tone
-            # Resolution: 800x480 base, scales to fit any display with -vf scale=-1:-1
-            log_info "Generating 1-hour test pattern video (800x480 base resolution)..."
-            log_info "This will take ~1-2 minutes. Progress:"
-            
-            if ffmpeg -y \
-                -loop 1 \
-                -i "$SMPTE_IMAGE" \
-                -f lavfi \
-                -i "sine=frequency=1000:sample_rate=48000" \
-                -vf "scale=800:480:force_original_aspect_ratio=decrease" \
-                -c:v libx264 \
-                -preset ultrafast \
-                -tune stillimage \
-                -c:a aac \
-                -b:a 128k \
-                -pix_fmt yuv420p \
-                -t 3600 \
-                -progress pipe:1 \
-                "$PATTERN_FILE" 2>&1 | tee "$TEMP_LOG" | grep -E "^frame=|^out_time=" | tail -1; then
-                
-                local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
-                log_info "✓ Test pattern video created successfully (${file_size})"
-                log_info "  Location: ${PATTERN_FILE}"
-                log_info "  Note: Video is encoded at 800x480 and will scale to match display"
-                
-                # Clean up temporary files
-                rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
-                return 0
-            else
-                log_error "ffmpeg failed to generate test pattern with SMPTE image"
-                rm -f "$TEMP_LOG"
-            fi
-        fi
-    else
-        log_warn "Could not download SMPTE image - using fallback method"
-    fi
-
-    # Fallback: Generate pattern using lavfi smptebars directly (800x480, 1 hour)
-    log_info "Generating test pattern using built-in color bars (800x480)..."
+    # Generate 1-hour test pattern video using FFmpeg's built-in smptebars generator
+    # Guarantees 800x480 resolution with 1kHz audio tone
+    log_info "Generating 1-hour test pattern using SMPTE color bars (800x480)..."
     log_info "This will take ~1-2 minutes. Progress:"
     
     if ffmpeg -y \
@@ -667,15 +620,15 @@ generate_test_pattern() {
         local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
         log_info "✓ Test pattern video created successfully (${file_size})"
         log_info "  Location: ${PATTERN_FILE}"
-        log_info "  Note: Video is encoded at 800x480 and will scale to match display"
+        log_info "  Resolution: 800x480 @ 25fps, 1 hour duration"
         
         # Clean up temporary files
-        rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
+        rm -f "$TEMP_LOG"
         return 0
     else
         log_error "ffmpeg failed to generate test pattern video"
         log_error "Ensure ffmpeg is installed: sudo apt-get install -y ffmpeg"
-        rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
+        rm -f "$TEMP_LOG"
         return 1
     fi
 }
