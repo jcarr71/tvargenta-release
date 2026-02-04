@@ -566,15 +566,17 @@ setup_audio() {
 # =============================================================================
 # SETUP TEST PATTERN
 # Generates SMPTE color bars test pattern with 1kHz tone during install
-# Shows progress with ffmpeg output
+# Uses original method: downloads SMPTE image and creates 1-hour video
+# Shows progress meter during generation
 # =============================================================================
 generate_test_pattern() {
-    log_info "Generating test pattern video..."
+    log_info "Generating test pattern video (1 hour, 1920x1080)..."
 
     local INSTALL_DIR="/srv/tv-cbia"
     local VIDEO_DIR="${INSTALL_DIR}/content/videos/system"
     local PATTERN_FILE="${VIDEO_DIR}/test_pattern.mp4"
     local SMPTE_IMAGE="${VIDEO_DIR}/smpte_bars.png"
+    local TEMP_LOG="${VIDEO_DIR}/ffmpeg_progress.log"
 
     # Create system video directory
     if [[ ! -d "$VIDEO_DIR" ]]; then
@@ -598,16 +600,18 @@ generate_test_pattern() {
         }
     fi
 
-    # Try to download SMPTE color bars image first
-    log_info "Attempting to download SMPTE color bars reference image..."
+    # Download SMPTE color bars reference image (1920x1080)
+    log_info "Downloading SMPTE color bars reference image..."
     local smpte_url="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/SMPTE_Color_Bars.svg/960px-SMPTE_Color_Bars.svg.png"
     
     if wget -q -O "$SMPTE_IMAGE" "$smpte_url" 2>/dev/null || curl -s -o "$SMPTE_IMAGE" -L "$smpte_url" 2>/dev/null; then
         if [[ -f "$SMPTE_IMAGE" ]]; then
-            log_info "Downloaded SMPTE image ($(du -h "$SMPTE_IMAGE" | cut -f1))"
+            local img_size=$(du -h "$SMPTE_IMAGE" | cut -f1)
+            log_info "Downloaded SMPTE image (${img_size})"
             
-            # Generate 10-second test pattern video with SMPTE bars + 1kHz tone
-            log_info "Generating test pattern video with SMPTE bars (this takes ~10 seconds)..."
+            # Generate 1-hour test pattern video with SMPTE bars + 1kHz tone
+            log_info "Generating 1-hour test pattern video with SMPTE bars..."
+            log_info "This will take ~2-3 minutes. Progress:"
             
             if ffmpeg -y \
                 -loop 1 \
@@ -620,50 +624,54 @@ generate_test_pattern() {
                 -c:a aac \
                 -b:a 128k \
                 -pix_fmt yuv420p \
-                -t 10 \
-                "$PATTERN_FILE" 2>&1 | grep -E "frame=|Duration"; then
+                -t 3600 \
+                -progress pipe:1 \
+                "$PATTERN_FILE" 2>&1 | tee "$TEMP_LOG" | grep -E "^frame=|^out_time=" | tail -1; then
                 
                 local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
-                log_info "Test pattern video created successfully (${file_size})"
-                log_info "Location: ${PATTERN_FILE}"
+                log_info "✓ Test pattern video created successfully (${file_size})"
+                log_info "  Location: ${PATTERN_FILE}"
                 
-                # Clean up temporary image
-                rm -f "$SMPTE_IMAGE"
+                # Clean up temporary files
+                rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
                 return 0
             else
                 log_error "ffmpeg failed to generate test pattern with SMPTE image"
+                rm -f "$TEMP_LOG"
             fi
         fi
     else
-        log_warn "Could not download SMPTE image - will generate pattern using lavfi only"
+        log_warn "Could not download SMPTE image - using fallback method"
     fi
 
-    # Fallback: Generate pattern without external image, using lavfi smptebars directly
-    log_info "Generating test pattern video using built-in color bars (this takes ~10 seconds)..."
+    # Fallback: Generate pattern using lavfi smptebars directly (1920x1080, 1 hour)
+    log_info "Generating test pattern using built-in color bars..."
+    log_info "This will take ~2-3 minutes. Progress:"
     
     if ffmpeg -y \
         -f lavfi \
-        -i "smptebars=s=640x480:d=10" \
+        -i "smptebars=s=1920x1080:d=3600" \
         -f lavfi \
-        -i "sine=f=1000:d=10" \
+        -i "sine=frequency=1000:sample_rate=48000" \
         -c:v libx264 \
         -preset ultrafast \
         -c:a aac \
         -b:a 128k \
         -pix_fmt yuv420p \
-        "$PATTERN_FILE" 2>&1 | grep -E "frame=|Duration"; then
+        -progress pipe:1 \
+        "$PATTERN_FILE" 2>&1 | tee "$TEMP_LOG" | grep -E "^frame=|^out_time=" | tail -1; then
         
         local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
-        log_info "Test pattern video created successfully (${file_size})"
-        log_info "Location: ${PATTERN_FILE}"
+        log_info "✓ Test pattern video created successfully (${file_size})"
+        log_info "  Location: ${PATTERN_FILE}"
         
-        # Clean up temporary image if it exists
-        rm -f "$SMPTE_IMAGE"
+        # Clean up temporary files
+        rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
         return 0
     else
         log_error "ffmpeg failed to generate test pattern video"
         log_error "Ensure ffmpeg is installed: sudo apt-get install -y ffmpeg"
-        rm -f "$SMPTE_IMAGE"
+        rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
         return 1
     fi
 }
