@@ -363,7 +363,7 @@ def ensure_system_videos_exist() -> None:
 def generate_test_pattern_video() -> bool:
     """
     Generate SMPTE color bars test pattern video with 1kHz tone.
-    Creates a 1-hour video for looping during 3am-4am.
+    Creates a 1-hour video (800x480 base, scales to display) for looping during 3am-4am.
     """
     try:
         SYSTEM_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
@@ -388,6 +388,7 @@ def generate_test_pattern_video() -> bool:
             return False
 
         # Generate 1-hour test pattern video with 1kHz tone
+        # Resolution: 800x480 base, scales to fit any display
         # Using ffmpeg to create video from image + generate tone
         subprocess.run([
             "ffmpeg", "-y",
@@ -395,6 +396,7 @@ def generate_test_pattern_video() -> bool:
             "-i", str(smpte_image),
             "-f", "lavfi",
             "-i", "sine=frequency=1000:sample_rate=48000",
+            "-vf", "scale=800:480:force_original_aspect_ratio=decrease",
             "-c:v", "libx264",
             "-preset", "ultrafast",
             "-tune", "stillimage",
@@ -407,6 +409,7 @@ def generate_test_pattern_video() -> bool:
         ], check=True, timeout=600)
 
         logger.info(f"[SCHEDULER] Test pattern video created: {TEST_PATTERN_VIDEO}")
+        logger.info("[SCHEDULER] Note: Video encoded at 800x480 base resolution, scales to display")
         return True
 
     except Exception as e:

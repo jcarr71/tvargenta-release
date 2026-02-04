@@ -570,7 +570,7 @@ setup_audio() {
 # Shows progress meter during generation
 # =============================================================================
 generate_test_pattern() {
-    log_info "Generating test pattern video (1 hour, 1920x1080)..."
+    log_info "Generating test pattern video (1 hour, 800x480 - scaled to fit display)..."
 
     local INSTALL_DIR="/srv/tv-cbia"
     local VIDEO_DIR="${INSTALL_DIR}/content/videos/system"
@@ -600,7 +600,7 @@ generate_test_pattern() {
         }
     fi
 
-    # Download SMPTE color bars reference image (1920x1080)
+    # Download SMPTE color bars reference image
     log_info "Downloading SMPTE color bars reference image..."
     local smpte_url="https://upload.wikimedia.org/wikipedia/commons/thumb/6/66/SMPTE_Color_Bars.svg/960px-SMPTE_Color_Bars.svg.png"
     
@@ -610,14 +610,16 @@ generate_test_pattern() {
             log_info "Downloaded SMPTE image (${img_size})"
             
             # Generate 1-hour test pattern video with SMPTE bars + 1kHz tone
-            log_info "Generating 1-hour test pattern video with SMPTE bars..."
-            log_info "This will take ~2-3 minutes. Progress:"
+            # Resolution: 800x480 base, scales to fit any display with -vf scale=-1:-1
+            log_info "Generating 1-hour test pattern video (800x480 base resolution)..."
+            log_info "This will take ~1-2 minutes. Progress:"
             
             if ffmpeg -y \
                 -loop 1 \
                 -i "$SMPTE_IMAGE" \
                 -f lavfi \
                 -i "sine=frequency=1000:sample_rate=48000" \
+                -vf "scale=800:480:force_original_aspect_ratio=decrease" \
                 -c:v libx264 \
                 -preset ultrafast \
                 -tune stillimage \
@@ -631,6 +633,7 @@ generate_test_pattern() {
                 local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
                 log_info "✓ Test pattern video created successfully (${file_size})"
                 log_info "  Location: ${PATTERN_FILE}"
+                log_info "  Note: Video is encoded at 800x480 and will scale to match display"
                 
                 # Clean up temporary files
                 rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
@@ -644,13 +647,13 @@ generate_test_pattern() {
         log_warn "Could not download SMPTE image - using fallback method"
     fi
 
-    # Fallback: Generate pattern using lavfi smptebars directly (1920x1080, 1 hour)
-    log_info "Generating test pattern using built-in color bars..."
-    log_info "This will take ~2-3 minutes. Progress:"
+    # Fallback: Generate pattern using lavfi smptebars directly (800x480, 1 hour)
+    log_info "Generating test pattern using built-in color bars (800x480)..."
+    log_info "This will take ~1-2 minutes. Progress:"
     
     if ffmpeg -y \
         -f lavfi \
-        -i "smptebars=s=1920x1080:d=3600" \
+        -i "smptebars=s=800x480:d=3600" \
         -f lavfi \
         -i "sine=frequency=1000:sample_rate=48000" \
         -c:v libx264 \
@@ -664,6 +667,7 @@ generate_test_pattern() {
         local file_size=$(du -h "$PATTERN_FILE" | cut -f1)
         log_info "✓ Test pattern video created successfully (${file_size})"
         log_info "  Location: ${PATTERN_FILE}"
+        log_info "  Note: Video is encoded at 800x480 and will scale to match display"
         
         # Clean up temporary files
         rm -f "$SMPTE_IMAGE" "$TEMP_LOG"
