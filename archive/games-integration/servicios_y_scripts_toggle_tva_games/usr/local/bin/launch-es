@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+
+# Aseguramos entorno gráfico correcto
+export DISPLAY=:0
+export XDG_RUNTIME_DIR=/run/user/1000
+export TERM=xterm
+
+# EmulationStation propio de RetroPie
+ES_BIN="/opt/retropie/supplementary/emulationstation/emulationstation"
+
+# Ejecutar como usuario normal (rs) con un entorno limpio y explícito
+exec sudo -u rs env -i \
+    HOME=/home/rs \
+    USER=rs \
+    LOGNAME=rs \
+    SHELL=/bin/bash \
+    DISPLAY=:0 \
+    XDG_RUNTIME_DIR=/run/user/1000 \
+    TERM=xterm \
+    "$ES_BIN"
+

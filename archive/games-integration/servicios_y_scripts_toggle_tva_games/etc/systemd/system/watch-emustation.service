@@ -1,0 +1,13 @@
+[Unit]
+Description=Watcher: vuelve a TVArgenta cuando EmulationStation termina
+After=emulationstation-session.service
+PartOf=enter-gaming.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/watch-emustation.sh
+Restart=no
+
+[Install]
+WantedBy=multi-user.target
+
