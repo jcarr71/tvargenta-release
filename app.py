@@ -80,6 +80,7 @@ def _hdr(name):
 # Ruta base de videos y metadatos
 TRIGGER_PATH = str(TMP_DIR / "trigger_reload.json")
 VOLUMEN_PATH = str(TMP_DIR / "tvargenta_volumen.json")
+VOLUMEN_PERSIST_PATH = CONTENT_DIR / "volumen.json"
 MENU_TRIGGER_PATH = str(TMP_DIR / "trigger_menu.json")
 MENU_STATE_PATH  = str(TMP_DIR / "menu_state.json")
 MENU_NAV_PATH    = str(TMP_DIR / "trigger_menu_nav.json")
@@ -139,15 +140,24 @@ def _start_ap_auto_stop_timer():
 DEFAULT_VOL = 25  # % volumen por defecto
 
 def init_volumen_por_defecto():
-    """Si no existe el archivo de volumen, lo crea con DEFAULT_VOL y notifica al front."""
+    """Restore volume from persistent storage, or create with DEFAULT_VOL."""
     try:
+        # Restore from persistent file if available, otherwise use default
+        vol = DEFAULT_VOL
+        if os.path.exists(VOLUMEN_PERSIST_PATH):
+            try:
+                with open(VOLUMEN_PERSIST_PATH, "r") as f:
+                    vol = json.load(f).get("valor", DEFAULT_VOL)
+                logger.info(f"[VOLUMEN] Restored from disk: {vol}%")
+            except (json.JSONDecodeError, ValueError):
+                logger.warning("[VOLUMEN] Persistent file corrupt, using default")
+
         if not os.path.exists(VOLUMEN_PATH):
             with open(VOLUMEN_PATH, "w") as f:
-                json.dump({"valor": DEFAULT_VOL}, f)
-            # avisar al front para que levante el valor inicial
+                json.dump({"valor": vol}, f)
             with open("/tmp/trigger_volumen.json", "w") as f:
                 json.dump({"timestamp": time.time()}, f)
-            logger.info(f"[VOLUMEN] Default inicializado en {DEFAULT_VOL}%")
+            logger.info(f"[VOLUMEN] Initialized at {vol}%")
     except Exception as e:
         logger.warning(f"[VOLUMEN] No pude inicializar default: {e}")
 
@@ -701,15 +711,25 @@ def save_tags(tags_data):
 
 _bootstrap_config_from_tags_if_empty()
 
-def get_canal_activo():
+def _load_canal_activo_data():
+    """Safely load canal_activo.json, recovering from empty/corrupt files."""
     if os.path.exists(CANAL_ACTIVO_FILE):
-        with open(CANAL_ACTIVO_FILE, "r", encoding="utf-8") as f:
-            return json.load(f).get("canal_id", "base")
-    return "base"
+        try:
+            with open(CANAL_ACTIVO_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, dict) and data.get("canal_id"):
+                    return data
+        except (json.JSONDecodeError, ValueError):
+            logger.warning("[CANAL] canal_activo.json corrupt/empty – resetting to default")
+        # File exists but is corrupt/empty – rewrite default
+        _write_json_atomic(CANAL_ACTIVO_FILE, DEFAULT_CANAL_ACTIVO)
+    return dict(DEFAULT_CANAL_ACTIVO)
+
+def get_canal_activo():
+    return _load_canal_activo_data().get("canal_id", "base")
 
 def set_canal_activo(canal_id):
-    with open(CANAL_ACTIVO_FILE, "w", encoding="utf-8") as f:
-        json.dump({"canal_id": canal_id}, f, indent=2, ensure_ascii=False)
+    _write_json_atomic(CANAL_ACTIVO_FILE, {"canal_id": canal_id})
 
 
 def get_canal_numero(canal_id, canales=None):
@@ -1581,24 +1601,11 @@ def guardar_configuracion():
 def vertele():
     canales = load_canales()
 
-    canal_activo_path = str(CANAL_ACTIVO_FILE)
-    canal_activo = None
-
-    if not os.path.exists(canal_activo_path):
-        # ElegÃ­ un id real: primero el de DEFAULT_CANAL_ACTIVO si existe, si no, el primer canal disponible
-        preferido = DEFAULT_CANAL_ACTIVO.get("canal_id", "1")
-        if preferido not in canales:
-            preferido = next(iter(canales.keys()), "1")
-        with open(canal_activo_path, "w", encoding="utf-8") as f:
-            json.dump({"canal_id": preferido}, f, ensure_ascii=False, indent=2)
-        canal_activo = preferido
-    else:
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
-            activo_data = json.load(f)
-            canal_activo = activo_data.get("canal_id") or DEFAULT_CANAL_ACTIVO.get("canal_id", "1")
-            if canal_activo not in canales and canales:
-                canal_activo = next(iter(canales.keys()))
-                set_canal_activo(canal_activo)  # persistÃ­ la migraciÃ³n
+    activo_data = _load_canal_activo_data()
+    canal_activo = activo_data.get("canal_id", "1")
+    if canal_activo not in canales and canales:
+        canal_activo = next(iter(canales.keys()))
+        set_canal_activo(canal_activo)
 
     return render_template("vertele.html",
                            canales=canales,
@@ -1608,60 +1615,55 @@ def vertele():
 
 @app.route("/api/next_video")
 def api_next_video():
+    # Safely read the active channel once for the whole request
+    activo = _load_canal_activo_data()
+    activo_canal_id = activo.get("canal_id")
+
     # Check if we're on Channel 03 (system AV input channel)
-    canal_activo_path = str(CANAL_ACTIVO_FILE)
-    if os.path.exists(canal_activo_path):
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
-            activo = json.load(f)
-            if activo.get("canal_id") == "03":
-                # Channel 03 is the AV input - frontend handles display based on VCR state
-                return jsonify({
-                    "channel_type": "av_input",
-                    "modo": "03",
-                    "canal_nombre": "03",
-                    "canal_id": "03",
-                    "canal_numero": "03",
-                })
+    if activo_canal_id == "03":
+        return jsonify({
+            "channel_type": "av_input",
+            "modo": "03",
+            "canal_nombre": "03",
+            "canal_id": "03",
+            "canal_numero": "03",
+        })
 
     # Check for broadcast TV scheduling
     # If channel has series_filter, use scheduled content instead of fairness-based selection
     canales = load_canales()
-    if os.path.exists(canal_activo_path):
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
-            activo = json.load(f)
-            canal_id = activo.get("canal_id")
-            if canal_id and canal_id in canales:
-                config = canales[canal_id]
-                if config.get("series_filter"):
-                    # This is a broadcast TV channel - use scheduler
-                    try:
-                        scheduled = scheduler.get_scheduled_content(canal_id)
-                        if scheduled:
-                            logger.info(f"[NEXT] Broadcast channel {canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
+    if activo_canal_id and activo_canal_id in canales:
+        config = canales[activo_canal_id]
+        if config.get("series_filter"):
+            # This is a broadcast TV channel - use scheduler
+            try:
+                scheduled = scheduler.get_scheduled_content(activo_canal_id)
+                if scheduled:
+                    logger.info(f"[NEXT] Broadcast channel {activo_canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
 
-                            # Get loudness data for automatic volume adjustment
-                            video_id = scheduled["video_id"]
-                            broadcast_metadata = load_metadata()
-                            loudness_lufs = None
-                            if video_id in broadcast_metadata:
-                                loudness_lufs = broadcast_metadata[video_id].get("loudness_lufs")
+                    # Get loudness data for automatic volume adjustment
+                    video_id = scheduled["video_id"]
+                    broadcast_metadata = load_metadata()
+                    loudness_lufs = None
+                    if video_id in broadcast_metadata:
+                        loudness_lufs = broadcast_metadata[video_id].get("loudness_lufs")
 
-                            return jsonify({
-                                "video_id": video_id,
-                                "video_url": scheduled["video_url"],
-                                "seek_to": scheduled.get("seek_to", 0),
-                                "title": scheduled.get("title", ""),
-                                "tags": [],
-                                "modo": canal_id,
-                                "canal_nombre": config.get("nombre", canal_id),
-                                "canal_numero": get_canal_numero(canal_id, canales),
-                                "broadcast_type": scheduled["type"],
-                                "is_broadcast": True,
-                                "loudness_lufs": loudness_lufs
-                            })
-                    except Exception as e:
-                        logger.error(f"[NEXT] Broadcast scheduling error for {canal_id}: {e}")
-                        # Fall through to normal selection if scheduler fails
+                    return jsonify({
+                        "video_id": video_id,
+                        "video_url": scheduled["video_url"],
+                        "seek_to": scheduled.get("seek_to", 0),
+                        "title": scheduled.get("title", ""),
+                        "tags": [],
+                        "modo": activo_canal_id,
+                        "canal_nombre": config.get("nombre", activo_canal_id),
+                        "canal_numero": get_canal_numero(activo_canal_id, canales),
+                        "broadcast_type": scheduled["type"],
+                        "is_broadcast": True,
+                        "loudness_lufs": loudness_lufs
+                    })
+            except Exception as e:
+                logger.error(f"[NEXT] Broadcast scheduling error for {activo_canal_id}: {e}")
+                # Fall through to normal selection if scheduler fails
 
     metadata = load_metadata()
 
@@ -1673,12 +1675,9 @@ def api_next_video():
     canal_id = "canal_base"
     config = load_config()
 
-    if os.path.exists(canal_activo_path):
-        with open(canal_activo_path, "r", encoding="utf-8") as f:
-            activo = json.load(f)
-            if activo.get("canal_id") in canales:
-                canal_id = activo["canal_id"]
-                config = canales[canal_id]
+    if activo_canal_id in canales:
+        canal_id = activo_canal_id
+        config = canales[canal_id]
     
     # --- De-dupe: si hay pick pendiente "fresco", reusalo ---
     now = time.time()
@@ -2781,9 +2780,10 @@ def api_should_reload():
 def api_volumen():
     if request.method == "POST":
         data = request.get_json()
-        nuevo_valor = max(0, min(100, data.get("valor", 50)))  # rango 0â€“100
+        nuevo_valor = max(0, min(100, data.get("valor", 50)))  # rango 0â€"100
         with open(VOLUMEN_PATH, "w") as f:
             json.dump({"valor": nuevo_valor}, f)
+        _write_json_atomic(VOLUMEN_PERSIST_PATH, {"valor": nuevo_valor})
         return jsonify({"ok": True, "valor": nuevo_valor})
 
     # mÃ©todo GET
