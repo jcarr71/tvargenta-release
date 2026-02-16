@@ -1044,6 +1044,7 @@
 
 		  // 6) preferencias UI (badge de canal, etc.)
 		  await cargarUiPrefs();
+		  await cargarBroadcastModeSetting();
 		} catch (e) {
 		  console.error("[PLAYER] init falló:", e);
 		  // fall back: igual probá cargar
@@ -1547,8 +1548,32 @@
 	let btPairedCache = [];      // lista de emparejados [{mac,name,connected},...]
 	let btScanCache = [];        // lista de nuevos sin emparejar [{mac,name},...]
 	let btSelectedIndex = null;  // qué item eligió el usuario dentro de esas listas
+	let channelsCache = [];       // [{id,nombre,icono}, ...]
+	let channelsMenuSource = "mine"; // "mine" | "predefined"
 	// WiFi
 	let wifiKnownCache = [];
+
+	async function loadChannelsMenuData() {
+	  try {
+		const r = await fetch("/api/canales");
+		const d = await r.json();
+		channelsCache = Array.isArray(d?.canales) ? d.canales : [];
+	  } catch (e) {
+		console.error("[MENU] load channels failed:", e);
+		channelsCache = [];
+	  }
+	}
+
+	function getChannelsForMenu(source = channelsMenuSource) {
+	  const all = Array.isArray(channelsCache) ? channelsCache : [];
+	  // Historical convention in this app:
+	  // - predefined channels usually have non-numeric ids
+	  // - user-created channels are generated with numeric ids
+	  if (source === "predefined") {
+		return all.filter(c => !/^\d+$/.test(String(c?.id ?? "")));
+	  }
+	  return all.filter(c => /^\d+$/.test(String(c?.id ?? "")));
+	}
 
 
 	// Asegura que el adaptador esté encendido y con agent/default-agent
@@ -2007,12 +2032,28 @@
 		  break;
 		}
 
+		case "channels_list": {
+		  const list = getChannelsForMenu(channelsMenuSource);
+		  if (list.length) {
+			for (const canal of list) {
+			  const nombre = (canal?.nombre || canal?.id || "").trim();
+			  items.push(nombre || String(canal?.id || "?"));
+			}
+		  } else {
+			items.push("No channels available");
+		  }
+		  items.push(tr("menu.back"));
+		  break;
+		}
+
 		// =========================
 		// CONFIG
 		// =========================
 		case "config": {
 		  const onOff = uiShowChannelName ? tr("settings.yes") : tr("settings.no");
 		  items.push(`${tr("settings.show_channel_name")}: ${onOff}`);
+		  const broadcastOnOff = broadcastModeEnabled ? tr("settings.yes") : tr("settings.no");
+		  items.push(`${tr("settings.broadcast_mode")}: ${broadcastOnOff}`);
 		  items.push(tr("settings.language"));
 		  items.push(tr("settings.timezone"));
 		  items.push(tr("settings.wifi"));
@@ -2236,6 +2277,9 @@
 		  ocultarOverlay();
 		  return go("config");
 
+		case "channels_list":
+		  return go("main");
+
 		case "wifi_known_list":
 		  wifiApOverlayActive = false;
 		  ocultarOverlay();
@@ -2277,6 +2321,18 @@ function ejecutarSeleccion() {
   if (menuMode === "main") {
     if (isBack(label)) return ocultarMenu();
 
+	if (label === tr("menu.predefined")) {
+	  channelsMenuSource = "predefined";
+	  loadChannelsMenuData().then(() => go("channels_list"));
+	  return;
+	}
+
+	if (label === tr("menu.mine")) {
+	  channelsMenuSource = "mine";
+	  loadChannelsMenuData().then(() => go("channels_list"));
+	  return;
+	}
+
     if (label === tr("menu.settings")) return go("config");
     if (label === tr("menu.poweroff")) return go("power_confirm");
 
@@ -2297,6 +2353,46 @@ function ejecutarSeleccion() {
     return;
   }
 
+	// =========================
+	// SUBMENÚ CHANNEL LIST
+	// =========================
+	if (menuMode === "channels_list") {
+	  const list = getChannelsForMenu(channelsMenuSource);
+	  const last = items.length - 1;
+
+	  if (menuIndex === last || isBack(label)) {
+		return goBackFrom("channels_list");
+	  }
+
+	  if (!list.length) {
+		return goBackFrom("channels_list");
+	  }
+
+	  const selected = list[menuIndex];
+	  if (!selected?.id) {
+		resetMenuTimer();
+		return;
+	  }
+
+	  fetch("/api/set_canal_activo", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ canal_id: String(selected.id) })
+	  })
+		.then(() => {
+		  if (typeof showChannelNumber === "function") {
+			showChannelNumber(String(selected.id));
+		  }
+		  ocultarMenu();
+		  cargarSiguienteVideo(true);
+		})
+		.catch((e) => {
+		  console.error("[MENU] set channel failed:", e);
+		  mostrarOverlay(tr("overlay.net_error"));
+		});
+	  return;
+	}
+
   // =========================
   // SUBMENÚ CONFIG
   // =========================
@@ -2313,6 +2409,12 @@ function ejecutarSeleccion() {
       guardarUiPrefs();
       return go("config");
     }
+
+	  if (label.startsWith(tr("settings.broadcast_mode"))) {
+		broadcastModeEnabled = !broadcastModeEnabled;
+		saveBroadcastModeSetting();
+		return go("config");
+	  }
 
     if (label === tr("settings.language")) {
       return go("lang_root");
@@ -2709,9 +2811,181 @@ function ejecutarSeleccion() {
 	  }
 	}, 120);
 
+	// ----------------------
+	// KEYBOARD SHORTCUTS (desktop/debug)
+	// ----------------------
+	function isTypingContext() {
+	  const el = document.activeElement;
+	  if (!el) return false;
+	  const tag = (el.tagName || "").toLowerCase();
+	  return tag === "input" || tag === "textarea" || tag === "select" || el.isContentEditable;
+	}
+
+	async function keyboardAdjustVolume(delta) {
+	  try {
+		const res = await fetch("/api/volumen");
+		const data = await res.json();
+		const actual = Number(data?.valor ?? 50);
+		const nuevo = Math.max(0, Math.min(100, actual + delta));
+
+		await fetch("/api/volumen", {
+		  method: "POST",
+		  headers: { "Content-Type": "application/json" },
+		  body: JSON.stringify({ valor: nuevo })
+		});
+
+		mostrarVolumen(nuevo);
+	  } catch (e) {
+		console.warn("[KB] volume adjust failed:", e);
+	  }
+	}
+
+	let keyboardChannelBusy = false;
+
+	function sortChannelIds(ids) {
+	  return [...ids].sort((a, b) => {
+		const aNum = /^\d+$/.test(a);
+		const bNum = /^\d+$/.test(b);
+
+		if (aNum && bNum) return Number(a) - Number(b);
+		if (aNum && !bNum) return -1;
+		if (!aNum && bNum) return 1;
+		return a.localeCompare(b, undefined, { sensitivity: "base" });
+	  });
+	}
+
+	async function keyboardChangeChannel(delta) {
+	  if (keyboardChannelBusy) return;
+	  keyboardChannelBusy = true;
+
+	  try {
+		const r = await fetch("/api/canales");
+		const d = await r.json();
+		const userChannels = Array.isArray(d?.canales)
+		  ? d.canales
+			  .map(c => String(c.id))
+			  .filter(id => id && id !== "03")
+		  : [];
+		const orderedUserChannels = sortChannelIds(userChannels);
+
+		const channels = ["03", ...orderedUserChannels];
+		if (!channels.length) return;
+
+		let current = String(currentChannelId || ultimoCanal || channels[0]);
+		if (current === "3") current = "03";
+
+		let idx = channels.indexOf(current);
+		if (idx < 0) idx = 0;
+
+		const nextId = channels[(idx + (delta > 0 ? 1 : -1) + channels.length) % channels.length];
+
+		// Update local state immediately so repeated key presses stay in sequence.
+		currentChannelId = nextId;
+		ultimoCanal = nextId;
+
+		await fetch("/api/set_canal_activo", {
+		  method: "POST",
+		  headers: { "Content-Type": "application/json" },
+		  body: JSON.stringify({ canal_id: nextId })
+		});
+
+		if (typeof showChannelNumber === "function") {
+		  showChannelNumber(nextId);
+		}
+		cargarSiguienteVideo(true);
+	  } catch (e) {
+		console.warn("[KB] channel change failed:", e);
+	  } finally {
+		keyboardChannelBusy = false;
+	  }
+	}
+
+	async function keyboardVcrPauseToggle() {
+	  try {
+		const res = await fetch("/api/vcr/pause", { method: "POST" });
+		const data = await res.json();
+		if (data?.ok && typeof pollVcrState === "function") {
+		  pollVcrState();
+		}
+	  } catch (e) {
+		console.warn("[KB] VCR pause toggle failed:", e);
+	  }
+	}
+
+	document.addEventListener("keydown", async (e) => {
+	  if (isTypingContext()) return;
+
+	  const key = e.key;
+	  const lower = (key || "").toLowerCase();
+
+	  // Keep browser from scrolling/focusing controls with these keys
+	  const prevent = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Spacebar", "Enter"];
+	  if (prevent.includes(key)) {
+		e.preventDefault();
+	  }
+
+	  // m: toggle menu
+	  if (lower === "m") {
+		if (menuVisible) ocultarMenu();
+		else mostrarMenu();
+		return;
+	  }
+
+	  // Esc: close menu if open
+	  if (key === "Escape") {
+		if (menuVisible) ocultarMenu();
+		return;
+	  }
+
+	  // Enter/Space: select in menu, else pause behavior
+	  if (key === "Enter" || key === " " || key === "Spacebar") {
+		if (menuVisible) {
+		  ejecutarSeleccion();
+		  return;
+		}
+
+		if (currentChannelId === VCR_CHANNEL_ID && vcrState?.tape_inserted && !vcrState?.is_rewinding) {
+		  await keyboardVcrPauseToggle();
+		  return;
+		}
+
+		// Fallback for non-VCR channels: local play/pause
+		if (video.paused) video.play().catch(() => {});
+		else video.pause();
+		return;
+	  }
+
+	  // When menu is open, arrows navigate menu
+	  if (menuVisible) {
+		if (key === "ArrowUp") moverCursor(-1);
+		else if (key === "ArrowDown") moverCursor(+1);
+		return;
+	  }
+
+	  // When menu is closed:
+	  // Left/Right => channel -/+ ; Up/Down => volume +/-
+	  if (key === "ArrowLeft") {
+		await keyboardChangeChannel(-1);
+		return;
+	  }
+	  if (key === "ArrowRight") {
+		await keyboardChangeChannel(+1);
+		return;
+	  }
+	  if (key === "ArrowUp") {
+		await keyboardAdjustVolume(+5);
+		return;
+	  }
+	  if (key === "ArrowDown") {
+		await keyboardAdjustVolume(-5);
+		return;
+	  }
+	});
+
 	
 	// --- Preferencias UI ---
 	let uiShowChannelName = true;
+	let broadcastModeEnabled = true;
 	const channelBadgeEl = document.getElementById("channel-badge");
 
 	async function cargarUiPrefs() {
@@ -2733,6 +3007,29 @@ function ejecutarSeleccion() {
 		  headers: {"Content-Type": "application/json"},
 		  body: JSON.stringify({ show_channel_name: uiShowChannelName })
 		});
+	  } catch {}
+	}
+
+	async function cargarBroadcastModeSetting() {
+	  try {
+		const r = await fetch("/api/broadcast_mode");
+		const d = await r.json();
+		broadcastModeEnabled = !!d.enabled;
+	  } catch {}
+	}
+
+	async function saveBroadcastModeSetting() {
+	  try {
+		await fetch("/api/broadcast_mode", {
+		  method: "POST",
+		  headers: {"Content-Type": "application/json"},
+		  body: JSON.stringify({ enabled: broadcastModeEnabled })
+		});
+		mostrarOverlay(
+		  broadcastModeEnabled
+			? (tr("settings.broadcast_on") || "Broadcast mode ON")
+			: (tr("settings.broadcast_off") || "Broadcast mode OFF")
+		);
 	  } catch {}
 	}
 

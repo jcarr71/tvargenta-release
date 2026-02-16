@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from werkzeug.utils import secure_filename
 import tempfile
 import shutil
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 import atexit
 import signal
 import time
@@ -34,6 +34,7 @@ from settings import (
     PLAYS_FILE, USER, UPLOAD_STATUS, TMP_DIR, CONFIG_PATH, LOG_DIR, I18N_DIR,
     VCR_STATE_FILE, VCR_TRIGGER_FILE, TAPES_FILE, VCR_RECORDING_STATE_FILE,
     SERIES_FILE, SERIES_VIDEO_DIR, COMMERCIALS_DIR,
+    app_now,
 )
 import re
 import bluetooth_manager
@@ -699,6 +700,18 @@ def load_config():
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {"tags_prioridad": [], "tags_incluidos": []}
+
+
+def get_broadcast_mode_enabled() -> bool:
+    """Global toggle for scheduler-based broadcast playback on series channels."""
+    cfg = load_config()
+    return bool(cfg.get("broadcast_mode_enabled", True))
+
+
+def set_broadcast_mode_enabled(enabled: bool) -> None:
+    cfg = load_config()
+    cfg["broadcast_mode_enabled"] = bool(enabled)
+    _write_json_atomic(CONFIG_FILE, cfg)
     
 # Ruta para ver y gestionar tags
 def load_tags():
@@ -1615,6 +1628,9 @@ def vertele():
 
 @app.route("/api/next_video")
 def api_next_video():
+    force_query = (request.args.get("force", "").lower() in {"1", "true", "yes", "y", "on"})
+    broadcast_mode_enabled = get_broadcast_mode_enabled()
+
     # Safely read the active channel once for the whole request
     activo = _load_canal_activo_data()
     activo_canal_id = activo.get("canal_id")
@@ -1634,10 +1650,16 @@ def api_next_video():
     canales = load_canales()
     if activo_canal_id and activo_canal_id in canales:
         config = canales[activo_canal_id]
-        if config.get("series_filter"):
+        if config.get("series_filter") and broadcast_mode_enabled:
             # This is a broadcast TV channel - use scheduler
             try:
-                scheduled = scheduler.get_scheduled_content(activo_canal_id)
+                # For forced-next requests, jump ahead one programming block
+                # so UI "next" controls can skip scheduled content deterministically.
+                if force_query:
+                    forced_ts = app_now() + timedelta(minutes=31)
+                    scheduled = scheduler.get_scheduled_content(activo_canal_id, timestamp=forced_ts)
+                else:
+                    scheduled = scheduler.get_scheduled_content(activo_canal_id)
                 if scheduled:
                     logger.info(f"[NEXT] Broadcast channel {activo_canal_id}: type={scheduled['type']}, video={scheduled['video_id']}, seek={scheduled.get('seek_to', 0)}")
 
@@ -1668,7 +1690,7 @@ def api_next_video():
     metadata = load_metadata()
 
     global _force_next_once
-    force_next = _force_next_once
+    force_next = _force_next_once or force_query
     _force_next_once = False
 
     # Canal activo + config
@@ -1869,6 +1891,17 @@ def api_next_video():
         "min_gap_minutes": MIN_GAP_MIN,        # debug útil
         "age_seconds": None if edad_s == float('inf') else int(edad_s)
     })
+
+
+@app.route("/api/broadcast_mode", methods=["GET", "POST"])
+def api_broadcast_mode():
+    if request.method == "POST":
+        data = request.get_json(force=True) or {}
+        enabled = bool(data.get("enabled", True))
+        set_broadcast_mode_enabled(enabled)
+        return jsonify({"ok": True, "enabled": enabled})
+
+    return jsonify({"enabled": get_broadcast_mode_enabled()})
 
 
 

@@ -42,6 +42,9 @@
 
   "settings.title": "Configuraciones",
   "settings.show_channel_name": "Mostrar nombre canal",
+  "settings.broadcast_mode": "Modo broadcast",
+  "settings.broadcast_on": "Modo broadcast ACTIVADO",
+  "settings.broadcast_off": "Modo broadcast DESACTIVADO",
   "settings.yes": "Sí",
   "settings.no": "No",
   "settings.timezone": "Zona horaria",

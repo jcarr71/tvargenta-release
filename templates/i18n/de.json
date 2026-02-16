@@ -42,6 +42,9 @@
 
   "settings.title": "Einstellungen",
   "settings.show_channel_name": "Kanalname anzeigen",
+  "settings.broadcast_mode": "Broadcast-Modus",
+  "settings.broadcast_on": "Broadcast-Modus AN",
+  "settings.broadcast_off": "Broadcast-Modus AUS",
   "settings.yes": "Ja",
   "settings.no": "Nein",
   "settings.timezone": "Zeitzone",

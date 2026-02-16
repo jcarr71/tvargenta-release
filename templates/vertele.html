@@ -61,10 +61,22 @@
     <p id="canal-activo" class="text-sm text-gray-400 mt-2"></p>
   </div>
   <div class="flex gap-4 mt-6">
-    <button onclick="loadNextVideo()" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-2 rounded font-bold shadow">
-      {{ tr("vertele.channel.btn_next") }}
-    </button>
     <a href="{{ url_for('index') }}" class="text-blue-400 hover:underline text-sm">{{ tr("vertele.nav.back_home") }}</a>
+  </div>
+
+  <!-- BOTTOM CHANNEL CONTROLS (touch/click friendly) -->
+  <div class="mt-4 w-full sm:w-4/5 md:w-2/3 lg:w-1/2">
+    <div class="grid grid-cols-3 gap-3">
+      <button id="btn-prev-channel" class="bg-gray-800 hover:bg-yellow-700 text-white px-4 py-3 rounded font-bold shadow">
+        ◀ {{ tr("vertele.channel.prev") if tr else "Prev" }}
+      </button>
+      <button id="btn-refresh-video" class="bg-yellow-500 hover:bg-yellow-600 text-black px-4 py-3 rounded font-bold shadow">
+        ⟳ {{ tr("vertele.channel.btn_next") }}
+      </button>
+      <button id="btn-next-channel" class="bg-gray-800 hover:bg-yellow-700 text-white px-4 py-3 rounded font-bold shadow">
+        {{ tr("vertele.channel.next") if tr else "Next" }} ▶
+      </button>
+    </div>
   </div>
 
   <script>
@@ -74,14 +86,51 @@
 	  const infoScore = document.getElementById("info-score");
 	  const canalActivoLabel = document.getElementById("canal-activo");
 	  const canalesGrid = document.getElementById("canales-grid");
+    const btnPrevChannel = document.getElementById("btn-prev-channel");
+    const btnNextChannel = document.getElementById("btn-next-channel");
+    const btnRefreshVideo = document.getElementById("btn-refresh-video");
 
-	  function loadNextVideo() {
-		fetch("/api/next_video")
+    let channelList = []; // [{id, nombre, icono}]
+    let currentChannelId = null;
+    let channelSwitchBusy = false;
+    let currentVideoId = null;
+
+    function sortChannelIds(ids) {
+    return [...ids].sort((a, b) => {
+      const aNum = /^\d+$/.test(a);
+      const bNum = /^\d+$/.test(b);
+
+      if (aNum && bNum) return Number(a) - Number(b);
+      if (aNum && !bNum) return -1;
+      if (!aNum && bNum) return 1;
+      return a.localeCompare(b, undefined, { sensitivity: "base" });
+    });
+    }
+
+    function orderedChannelIds() {
+    // /api/set_canal_activo only accepts channels from canales.json,
+    // so keep cycling limited to user/configured channels here.
+    return sortChannelIds(channelList.map(c => String(c.id || "")).filter(Boolean));
+    }
+
+    function loadNextVideo(retries = 0, force = false) {
+    const url = force ? "/api/next_video?force=1" : "/api/next_video";
+    fetch(url)
 		  .then(res => {
 			if (!res.ok) throw new Error("Error al buscar próximo video");
 			return res.json();
 		  })
 		  .then(data => {
+      currentChannelId = String(data?.modo || currentChannelId || "");
+
+      if (data.cooldown) {
+        // Same behavior as player: retry shortly after cooldown window
+        if (retries < 3) {
+        setTimeout(() => loadNextVideo(retries + 1, force), 650);
+        }
+        return;
+      }
+
 			if (data.no_videos) {
 			  videoEl.src = "";
 			  infoTitle.textContent = "{{ tr('vertele.video.unsupported') }}";
@@ -91,6 +140,7 @@
 			}
 
 			const videoUrl = data.video_url || `/videos/${data.video_id}.mp4`;
+      currentVideoId = data.video_id || null;
 			videoEl.src = videoUrl;
 			videoEl.load();
 			videoEl.volume = 0.5;
@@ -110,49 +160,115 @@
 		  });
 	  }
 
+    async function loadNextVideoFromButton() {
+    try {
+      // Clear pending pick for current item to avoid immediate reuse when possible.
+      if (currentVideoId) {
+      await fetch("/api/played", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ video_id: currentVideoId })
+      });
+      }
+    } catch (e) {
+      console.warn("Could not report current video before next:", e);
+    }
+
+    loadNextVideo(0, true);
+    }
+
 	  videoEl.addEventListener("ended", () => {
 		setTimeout(loadNextVideo, 500);
 	  });
 
 	  loadNextVideo();
 
-    // Cargar grilla de canales
-    fetch("/api/canales")
-      .then(res => {
-        if (!res.ok) throw new Error("{{ tr('vertele.channel.error') }}");
-        return res.json();
-      })
-      .then(data => {
-        if (!data || !data.canales) return;
+    if (btnRefreshVideo) {
+    btnRefreshVideo.addEventListener("click", loadNextVideoFromButton);
+    }
 
-        data.canales.forEach(canal => {
-          if (!canal.id) return;
+    async function loadChannelsGrid() {
+      try {
+      const res = await fetch("/api/canales");
+      if (!res.ok) throw new Error("{{ tr('vertele.channel.error') }}");
+      const data = await res.json();
 
-          const btn = document.createElement("button");
-          btn.textContent = `${canal.icono || "📺"} ${canal.nombre}`;
-          btn.setAttribute("aria-label", `Seleccionar canal ${canal.nombre}`);
-          btn.className = "bg-gray-800 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-bold";
-          btn.onclick = () => setCanalActivo(canal.id);
-          canalesGrid.appendChild(btn);
-        });
+      if (!data || !Array.isArray(data.canales)) return;
+      channelList = data.canales;
+      canalesGrid.innerHTML = "";
 
-        canalActivoLabel.textContent = `📡 Canal actual: ${data.canal_activo_nombre}`;
-      })
-      .catch(err => {
-        console.error("Error al cargar canales:", err);
+      channelList.forEach(canal => {
+        if (!canal.id) return;
+
+        const btn = document.createElement("button");
+        btn.textContent = `${canal.icono || "📺"} ${canal.nombre}`;
+        btn.setAttribute("aria-label", `Seleccionar canal ${canal.nombre}`);
+        btn.className = "bg-gray-800 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-bold";
+        btn.onclick = () => setCanalActivo(canal.id);
+        canalesGrid.appendChild(btn);
       });
 
+      canalActivoLabel.textContent = `📡 Canal actual: ${data.canal_activo_nombre}`;
+      } catch (err) {
+      console.error("Error al cargar canales:", err);
+      }
+    }
+
+    loadChannelsGrid();
+
     function setCanalActivo(id) {
-      fetch("/api/set_canal_activo", {
+      return fetch("/api/set_canal_activo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ canal_id: id })
       })
-        .then(res => res.json())
+        .then(async (res) => {
+		  const data = await res.json();
+		  if (!res.ok || data?.error) {
+			throw new Error(data?.error || "set_canal_activo failed");
+		  }
+		  return data;
+		})
         .then(() => {
-          location.reload();
+      currentChannelId = String(id);
+      loadChannelsGrid();
+      loadNextVideo();
         });
     }
+
+  async function cycleChannel(delta) {
+    if (channelSwitchBusy) return;
+    channelSwitchBusy = true;
+
+    try {
+    if (!channelList.length) {
+      await loadChannelsGrid();
+    }
+
+    const channels = orderedChannelIds();
+    if (!channels.length) return;
+
+    let current = String(currentChannelId || channels[0]);
+    if (current === "3") current = "03";
+
+    let idx = channels.indexOf(current);
+    if (idx < 0) idx = 0;
+
+    const nextId = channels[(idx + (delta > 0 ? 1 : -1) + channels.length) % channels.length];
+    await setCanalActivo(nextId);
+    } catch (e) {
+    console.error("Error cycling channels:", e);
+    } finally {
+    channelSwitchBusy = false;
+    }
+  }
+
+  if (btnPrevChannel) {
+    btnPrevChannel.addEventListener("click", () => cycleChannel(-1));
+  }
+  if (btnNextChannel) {
+    btnNextChannel.addEventListener("click", () => cycleChannel(+1));
+  }
 	
 	(function() {
 	  const sel = document.getElementById('vertele-lang-select');
