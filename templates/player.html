@@ -1082,7 +1082,9 @@
 
 	  ultimaCarga = Date.now();
 
-	  fetch('/api/next_video', { signal: currentFetchController.signal })
+	  const nextVideoUrl = force ? '/api/next_video?force=1' : '/api/next_video';
+
+	  fetch(nextVideoUrl, { signal: currentFetchController.signal })
 		.then(res => res.json())
 		.then(data => {
 		  // Stale response check - ignore if user changed channel while waiting
@@ -2928,6 +2930,12 @@ function ejecutarSeleccion() {
 	  if (lower === "m") {
 		if (menuVisible) ocultarMenu();
 		else mostrarMenu();
+		return;
+	  }
+
+	  // n: next video (force)
+	  if (lower === "n") {
+		cargarSiguienteVideo(true);
 		return;
 	  }
 
